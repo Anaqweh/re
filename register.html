@@ -861,13 +861,10 @@
             <input type="text" id="specialty" name="specialty" required placeholder="مثال: معلم لغة عربية / مدرب / إداري">
           </div>
 
-          <div class="form-group">
-            <label for="course">اختيار الدورة <span class="required">*</span></label>
-            <select id="course" name="course" required>
-              <option value="" disabled selected>— جاري تحميل الدورات —</option>
-            </select>
-            <div class="course-price-box" id="coursePriceBox"></div>
-          </div>
+          <select id="course" name="course" required style="display:none;">
+            <option value="" disabled selected></option>
+          </select>
+          <div id="coursePriceBox" style="display:none;"></div>
 
           <div class="form-group" id="regTypeGroup" style="display:none;">
             <label>نوع التسجيل <span class="required">*</span></label>
@@ -883,9 +880,7 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <div class="reg-type-note" id="regTypeNote">اختر دورة لعرض السعر ونوع التسجيل</div>
-          </div>
+          <div style="display:none;"><div id="regTypeNote"></div></div>
 
           <div class="form-group hidden" id="certificateGroup">
             <label class="main-label" id="certificateGroupTitle">اختيار الشهادات</label>
@@ -1417,8 +1412,8 @@ NOTIFY pgrst, 'reload schema';`;
       }
       if (!window.supabaseClient) {
         console.error('loadCoursesIntoSelect: supabaseClient missing');
-        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-        if (note) note.textContent = 'تعذّر الاتصال بقاعدة البيانات.';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
+        if (note) note.textContent = '';
         return false;
       }
 
@@ -1429,19 +1424,19 @@ NOTIFY pgrst, 'reload schema';`;
           .eq('status', 'active')
           .order('created_at', { ascending: true });
 
-        courseSelect.innerHTML = '<option value="" disabled selected>— اختر الدورة —</option>';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
         coursesById = {};
 
         if (error) {
           console.error('Courses load error:', error);
-          courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+          courseSelect.innerHTML = '<option value="" disabled selected></option>';
           if (note) note.textContent = '';
           return false;
         }
 
         if (!data?.length) {
-          courseSelect.innerHTML = '<option value="" disabled selected>— لا توجد دورات متاحة —</option>';
-          if (note) note.textContent = 'لا توجد دورات متاحة للتسجيل حالياً.';
+          courseSelect.innerHTML = '<option value="" disabled selected></option>';
+          if (note) note.textContent = '';
           return true;
         }
 
@@ -1462,7 +1457,7 @@ NOTIFY pgrst, 'reload schema';`;
           console.warn('course_certificates load failed:', certLoadErr);
         }
 
-        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+        if (note) note.textContent = '';
 
         uniqueCourses.forEach(row => {
           const entry = cacheCourseRow(row, certsByCourse);
@@ -1476,7 +1471,7 @@ NOTIFY pgrst, 'reload schema';`;
       } catch (e) {
         console.error('Courses load error:', e);
         coursesById = {};
-        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
         if (note) note.textContent = '';
         return false;
       }
@@ -1642,7 +1637,7 @@ NOTIFY pgrst, 'reload schema';`;
           box.classList.remove('visible', 'free');
           box.textContent = '';
         }
-        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+        if (note) note.textContent = '';
         submitBtnDefaultText = 'إرسال التسجيل';
         document.getElementById('certificateGroup')?.classList.add('hidden');
         if (submitButton) submitButton.textContent = submitBtnDefaultText;
@@ -1722,10 +1717,6 @@ NOTIFY pgrst, 'reload schema';`;
       nav.querySelectorAll('a').forEach(link => {
         link.addEventListener('click', () => nav.classList.remove('open'));
       });
-    }
-
-    if (courseSelect) {
-      courseSelect.addEventListener('change', () => updateCourseSelectionUI(false));
     }
 
     if (sqlScript) sqlScript.value = SUPABASE_FIX_SQL;
@@ -2092,7 +2083,6 @@ NOTIFY pgrst, 'reload schema';`;
           courseSelect.value = resolvedId;
         } else {
           console.warn('Register init: course from URL not found', { courseId, courseName });
-          showFormError('لم يتم العثور على الدورة في الرابط. يمكنك اختيار دورة من القائمة.');
         }
       }
 
