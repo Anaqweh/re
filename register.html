@@ -1000,19 +1000,22 @@
           }
         };
       }
-      if (!window.InexcCourseLoad) {
-        window.InexcCourseLoad = {
-          dedupeCoursesByName: function (rows) {
-            var seen = new Map();
-            (rows || []).forEach(function (r) {
-              var name = String(r.name || '').trim();
-              if (name && !seen.has(name)) seen.set(name, r);
-            });
-            return Array.from(seen.values());
-          },
-          normalizeCourseFields: function (row) { return row || {}; },
-          EMPTY_INFO_TEXT: 'لم تتم إضافة معلومات بعد'
+      window.InexcCourseLoad = window.InexcCourseLoad || {};
+      if (typeof window.InexcCourseLoad.dedupeCoursesByName !== 'function') {
+        window.InexcCourseLoad.dedupeCoursesByName = function (rows) {
+          var seen = new Map();
+          (rows || []).forEach(function (r) {
+            var name = String(r.name || '').trim();
+            if (name && !seen.has(name)) seen.set(name, r);
+          });
+          return Array.from(seen.values());
         };
+      }
+      if (typeof window.InexcCourseLoad.normalizeCourseFields !== 'function') {
+        window.InexcCourseLoad.normalizeCourseFields = function (row) { return row || {}; };
+      }
+      if (!window.InexcCourseLoad.EMPTY_INFO_TEXT) {
+        window.InexcCourseLoad.EMPTY_INFO_TEXT = 'لم تتم إضافة معلومات بعد';
       }
       if (!window.InexcCertificateSystem) {
         window.InexcCertificateSystem = {
@@ -1151,9 +1154,9 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     function buildRegisterCourseEntry(row, courseCerts) {
-      const normalized = window.InexcCourseLoad
+      const normalized = window.InexcCourseLoad && typeof InexcCourseLoad.normalizeCourseFields === 'function'
         ? InexcCourseLoad.normalizeCourseFields(row)
-        : row;
+        : (row || {});
       const paid = normalized.type === 'paid';
       const price = paid ? (Number(normalized.price) || 0) : 0;
       return {
@@ -1523,7 +1526,7 @@ NOTIFY pgrst, 'reload schema';`;
           return true;
         }
 
-        const uniqueCourses = window.InexcCourseLoad
+        const uniqueCourses = window.InexcCourseLoad && typeof InexcCourseLoad.dedupeCoursesByName === 'function'
           ? InexcCourseLoad.dedupeCoursesByName(data)
           : data;
 

@@ -5877,19 +5877,22 @@
   <script src="js/certificate-system.js"></script>
   <script>
     (function () {
-      if (!window.InexcCourseLoad) {
-        window.InexcCourseLoad = {
-          dedupeCoursesByName: function (rows) {
-            const byName = new Map();
-            (rows || []).forEach(function (row) {
-              var name = String(row && row.name || '').trim();
-              if (name) byName.set(name, row);
-            });
-            return Array.from(byName.values());
-          },
-          normalizeCourseFields: function (row) { return row || {}; },
-          EMPTY_INFO_TEXT: 'لم تتم إضافة معلومات بعد'
+      window.InexcCourseLoad = window.InexcCourseLoad || {};
+      if (typeof window.InexcCourseLoad.dedupeCoursesByName !== 'function') {
+        window.InexcCourseLoad.dedupeCoursesByName = function (rows) {
+          const byName = new Map();
+          (rows || []).forEach(function (row) {
+            var name = String(row && row.name || '').trim();
+            if (name) byName.set(name, row);
+          });
+          return Array.from(byName.values());
         };
+      }
+      if (typeof window.InexcCourseLoad.normalizeCourseFields !== 'function') {
+        window.InexcCourseLoad.normalizeCourseFields = function (row) { return row || {}; };
+      }
+      if (!window.InexcCourseLoad.EMPTY_INFO_TEXT) {
+        window.InexcCourseLoad.EMPTY_INFO_TEXT = 'لم تتم إضافة معلومات بعد';
       }
       if (!window.InexcCourseCertificatesApi) {
         window.InexcCourseCertificatesApi = {
@@ -6229,7 +6232,7 @@
       const matches = coursesCache.filter(c => String(c.name || '').trim() === name);
       if (!matches.length) return null;
       if (matches.length === 1) return matches[0];
-      const deduped = window.InexcCourseLoad
+      const deduped = window.InexcCourseLoad && typeof InexcCourseLoad.dedupeCoursesByName === 'function'
         ? InexcCourseLoad.dedupeCoursesByName(matches)
         : matches;
       return deduped[0] || matches[0];
