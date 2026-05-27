@@ -20,6 +20,10 @@
     return type?.certificate_name || type?.name || type?.label || type?.title || type?.certificate_type || resolveTypeKey(type);
   }
 
+  function hasValue(value) {
+    return value !== undefined && value !== null && String(value).trim() !== '';
+  }
+
   function normalizeCertificateType(row) {
     if (!row) return null;
     const key = resolveTypeKey(row);
@@ -51,21 +55,31 @@
   }
 
   /** تطبيع صف course_certificates — الأعمدة الجديدة فقط */
-  function normalizeCourseCertificate(row) {
+  function normalizeCourseCertificate(row, certificateType) {
     if (!row) return null;
 
     const rowId = row.id || null;
-    const name = String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim() || 'شهادة';
-    const price = Number(row.price ?? row.certificate_price ?? row.price_override) || 0;
+    const typeKey = resolveTypeKey(certificateType);
+    const name = String(row.certificate_name || row.name || row.label || resolveTypeName(certificateType) || row.certificate_type || '').trim() || 'شهادة';
+    const priceSource = hasValue(row.price)
+      ? row.price
+      : (hasValue(row.certificate_price)
+        ? row.certificate_price
+        : (hasValue(row.price_override)
+          ? row.price_override
+          : (certificateType?.price ?? certificateType?.default_price)));
+    const price = Number(priceSource) || 0;
 
     return {
       id: rowId,
       course_id: row.course_id || null,
       key: rowId ? String(rowId) : '',
+      certificate_type_id: row.certificate_type_id || certificateType?.id || null,
+      certificate_type: row.certificate_type || typeKey || '',
       certificate_name: name,
       name,
-      issuer_name: String(row.issuer_name || '').trim(),
-      description: String(row.description || row.short_description || '').trim(),
+      issuer_name: String(row.issuer_name || certificateType?.issuer_name || '').trim(),
+      description: String(row.description || row.short_description || certificateType?.description || certificateType?.short_description || '').trim(),
       price,
       is_enabled: row.is_enabled != null
         ? asBool(row.is_enabled, false)
@@ -110,7 +124,7 @@
   }
 
   function getSelectableForFreeCourse(certs) {
-    return getVisibleForStudent(certs).filter(isOptionalPurchase);
+    return getVisibleForStudent(certs);
   }
 
   function getIncludedForPaidCourse(certs) {

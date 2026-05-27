@@ -5872,6 +5872,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
+  <script src="js/course-load-utils.js"></script>
+  <script src="js/course-certificates-api.js"></script>
+  <script src="js/certificate-system.js"></script>
   <script>
     (function () {
       if (!window.InexcCourseLoad) {
@@ -5893,6 +5896,8 @@
           buildCourseCertRecord: function (cert, courseId) {
             return {
               course_id: courseId,
+              certificate_type_id: cert.certificate_type_id || null,
+              certificate_type: cert.certificate_type || cert.key || '',
               certificate_name: String(cert.certificate_name || '').trim(),
               issuer_name: String(cert.issuer_name || '').trim(),
               description: String(cert.description || '').trim(),
@@ -5928,7 +5933,17 @@
               return data?.id;
             }
           },
-          normalizeCourseCertificateRow: function (row) { return row; }
+          normalizeCourseCertificateRow: function (row) {
+            return row ? {
+              ...row,
+              certificate_type_id: row.certificate_type_id || null,
+              certificate_type: row.certificate_type || '',
+              certificate_name: String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim(),
+              issuer_name: String(row.issuer_name || '').trim(),
+              description: String(row.description || row.short_description || '').trim(),
+              price: Number(row.price ?? row.certificate_price ?? row.price_override) || 0
+            } : row;
+          }
         };
       }
       window.loadOptionalScript = function (src) {
@@ -9334,12 +9349,45 @@
       }));
     }
 
+    function getCertificateTypeByToken(token) {
+      const value = String(token || '').trim();
+      if (!value) return null;
+      return getAllCertificateTypesForAdmin().find(type =>
+        String(type.id || '') === value || String(type.key || '') === value
+      ) || null;
+    }
+
+    function getCourseCertSelectedTypeToken(cert) {
+      return String(cert?.certificate_type_id || cert?.certificate_type || '');
+    }
+
+    function applyCertificateTypeToCert(cert, type, overwrite) {
+      if (!cert || !type) return cert;
+      cert.certificate_type_id = type.id || null;
+      cert.certificate_type = type.key || '';
+      if (overwrite || !String(cert.certificate_name || '').trim()) {
+        cert.certificate_name = type.name || '';
+      }
+      if (overwrite || !String(cert.issuer_name || '').trim()) {
+        cert.issuer_name = type.issuer_name || '';
+      }
+      if (overwrite || !String(cert.description || '').trim()) {
+        cert.description = type.description || type.subtitle || '';
+      }
+      if (overwrite || Number(cert.price) === 0) {
+        cert.price = Number(type.price) || 0;
+      }
+      return cert;
+    }
+
     let currentCourseCerts = [];
 
     function createEmptyCourseCert() {
       return {
         id: null,
         localId: 'new_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        certificate_type_id: null,
+        certificate_type: '',
         certificate_name: '',
         issuer_name: '',
         description: '',
@@ -9363,6 +9411,8 @@
       return {
         id: normalized?.id || row?.id || null,
         localId: (normalized?.id || row?.id) ? String(normalized?.id || row?.id) : getCourseCertRowToken(row),
+        certificate_type_id: normalized?.certificate_type_id || row?.certificate_type_id || null,
+        certificate_type: normalized?.certificate_type || row?.certificate_type || '',
         certificate_name: normalized?.certificate_name || row?.certificate_name || '',
         issuer_name: normalized?.issuer_name || row?.issuer_name || '',
         description: normalized?.description || row?.description || '',
@@ -9379,6 +9429,10 @@
       const cert = currentCourseCerts.find(c => getCourseCertRowToken(c) === token);
       if (!cert) return null;
 
+      const typeToken = card.querySelector('[data-field="certificate_type_id"]')?.value || '';
+      const type = getCertificateTypeByToken(typeToken);
+      cert.certificate_type_id = type?.id || null;
+      cert.certificate_type = type?.key || '';
       cert.certificate_name = card.querySelector('[data-field="certificate_name"]')?.value?.trim() || '';
       cert.issuer_name = card.querySelector('[data-field="issuer_name"]')?.value?.trim() || '';
       cert.description = card.querySelector('[data-field="description"]')?.value?.trim() || '';
@@ -9394,7 +9448,7 @@
       if (!certificatesList) return [...currentCourseCerts];
       certificatesList.querySelectorAll('.course-cert-card').forEach(card => syncCourseCertFromCard(card));
       return currentCourseCerts
-        .filter(c => (c.certificate_name || '').trim())
+        .filter(c => (c.certificate_name || '').trim() || c.certificate_type_id || c.certificate_type)
         .map(c => ({ ...c }));
     }
 
@@ -9414,6 +9468,23 @@
       certificatesList.innerHTML = currentCourseCerts.map((cert, index) => {
         const token = escapeHtml(getCourseCertRowToken(cert));
         const inactiveClass = cert.is_enabled ? '' : ' cert-row-inactive';
+        const selectedTypeToken = getCourseCertSelectedTypeToken(cert);
+        const typeOptions = getActiveCertificateTypes();
+        const typeSelect = `
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>نوع الشهادة من قائمة الشهادات</label>
+            <select data-field="certificate_type_id">
+              <option value="">— شهادة مخصصة / اكتب الاسم يدويًا —</option>
+              ${typeOptions.map(type => {
+                const value = escapeHtml(String(type.id || type.key || ''));
+                const selected = selectedTypeToken && (String(type.id || '') === selectedTypeToken || String(type.key || '') === selectedTypeToken)
+                  ? 'selected'
+                  : '';
+                return `<option value="${value}" ${selected}>${escapeHtml(type.name || type.key || '')}</option>`;
+              }).join('')}
+            </select>
+            <small style="display:block;color:var(--text-muted);margin-top:6px;">اختيار النوع يملأ الاسم والجهة والوصف والسعر، ويمكن تعديلها لهذه الدورة فقط.</small>
+          </div>`;
         return `
           <div class="course-cert-card${inactiveClass}" data-cert-token="${token}">
             <div class="course-cert-card-head">
@@ -9421,6 +9492,7 @@
               <button type="button" class="btn-cert-action btn-cert-delete" data-remove-cert="${token}">حذف</button>
             </div>
             <div class="course-cert-fields">
+              ${typeSelect}
               <div class="form-group">
                 <label>اسم الشهادة</label>
                 <input type="text" data-field="certificate_name" value="${escapeHtml(cert.certificate_name || '')}" placeholder="مثال: شهادة حضور" required>
@@ -9448,6 +9520,14 @@
       }).join('');
 
       certificatesList.querySelectorAll('.course-cert-card').forEach(card => {
+        card.querySelector('[data-field="certificate_type_id"]')?.addEventListener('change', (event) => {
+          const cert = syncCourseCertFromCard(card);
+          const type = getCertificateTypeByToken(event.target.value);
+          if (cert && type) {
+            applyCertificateTypeToCert(cert, type, true);
+          }
+          renderCourseCertificatesEditor(currentCourseCerts);
+        });
         card.querySelectorAll('input, textarea').forEach(input => {
           input.addEventListener('input', () => syncCourseCertFromCard(card));
           input.addEventListener('change', () => {
@@ -9470,6 +9550,8 @@
       }
       return {
         course_id: courseId,
+        certificate_type_id: cert.certificate_type_id || null,
+        certificate_type: cert.certificate_type || '',
         certificate_name: String(cert.certificate_name || '').trim(),
         issuer_name: String(cert.issuer_name || '').trim(),
         description: String(cert.description || '').trim(),

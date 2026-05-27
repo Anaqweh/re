@@ -13,19 +13,41 @@
     return fallback;
   }
 
-  function normalizeCourseCertificateRow(row) {
+  function hasValue(value) {
+    return value !== undefined && value !== null && String(value).trim() !== '';
+  }
+
+  function resolveTypeKey(type) {
+    return type?.key || type?.type_key || type?.certificate_type || type?.code || '';
+  }
+
+  function resolveTypeName(type) {
+    return type?.certificate_name || type?.name || type?.label || type?.title || type?.certificate_type || resolveTypeKey(type);
+  }
+
+  function normalizeCourseCertificateRow(row, certificateType) {
     if (!row) return null;
     const rowId = row.id || null;
-    const name = String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim();
+    const typeKey = resolveTypeKey(certificateType);
+    const name = String(row.certificate_name || row.name || row.label || resolveTypeName(certificateType) || row.certificate_type || '').trim();
+    const priceSource = hasValue(row.price)
+      ? row.price
+      : (hasValue(row.certificate_price)
+        ? row.certificate_price
+        : (hasValue(row.price_override)
+          ? row.price_override
+          : (certificateType?.price ?? certificateType?.default_price)));
     return {
       id: rowId,
       course_id: row.course_id || null,
       key: rowId ? String(rowId) : '',
+      certificate_type_id: row.certificate_type_id || certificateType?.id || null,
+      certificate_type: row.certificate_type || typeKey || '',
       certificate_name: name,
       name,
-      issuer_name: String(row.issuer_name || '').trim(),
-      description: String(row.description || row.short_description || '').trim(),
-      price: Number(row.price ?? row.certificate_price ?? row.price_override) || 0,
+      issuer_name: String(row.issuer_name || certificateType?.issuer_name || '').trim(),
+      description: String(row.description || row.short_description || certificateType?.description || certificateType?.short_description || '').trim(),
+      price: Number(priceSource) || 0,
       is_enabled: row.is_enabled != null
         ? asBool(row.is_enabled, false)
         : (!row.status || row.status === 'active'),
@@ -54,6 +76,8 @@
   function buildCourseCertRecord(cert, courseId) {
     return {
       course_id: courseId,
+      certificate_type_id: cert.certificate_type_id || null,
+      certificate_type: cert.certificate_type || cert.key || '',
       certificate_name: String(cert.certificate_name || '').trim(),
       issuer_name: String(cert.issuer_name || '').trim(),
       description: String(cert.description || '').trim(),
@@ -63,6 +87,59 @@
       included_in_course: !!cert.included_in_course,
       is_optional_purchase: !!cert.is_optional_purchase
     };
+  }
+
+  function getMissingColumn(error) {
+    const msg = error?.message || '';
+    const match = msg.match(/Could not find the '([^']+)' column/i);
+    if (match) return match[1];
+    const lower = msg.toLowerCase();
+    return [
+      'certificate_type_id',
+      'certificate_type',
+      'certificate_name',
+      'issuer_name',
+      'description',
+      'price',
+      'is_enabled',
+      'show_to_student',
+      'included_in_course',
+      'is_optional_purchase'
+    ].find(col => lower.includes(col) && (lower.includes('column') || lower.includes('schema cache'))) || null;
+  }
+
+  function mapTypesByKey(types) {
+    const map = {};
+    (types || []).forEach(type => {
+      if (!type) return;
+      if (type.id) map[String(type.id)] = type;
+      const key = resolveTypeKey(type);
+      if (key) map[String(key)] = type;
+      const name = resolveTypeName(type);
+      if (name) map[String(name).trim()] = type;
+    });
+    return map;
+  }
+
+  async function loadCertificateTypesForRows(client, rows) {
+    const needsTypes = (rows || []).some(row => row?.certificate_type_id || row?.certificate_type);
+    if (!needsTypes) return {};
+
+    try {
+      const ids = [...new Set((rows || []).map(row => row?.certificate_type_id).filter(Boolean).map(String))];
+      const hasKeyOnlyRows = (rows || []).some(row => row?.certificate_type && !row?.certificate_type_id);
+      let query = client.from('certificate_types').select('*');
+      if (ids.length && !hasKeyOnlyRows) query = query.in('id', ids);
+      const { data, error } = await query;
+      if (error) {
+        console.warn('certificate_types lookup failed:', error.message || error);
+        return {};
+      }
+      return mapTypesByKey(data || []);
+    } catch (err) {
+      console.warn('certificate_types lookup exception:', err);
+      return {};
+    }
   }
 
   async function fetchCourseCertificates(client, options) {
@@ -83,7 +160,13 @@
         return { data: [], error };
       }
 
-      const mapped = (data || []).map(normalizeCourseCertificateRow).filter(Boolean);
+      const typeMap = await loadCertificateTypesForRows(client, data || []);
+      const mapped = (data || []).map(row => {
+        const type = typeMap[String(row.certificate_type_id || '')]
+          || typeMap[String(row.certificate_type || '')]
+          || null;
+        return normalizeCourseCertificateRow(row, type);
+      }).filter(Boolean);
       return { data: dedupeCourseCertificates(mapped), error: null };
     } catch (err) {
       console.error('fetchCourseCertificates exception:', err);
@@ -94,24 +177,38 @@
   async function saveCourseCertificateRecord(client, record, certId) {
     if (!client) throw new Error('supabaseClient missing');
 
-    if (certId) {
-      const { data, error } = await client
-        .from('course_certificates')
-        .update(record)
-        .eq('id', certId)
-        .select('id')
-        .single();
-      if (error) throw error;
-      return data?.id || certId;
+    let payload = { ...record };
+    const maxAttempts = Object.keys(payload).length + 2;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let result;
+      if (certId) {
+        result = await client
+          .from('course_certificates')
+          .update(payload)
+          .eq('id', certId)
+          .select('id')
+          .single();
+      } else {
+        result = await client
+          .from('course_certificates')
+          .insert([payload])
+          .select('id')
+          .single();
+      }
+
+      if (!result.error) return result.data?.id || certId || null;
+
+      const missingColumn = getMissingColumn(result.error);
+      if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+        delete payload[missingColumn];
+        continue;
+      }
+
+      throw result.error;
     }
 
-    const { data, error } = await client
-      .from('course_certificates')
-      .insert([record])
-      .select('id')
-      .single();
-    if (error) throw error;
-    return data?.id || null;
+    throw new Error('تعذّر حفظ شهادة الدورة — تحقق من أعمدة جدول course_certificates');
   }
 
   global.InexcCourseCertificatesApi = {

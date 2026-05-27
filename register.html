@@ -944,6 +944,8 @@
             id: row.id || null,
             course_id: row.course_id || null,
             key: row.id ? String(row.id) : '',
+            certificate_type_id: row.certificate_type_id || null,
+            certificate_type: row.certificate_type || '',
             certificate_name: name,
             name: name,
             issuer_name: String(row.issuer_name || '').trim(),
@@ -976,6 +978,8 @@
           buildCourseCertRecord: function (cert, courseId) {
             return {
               course_id: courseId,
+              certificate_type_id: cert.certificate_type_id || null,
+              certificate_type: cert.certificate_type || cert.key || '',
               certificate_name: String(cert.certificate_name || '').trim(),
               issuer_name: String(cert.issuer_name || '').trim(),
               description: String(cert.description || '').trim(),
@@ -1014,7 +1018,7 @@
             });
           },
           getSelectableForFreeCourse: function (certs) {
-            return this.getVisibleForStudent(certs).filter(function (c) { return c.is_optional_purchase !== false; });
+            return this.getVisibleForStudent(certs);
           },
           getIncludedForPaidCourse: function (certs) {
             return this.getVisibleForStudent(certs).filter(function (c) { return !!c.included_in_course; });
@@ -1265,9 +1269,7 @@ NOTIFY pgrst, 'reload schema';`;
 
     function getVisibleCertificates(courseCertificates, isPaidCourseSelected) {
       const courseList = courseCertificates || [];
-      const configured = getConfiguredCourseCertificates(courseList);
-      if (configured.length || courseList.length) return configured;
-      return buildCertificateTypeCourseOptions(!!isPaidCourseSelected);
+      return getConfiguredCourseCertificates(courseList);
     }
 
     function renderCertificateOptionsForCourse(courseCertificates, preserveSelection, isPaidCourseSelected) {
@@ -1681,21 +1683,15 @@ NOTIFY pgrst, 'reload schema';`;
     function getSelectableCertificates(courseCertificates) {
       const courseList = courseCertificates || [];
       if (window.InexcCertificateSystem) {
-        const selectable = InexcCertificateSystem.getSelectableForFreeCourse(courseList);
-        if (selectable.length || courseList.length) return selectable;
-        return buildCertificateTypeCourseOptions(false);
+        return InexcCertificateSystem.getSelectableForFreeCourse(courseList);
       }
-      const configured = getConfiguredCourseCertificates(courseList);
-      if (configured.length || courseList.length) return configured;
-      return buildCertificateTypeCourseOptions(false);
+      return getConfiguredCourseCertificates(courseList);
     }
 
     function getIncludedCertificates(courseCertificates) {
       const courseList = courseCertificates || [];
       if (window.InexcCertificateSystem) {
-        const included = InexcCertificateSystem.getIncludedForPaidCourse(courseList);
-        if (included.length || courseList.length) return included;
-        return buildCertificateTypeCourseOptions(true);
+        return InexcCertificateSystem.getIncludedForPaidCourse(courseList);
       }
       return getVisibleCertificates(courseList, true);
     }
