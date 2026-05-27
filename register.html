@@ -861,7 +861,7 @@
             <input type="text" id="specialty" name="specialty" required placeholder="مثال: معلم لغة عربية / مدرب / إداري">
           </div>
 
-          <div class="form-group">
+          <div class="form-group hidden" id="coursePickerGroup">
             <label for="course">اختيار الدورة <span class="required">*</span></label>
             <select id="course" name="course" required>
               <option value="" disabled selected>— جاري تحميل الدورات —</option>
@@ -883,7 +883,7 @@
             </div>
           </div>
 
-          <div class="form-group">
+          <div class="form-group hidden" id="regTypeNoteGroup">
             <div class="reg-type-note" id="regTypeNote">اختر دورة لعرض السعر ونوع التسجيل</div>
           </div>
 
@@ -1725,7 +1725,15 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     if (courseSelect) {
-      courseSelect.addEventListener('change', () => updateCourseSelectionUI(false));
+      courseSelect.addEventListener('change', () => {
+        hideFormError();
+        updateCourseSelectionUI(false);
+      });
+    }
+
+    function setCoursePickerVisible(visible) {
+      document.getElementById('coursePickerGroup')?.classList.toggle('hidden', !visible);
+      document.getElementById('regTypeNoteGroup')?.classList.toggle('hidden', !visible);
     }
 
     if (sqlScript) sqlScript.value = SUPABASE_FIX_SQL;
@@ -2091,10 +2099,14 @@ NOTIFY pgrst, 'reload schema';`;
         const resolvedId = await resolveCourseFromUrl();
         if (resolvedId && courseSelect) {
           courseSelect.value = resolvedId;
+          setCoursePickerVisible(false);
         } else {
           console.warn('Register init: course from URL not found', { courseId, courseName });
           showFormError('لم يتم العثور على الدورة في الرابط. يمكنك اختيار دورة من القائمة.');
+          setCoursePickerVisible(true);
         }
+      } else {
+        setCoursePickerVisible(true);
       }
 
       try {
