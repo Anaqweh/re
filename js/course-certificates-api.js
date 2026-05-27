@@ -73,19 +73,28 @@
       .filter(c => c.is_enabled && c.show_to_student);
   }
 
-  function buildCourseCertRecord(cert, courseId) {
+  function buildCourseCertRecord(cert, courseId, courseName) {
+    const name = String(cert.certificate_name || cert.name || cert.label || '').trim();
+    const type = cert.certificate_type || cert.key || name || 'certificate';
+    const price = Number(cert.price ?? cert.certificate_price) || 0;
     return {
       course_id: courseId,
+      course_name: String(courseName || cert.course_name || '').trim(),
       certificate_type_id: cert.certificate_type_id || null,
-      certificate_type: cert.certificate_type || cert.key || '',
-      certificate_name: String(cert.certificate_name || '').trim(),
+      certificate_type: type,
+      certificate_name: name,
       issuer_name: String(cert.issuer_name || '').trim(),
       description: String(cert.description || '').trim(),
-      price: Number(cert.price) || 0,
+      price,
+      certificate_price: price,
+      price_override: price > 0 ? price : null,
       is_enabled: !!cert.is_enabled,
       show_to_student: !!cert.show_to_student,
       included_in_course: !!cert.included_in_course,
-      is_optional_purchase: !!cert.is_optional_purchase
+      included_in_paid_course: !!cert.included_in_course,
+      is_optional_purchase: !!cert.is_optional_purchase,
+      allow_purchase_in_free_course: !!cert.is_optional_purchase,
+      status: cert.is_enabled === false ? 'inactive' : 'active'
     };
   }
 
@@ -97,14 +106,21 @@
     return [
       'certificate_type_id',
       'certificate_type',
+      'course_id',
+      'course_name',
       'certificate_name',
       'issuer_name',
       'description',
       'price',
+      'certificate_price',
+      'price_override',
       'is_enabled',
       'show_to_student',
       'included_in_course',
-      'is_optional_purchase'
+      'included_in_paid_course',
+      'is_optional_purchase',
+      'allow_purchase_in_free_course',
+      'status'
     ].find(col => lower.includes(col) && (lower.includes('column') || lower.includes('schema cache'))) || null;
   }
 
