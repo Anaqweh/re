@@ -4,8 +4,7 @@
 (function (global) {
   'use strict';
 
-  const CERT_COLUMNS =
-    'id, course_id, certificate_name, issuer_name, description, price, is_enabled, show_to_student, included_in_course, is_optional_purchase';
+  const CERT_COLUMNS = '*';
 
   function asBool(value, fallback) {
     if (value === true || value === false) return value;
@@ -17,19 +16,22 @@
   function normalizeCourseCertificateRow(row) {
     if (!row) return null;
     const rowId = row.id || null;
+    const name = String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim();
     return {
       id: rowId,
       course_id: row.course_id || null,
       key: rowId ? String(rowId) : '',
-      certificate_name: String(row.certificate_name || '').trim(),
-      name: String(row.certificate_name || '').trim(),
+      certificate_name: name,
+      name,
       issuer_name: String(row.issuer_name || '').trim(),
-      description: String(row.description || '').trim(),
-      price: Number(row.price) || 0,
-      is_enabled: asBool(row.is_enabled, false),
+      description: String(row.description || row.short_description || '').trim(),
+      price: Number(row.price ?? row.certificate_price ?? row.price_override) || 0,
+      is_enabled: row.is_enabled != null
+        ? asBool(row.is_enabled, false)
+        : (!row.status || row.status === 'active'),
       show_to_student: asBool(row.show_to_student, true),
-      included_in_course: asBool(row.included_in_course, false),
-      is_optional_purchase: asBool(row.is_optional_purchase, false)
+      included_in_course: asBool(row.included_in_course ?? row.included_in_paid_course, false),
+      is_optional_purchase: asBool(row.is_optional_purchase ?? row.allow_purchase_in_free_course, true)
     };
   }
 

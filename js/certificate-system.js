@@ -55,8 +55,8 @@
     if (!row) return null;
 
     const rowId = row.id || null;
-    const name = String(row.certificate_name || '').trim() || 'شهادة';
-    const price = Number(row.price) || 0;
+    const name = String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim() || 'شهادة';
+    const price = Number(row.price ?? row.certificate_price ?? row.price_override) || 0;
 
     return {
       id: rowId,
@@ -65,12 +65,14 @@
       certificate_name: name,
       name,
       issuer_name: String(row.issuer_name || '').trim(),
-      description: String(row.description || '').trim(),
+      description: String(row.description || row.short_description || '').trim(),
       price,
-      is_enabled: asBool(row.is_enabled, false),
+      is_enabled: row.is_enabled != null
+        ? asBool(row.is_enabled, false)
+        : (!row.status || row.status === 'active'),
       show_to_student: asBool(row.show_to_student, true),
-      included_in_course: asBool(row.included_in_course, false),
-      is_optional_purchase: asBool(row.is_optional_purchase, false)
+      included_in_course: asBool(row.included_in_course ?? row.included_in_paid_course, false),
+      is_optional_purchase: asBool(row.is_optional_purchase ?? row.allow_purchase_in_free_course, true)
     };
   }
 
