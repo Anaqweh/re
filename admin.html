@@ -5872,35 +5872,51 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
+  <script src="js/course-load-utils.js"></script>
+  <script src="js/course-certificates-api.js"></script>
+  <script src="js/certificate-system.js"></script>
   <script>
     (function () {
-      if (!window.InexcCourseLoad) {
-        window.InexcCourseLoad = {
-          dedupeCoursesByName: function (rows) {
-            const byName = new Map();
-            (rows || []).forEach(function (row) {
-              var name = String(row && row.name || '').trim();
-              if (name) byName.set(name, row);
-            });
-            return Array.from(byName.values());
-          },
-          normalizeCourseFields: function (row) { return row || {}; },
-          EMPTY_INFO_TEXT: 'لم تتم إضافة معلومات بعد'
+      window.InexcCourseLoad = window.InexcCourseLoad || {};
+      if (typeof window.InexcCourseLoad.dedupeCoursesByName !== 'function') {
+        window.InexcCourseLoad.dedupeCoursesByName = function (rows) {
+          const byName = new Map();
+          (rows || []).forEach(function (row) {
+            var name = String(row && row.name || '').trim();
+            if (name) byName.set(name, row);
+          });
+          return Array.from(byName.values());
         };
+      }
+      if (typeof window.InexcCourseLoad.normalizeCourseFields !== 'function') {
+        window.InexcCourseLoad.normalizeCourseFields = function (row) { return row || {}; };
+      }
+      if (!window.InexcCourseLoad.EMPTY_INFO_TEXT) {
+        window.InexcCourseLoad.EMPTY_INFO_TEXT = 'لم تتم إضافة معلومات بعد';
       }
       if (!window.InexcCourseCertificatesApi) {
         window.InexcCourseCertificatesApi = {
-          buildCourseCertRecord: function (cert, courseId) {
+          buildCourseCertRecord: function (cert, courseId, courseName) {
+            const certName = String(cert.certificate_name || cert.name || cert.label || '').trim();
+            const price = Number(cert.price ?? cert.certificate_price) || 0;
             return {
               course_id: courseId,
-              certificate_name: String(cert.certificate_name || '').trim(),
+              course_name: String(courseName || cert.course_name || '').trim(),
+              certificate_type_id: cert.certificate_type_id || null,
+              certificate_type: cert.certificate_type || cert.key || certName || 'certificate',
+              certificate_name: certName,
               issuer_name: String(cert.issuer_name || '').trim(),
               description: String(cert.description || '').trim(),
-              price: Number(cert.price) || 0,
+              price,
+              certificate_price: price,
+              price_override: price > 0 ? price : null,
               is_enabled: !!cert.is_enabled,
               show_to_student: !!cert.show_to_student,
               included_in_course: !!cert.included_in_course,
-              is_optional_purchase: !!cert.is_optional_purchase
+              included_in_paid_course: !!cert.included_in_course,
+              is_optional_purchase: !!cert.is_optional_purchase,
+              allow_purchase_in_free_course: !!cert.is_optional_purchase,
+              status: cert.is_enabled === false ? 'inactive' : 'active'
             };
           },
           fetchCourseCertificates: async function (client, opts) {
@@ -5918,17 +5934,45 @@
             }
           },
           saveCourseCertificateRecord: async function (client, record, existingId) {
-            if (existingId) {
-              const { error } = await client.from('course_certificates').update(record).eq('id', existingId);
-              if (error) throw error;
-              return existingId;
-            } else {
-              const { data, error } = await client.from('course_certificates').insert([record]).select('id').single();
-              if (error) throw error;
-              return data?.id;
+            const missingColumn = function (error) {
+              const msg = error?.message || '';
+              const match = msg.match(/Could not find the '([^']+)' column/i);
+              if (match) return match[1];
+              const lower = msg.toLowerCase();
+              return [
+                'certificate_type_id', 'certificate_type', 'course_id', 'course_name', 'certificate_name',
+                'issuer_name', 'description', 'price', 'certificate_price', 'price_override',
+                'is_enabled', 'show_to_student', 'included_in_course', 'included_in_paid_course',
+                'is_optional_purchase', 'allow_purchase_in_free_course', 'status'
+              ].find(col => lower.includes(col) && (lower.includes('column') || lower.includes('schema cache'))) || null;
+            };
+            let payload = { ...record };
+            const maxAttempts = Object.keys(payload).length + 2;
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+              const result = existingId
+                ? await client.from('course_certificates').update(payload).eq('id', existingId).select('id').single()
+                : await client.from('course_certificates').insert([payload]).select('id').single();
+              if (!result.error) return result.data?.id || existingId;
+              const col = missingColumn(result.error);
+              if (col && Object.prototype.hasOwnProperty.call(payload, col)) {
+                delete payload[col];
+                continue;
+              }
+              throw result.error;
             }
+            throw new Error('تعذّر حفظ شهادة الدورة — تحقق من أعمدة جدول course_certificates');
           },
-          normalizeCourseCertificateRow: function (row) { return row; }
+          normalizeCourseCertificateRow: function (row) {
+            return row ? {
+              ...row,
+              certificate_type_id: row.certificate_type_id || null,
+              certificate_type: row.certificate_type || '',
+              certificate_name: String(row.certificate_name || row.name || row.label || row.certificate_type || '').trim(),
+              issuer_name: String(row.issuer_name || '').trim(),
+              description: String(row.description || row.short_description || '').trim(),
+              price: Number(row.price ?? row.certificate_price ?? row.price_override) || 0
+            } : row;
+          }
         };
       }
       window.loadOptionalScript = function (src) {
@@ -6188,7 +6232,7 @@
       const matches = coursesCache.filter(c => String(c.name || '').trim() === name);
       if (!matches.length) return null;
       if (matches.length === 1) return matches[0];
-      const deduped = window.InexcCourseLoad
+      const deduped = window.InexcCourseLoad && typeof InexcCourseLoad.dedupeCoursesByName === 'function'
         ? InexcCourseLoad.dedupeCoursesByName(matches)
         : matches;
       return deduped[0] || matches[0];
@@ -9334,12 +9378,45 @@
       }));
     }
 
+    function getCertificateTypeByToken(token) {
+      const value = String(token || '').trim();
+      if (!value) return null;
+      return getAllCertificateTypesForAdmin().find(type =>
+        String(type.id || '') === value || String(type.key || '') === value
+      ) || null;
+    }
+
+    function getCourseCertSelectedTypeToken(cert) {
+      return String(cert?.certificate_type_id || cert?.certificate_type || '');
+    }
+
+    function applyCertificateTypeToCert(cert, type, overwrite) {
+      if (!cert || !type) return cert;
+      cert.certificate_type_id = type.id || null;
+      cert.certificate_type = type.key || '';
+      if (overwrite || !String(cert.certificate_name || '').trim()) {
+        cert.certificate_name = type.name || '';
+      }
+      if (overwrite || !String(cert.issuer_name || '').trim()) {
+        cert.issuer_name = type.issuer_name || '';
+      }
+      if (overwrite || !String(cert.description || '').trim()) {
+        cert.description = type.description || type.subtitle || '';
+      }
+      if (overwrite || Number(cert.price) === 0) {
+        cert.price = Number(type.price) || 0;
+      }
+      return cert;
+    }
+
     let currentCourseCerts = [];
 
     function createEmptyCourseCert() {
       return {
         id: null,
         localId: 'new_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        certificate_type_id: null,
+        certificate_type: '',
         certificate_name: '',
         issuer_name: '',
         description: '',
@@ -9363,6 +9440,8 @@
       return {
         id: normalized?.id || row?.id || null,
         localId: (normalized?.id || row?.id) ? String(normalized?.id || row?.id) : getCourseCertRowToken(row),
+        certificate_type_id: normalized?.certificate_type_id || row?.certificate_type_id || null,
+        certificate_type: normalized?.certificate_type || row?.certificate_type || '',
         certificate_name: normalized?.certificate_name || row?.certificate_name || '',
         issuer_name: normalized?.issuer_name || row?.issuer_name || '',
         description: normalized?.description || row?.description || '',
@@ -9379,6 +9458,10 @@
       const cert = currentCourseCerts.find(c => getCourseCertRowToken(c) === token);
       if (!cert) return null;
 
+      const typeToken = card.querySelector('[data-field="certificate_type_id"]')?.value || '';
+      const type = getCertificateTypeByToken(typeToken);
+      cert.certificate_type_id = type?.id || null;
+      cert.certificate_type = type?.key || '';
       cert.certificate_name = card.querySelector('[data-field="certificate_name"]')?.value?.trim() || '';
       cert.issuer_name = card.querySelector('[data-field="issuer_name"]')?.value?.trim() || '';
       cert.description = card.querySelector('[data-field="description"]')?.value?.trim() || '';
@@ -9394,7 +9477,7 @@
       if (!certificatesList) return [...currentCourseCerts];
       certificatesList.querySelectorAll('.course-cert-card').forEach(card => syncCourseCertFromCard(card));
       return currentCourseCerts
-        .filter(c => (c.certificate_name || '').trim())
+        .filter(c => (c.certificate_name || '').trim() || c.certificate_type_id || c.certificate_type)
         .map(c => ({ ...c }));
     }
 
@@ -9414,6 +9497,23 @@
       certificatesList.innerHTML = currentCourseCerts.map((cert, index) => {
         const token = escapeHtml(getCourseCertRowToken(cert));
         const inactiveClass = cert.is_enabled ? '' : ' cert-row-inactive';
+        const selectedTypeToken = getCourseCertSelectedTypeToken(cert);
+        const typeOptions = getActiveCertificateTypes();
+        const typeSelect = `
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>نوع الشهادة من قائمة الشهادات</label>
+            <select data-field="certificate_type_id">
+              <option value="">— شهادة مخصصة / اكتب الاسم يدويًا —</option>
+              ${typeOptions.map(type => {
+                const value = escapeHtml(String(type.id || type.key || ''));
+                const selected = selectedTypeToken && (String(type.id || '') === selectedTypeToken || String(type.key || '') === selectedTypeToken)
+                  ? 'selected'
+                  : '';
+                return `<option value="${value}" ${selected}>${escapeHtml(type.name || type.key || '')}</option>`;
+              }).join('')}
+            </select>
+            <small style="display:block;color:var(--text-muted);margin-top:6px;">اختيار النوع يملأ الاسم والجهة والوصف والسعر، ويمكن تعديلها لهذه الدورة فقط.</small>
+          </div>`;
         return `
           <div class="course-cert-card${inactiveClass}" data-cert-token="${token}">
             <div class="course-cert-card-head">
@@ -9421,6 +9521,7 @@
               <button type="button" class="btn-cert-action btn-cert-delete" data-remove-cert="${token}">حذف</button>
             </div>
             <div class="course-cert-fields">
+              ${typeSelect}
               <div class="form-group">
                 <label>اسم الشهادة</label>
                 <input type="text" data-field="certificate_name" value="${escapeHtml(cert.certificate_name || '')}" placeholder="مثال: شهادة حضور" required>
@@ -9448,6 +9549,14 @@
       }).join('');
 
       certificatesList.querySelectorAll('.course-cert-card').forEach(card => {
+        card.querySelector('[data-field="certificate_type_id"]')?.addEventListener('change', (event) => {
+          const cert = syncCourseCertFromCard(card);
+          const type = getCertificateTypeByToken(event.target.value);
+          if (cert && type) {
+            applyCertificateTypeToCert(cert, type, true);
+          }
+          renderCourseCertificatesEditor(currentCourseCerts);
+        });
         card.querySelectorAll('input, textarea').forEach(input => {
           input.addEventListener('input', () => syncCourseCertFromCard(card));
           input.addEventListener('change', () => {
@@ -9464,20 +9573,30 @@
       });
     }
 
-    function buildCourseCertDbRecord(cert, courseId) {
+    function buildCourseCertDbRecord(cert, courseId, courseName) {
       if (window.InexcCourseCertificatesApi?.buildCourseCertRecord) {
-        return InexcCourseCertificatesApi.buildCourseCertRecord(cert, courseId);
+        return InexcCourseCertificatesApi.buildCourseCertRecord(cert, courseId, courseName);
       }
+      const certName = String(cert.certificate_name || '').trim();
+      const price = Number(cert.price) || 0;
       return {
         course_id: courseId,
-        certificate_name: String(cert.certificate_name || '').trim(),
+        course_name: String(courseName || '').trim(),
+        certificate_type_id: cert.certificate_type_id || null,
+        certificate_type: cert.certificate_type || certName || 'certificate',
+        certificate_name: certName,
         issuer_name: String(cert.issuer_name || '').trim(),
         description: String(cert.description || '').trim(),
-        price: Number(cert.price) || 0,
+        price,
+        certificate_price: price,
+        price_override: price > 0 ? price : null,
         is_enabled: !!cert.is_enabled,
         show_to_student: !!cert.show_to_student,
         included_in_course: !!cert.included_in_course,
-        is_optional_purchase: !!cert.is_optional_purchase
+        included_in_paid_course: !!cert.included_in_course,
+        is_optional_purchase: !!cert.is_optional_purchase,
+        allow_purchase_in_free_course: !!cert.is_optional_purchase,
+        status: cert.is_enabled === false ? 'inactive' : 'active'
       };
     }
 
@@ -9517,7 +9636,7 @@
       }
     }
 
-    async function saveCertificates(courseId, certificatesData) {
+    async function saveCertificates(courseId, certificatesData, courseName) {
       console.log('certificatesData', certificatesData);
 
       if (!courseId) {
@@ -9543,7 +9662,7 @@
         const saveFn = window.InexcCourseCertificatesApi?.saveCourseCertificateRecord;
 
         for (const cert of certificatesData) {
-          const record = buildCourseCertDbRecord(cert, courseId);
+          const record = buildCourseCertDbRecord(cert, courseId, courseName);
           let savedId = null;
 
           if (saveFn) {
@@ -9574,8 +9693,8 @@
       }
     }
 
-    async function saveCourseCertificates(courseId, _courseName, certificates) {
-      return saveCertificates(courseId, certificates);
+    async function saveCourseCertificates(courseId, courseName, certificates) {
+      return saveCertificates(courseId, certificates, courseName);
     }
 
     function togglePriceField() {
@@ -9812,7 +9931,7 @@
       let certSaveFailed = false;
       if (courseId && certificatesData.length) {
         try {
-          await saveCertificates(courseId, certificatesData);
+          await saveCertificates(courseId, certificatesData, courseName);
         } catch (certErr) {
           certSaveFailed = true;
           console.error('saveCertificates error (course already saved):', certErr);
