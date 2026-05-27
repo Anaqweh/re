@@ -982,36 +982,88 @@
           }
         };
       }
-      if (!window.InexcCourseLoad) {
-        window.InexcCourseLoad = {
-          dedupeCoursesByName: function (rows) {
-            var seen = new Map();
-            (rows || []).forEach(function (r) {
-              var name = String(r.name || '').trim();
-              if (name && !seen.has(name)) seen.set(name, r);
-            });
-            return Array.from(seen.values());
-          }
+      window.InexcCourseLoad = window.InexcCourseLoad || {};
+      if (typeof window.InexcCourseLoad.dedupeCoursesByName !== 'function') {
+        window.InexcCourseLoad.dedupeCoursesByName = function (rows) {
+          var seen = new Map();
+          (rows || []).forEach(function (r) {
+            var name = String(r.name || '').trim();
+            if (name && !seen.has(name)) seen.set(name, r);
+          });
+          return Array.from(seen.values());
         };
       }
-      if (!window.InexcCertificateSystem) {
-        window.InexcCertificateSystem = {
-          isIncludedInCourse: function (cert) { return !!cert.included_in_course; },
-          isOptionalPurchase: function (cert) { return !!cert.is_optional_purchase; },
-          getVisibleForStudent: function (certs) {
-            return (certs || []).filter(function (c) {
-              return c && c.is_enabled !== false && c.show_to_student !== false;
-            });
-          },
-          dedupeCourseCertificates: function (certs) {
-            var seen = new Set();
-            return (certs || []).filter(function (c) {
-              var key = String(c.id || c.certificate_name || '');
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-          }
+      if (typeof window.InexcCourseLoad.normalizeCourseFields !== 'function') {
+        window.InexcCourseLoad.normalizeCourseFields = function (row) { return row || {}; };
+      }
+
+      window.InexcCertificateSystem = window.InexcCertificateSystem || {};
+      if (typeof window.InexcCertificateSystem.isPaidCourse !== 'function') {
+        window.InexcCertificateSystem.isPaidCourse = function (course) {
+          return !!(course && (course.paid === true || course.type === 'paid') && Number(course.price) > 0);
+        };
+      }
+      if (typeof window.InexcCertificateSystem.isIncludedInCourse !== 'function') {
+        window.InexcCertificateSystem.isIncludedInCourse = function (cert) { return !!cert.included_in_course; };
+      }
+      if (typeof window.InexcCertificateSystem.isOptionalPurchase !== 'function') {
+        window.InexcCertificateSystem.isOptionalPurchase = function (cert) { return cert?.is_optional_purchase !== false; };
+      }
+      if (typeof window.InexcCertificateSystem.getVisibleForStudent !== 'function') {
+        window.InexcCertificateSystem.getVisibleForStudent = function (certs) {
+          return (certs || []).filter(function (c) {
+            return c && c.is_enabled !== false && c.show_to_student !== false;
+          });
+        };
+      }
+      if (typeof window.InexcCertificateSystem.getSelectableForFreeCourse !== 'function') {
+        window.InexcCertificateSystem.getSelectableForFreeCourse = function (certs) {
+          return this.getVisibleForStudent(certs);
+        };
+      }
+      if (typeof window.InexcCertificateSystem.getIncludedForPaidCourse !== 'function') {
+        window.InexcCertificateSystem.getIncludedForPaidCourse = function (certs) {
+          return this.getVisibleForStudent(certs).filter(function (c) { return !!c.included_in_course; });
+        };
+      }
+      if (typeof window.InexcCertificateSystem.buildIncludedRegistrationPayload !== 'function') {
+        window.InexcCertificateSystem.buildIncludedRegistrationPayload = function (certs) {
+          return this.getIncludedForPaidCourse(certs).map(function (c) {
+            return {
+              key: String(c.id || c.key || ''),
+              certificate_type_id: c.id || c.certificate_type_id || null,
+              label: c.certificate_name || c.name,
+              issuer_name: c.issuer_name || '',
+              price: 0,
+              included: true
+            };
+          });
+        };
+      }
+      if (typeof window.InexcCertificateSystem.dedupeCourseCertificates !== 'function') {
+        window.InexcCertificateSystem.dedupeCourseCertificates = function (certs) {
+          var seen = new Set();
+          return (certs || []).filter(function (c) {
+            var key = String(c.id || c.key || c.certificate_name || '');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        };
+      }
+      if (typeof window.InexcCertificateSystem.getCertificatesTotalPrice !== 'function') {
+        window.InexcCertificateSystem.getCertificatesTotalPrice = function (certs) {
+          return (certs || []).reduce(function (sum, cert) { return sum + (Number(cert.price ?? cert.certificate_price) || 0); }, 0);
+        };
+      }
+      if (typeof window.InexcCertificateSystem.calculateCheckoutAmount !== 'function') {
+        window.InexcCertificateSystem.calculateCheckoutAmount = function (course, selectedCerts) {
+          return this.isPaidCourse(course) ? (Number(course.price) || 0) : this.getCertificatesTotalPrice(selectedCerts);
+        };
+      }
+      if (typeof window.InexcCertificateSystem.requiresPayment !== 'function') {
+        window.InexcCertificateSystem.requiresPayment = function (course, selectedCerts) {
+          return this.calculateCheckoutAmount(course, selectedCerts) > 0;
         };
       }
     })();
@@ -1102,9 +1154,9 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     function buildRegisterCourseEntry(row, courseCerts) {
-      const normalized = window.InexcCourseLoad
+      const normalized = window.InexcCourseLoad && typeof InexcCourseLoad.normalizeCourseFields === 'function'
         ? InexcCourseLoad.normalizeCourseFields(row)
-        : row;
+        : (row || {});
       const paid = normalized.type === 'paid';
       const price = paid ? (Number(normalized.price) || 0) : 0;
       return {
@@ -1445,7 +1497,7 @@ NOTIFY pgrst, 'reload schema';`;
           return true;
         }
 
-        const uniqueCourses = window.InexcCourseLoad
+        const uniqueCourses = window.InexcCourseLoad && typeof InexcCourseLoad.dedupeCoursesByName === 'function'
           ? InexcCourseLoad.dedupeCoursesByName(data)
           : data;
 
@@ -1573,13 +1625,15 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     function isPaidCourse(info) {
-      if (window.InexcCertificateSystem) return InexcCertificateSystem.isPaidCourse(info);
+      if (window.InexcCertificateSystem && typeof InexcCertificateSystem.isPaidCourse === 'function') {
+        return InexcCertificateSystem.isPaidCourse(info);
+      }
       return !!(info.paid && Number(info.price) > 0);
     }
 
     function getCheckoutAmount(info) {
       const selected = getSelectedCertificates();
-      if (window.InexcCertificateSystem) {
+      if (window.InexcCertificateSystem && typeof InexcCertificateSystem.calculateCheckoutAmount === 'function') {
         return InexcCertificateSystem.calculateCheckoutAmount(info, selected);
       }
       if (isPaidCourse(info)) return Number(info.price) || 0;
@@ -1587,7 +1641,7 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     function requiresPayment(info) {
-      if (window.InexcCertificateSystem) {
+      if (window.InexcCertificateSystem && typeof InexcCertificateSystem.requiresPayment === 'function') {
         return InexcCertificateSystem.requiresPayment(info, getSelectedCertificates());
       }
       return getCheckoutAmount(info) > 0;
@@ -1601,14 +1655,14 @@ NOTIFY pgrst, 'reload schema';`;
     }
 
     function getSelectableCertificates(courseCertificates) {
-      if (window.InexcCertificateSystem) {
+      if (window.InexcCertificateSystem && typeof InexcCertificateSystem.getSelectableForFreeCourse === 'function') {
         return InexcCertificateSystem.getSelectableForFreeCourse(courseCertificates || []);
       }
       return getConfiguredCourseCertificates(courseCertificates);
     }
 
     function getIncludedCertificates(courseCertificates) {
-      if (window.InexcCertificateSystem) {
+      if (window.InexcCertificateSystem && typeof InexcCertificateSystem.getIncludedForPaidCourse === 'function') {
         return InexcCertificateSystem.getIncludedForPaidCourse(courseCertificates || []);
       }
       return getVisibleCertificates(courseCertificates);
@@ -1891,7 +1945,7 @@ NOTIFY pgrst, 'reload schema';`;
 
       const isPaid = isPaidCourse(courseInfo);
       const selectedCerts = isPaid
-        ? (window.InexcCertificateSystem
+        ? (window.InexcCertificateSystem && typeof InexcCertificateSystem.buildIncludedRegistrationPayload === 'function'
           ? InexcCertificateSystem.buildIncludedRegistrationPayload(courseInfo.certificates || [])
           : getIncludedCertificates(courseInfo.certificates || []).map(c => ({
               id: c.id,
