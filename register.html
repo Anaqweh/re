@@ -1435,7 +1435,7 @@ NOTIFY pgrst, 'reload schema';`;
         if (error) {
           console.error('Courses load error:', error);
           courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-          if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+          if (note) note.textContent = '';
           return false;
         }
 
@@ -1477,7 +1477,7 @@ NOTIFY pgrst, 'reload schema';`;
         console.error('Courses load error:', e);
         coursesById = {};
         courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-        if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+        if (note) note.textContent = '';
         return false;
       }
     }
@@ -2082,8 +2082,7 @@ NOTIFY pgrst, 'reload schema';`;
 
       const coursesOk = await loadCoursesIntoSelect();
       if (!coursesOk) {
-        showFormError('تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.');
-        return;
+        console.warn('Register init: courses list did not load; continuing without showing a user-facing error.');
       }
 
       const { courseId, courseName } = getUrlCourseParams();
