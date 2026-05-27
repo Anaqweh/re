@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="سجّل في دورتك — التميز الابتكاري INEXC">
+  <title>التسجيل | INEXC — التميز الابتكاري</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" type="image/png" href="assets/inexc-icon.png">
+  <link rel="stylesheet" href="css/inexc-logo.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --navy-light: #2E4A7A;
+      --gold: #C8A96E;
+      --gold-hover: #b89960;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #1B2A4A;
+      --text-muted: #6b7c8a;
+      --border: #e8ecf2;
+      --shadow: 0 2px 12px rgba(27, 42, 74, 0.08);
+      --shadow-hover: 0 8px 28px rgba(27, 42, 74, 0.12);
+      --radius: 14px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
+    header {
+      background: var(--navy);
+      padding: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+      gap: 20px;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      background: transparent;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    nav a {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover,
+    nav a.active {
+      color: var(--gold);
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .menu-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: #fff;
+      margin: 5px 0;
+      border-radius: 2px;
+      transition: 0.3s;
+    }
+
+    /* Page hero */
+    .page-hero {
+      text-align: center;
+      padding: 56px 20px 48px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-light) 100%);
+    }
+
+    .page-hero h1 {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.4;
+    }
+
+    /* Register section */
+    .register-section {
+      flex: 1;
+      padding: 48px 0 64px;
+    }
+
+    .form-card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .form-group {
+      margin-bottom: 22px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+
+    .form-group label .required {
+      color: #c45c5c;
+      margin-right: 2px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="tel"],
+    .form-group input[type="email"],
+    .form-group select,
+    .form-group input[type="file"] {
+      width: 100%;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--navy-light);
+      box-shadow: 0 0 0 3px rgba(46, 74, 122, 0.12);
+    }
+
+    .form-group input[type="file"] {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .form-group input[type="file"]::file-selector-button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      margin-left: 12px;
+      border: none;
+      border-radius: 6px;
+      background: var(--navy);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .radio-option input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--navy);
+      cursor: pointer;
+    }
+
+    .paid-fields {
+      display: none;
+    }
+
+    .course-price-box {
+      display: none;
+      margin-top: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.25);
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .course-price-box.visible {
+      display: block;
+    }
+
+    .course-price-box.free {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.25);
+      color: #15803d;
+    }
+
+    .reg-type-note {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    #certificateGroup.hidden {
+      display: none;
+    }
+
+    .main-label {
+      display: block;
+      margin-bottom: 18px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .certificate-options {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .certificate-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 18px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .certificate-option:hover {
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    .certificate-option.hidden-option {
+      display: none;
+    }
+
+    .certificate-option input {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--navy);
+      flex-shrink: 0;
+    }
+
+    .certificate-content {
+      flex: 1;
+    }
+
+    .certificate-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .certificate-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    .certificate-issuer {
+      font-size: 0.82rem;
+      color: #9a7d4a;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .certificate-option.readonly-cert {
+      cursor: default;
+      background: #f8fafc;
+      border-style: dashed;
+    }
+
+    .certificate-option.readonly-cert:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .included-badge {
+      background: rgba(27, 42, 74, 0.08);
+      color: var(--navy);
+    }
+
+    .certificate-price {
+      min-width: 110px;
+      text-align: center;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--gold);
+      flex-shrink: 0;
+    }
+
+    .free-price {
+      background: #ecfdf3;
+      color: #059669;
+    }
+
+    .active-option {
+      border-color: var(--gold);
+      background: #fffdf7;
+    }
+
+    .certificate-hint {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin: -8px 0 16px;
+      line-height: 1.7;
+    }
+
+    .certificate-total {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 16px;
+      padding: 16px 18px;
+      background: #fffdf7;
+      border: 2px solid var(--gold);
+      border-radius: 16px;
+      font-size: 0.95rem;
+      color: var(--navy);
+    }
+
+    .certificate-total.visible {
+      display: flex;
+    }
+
+    .certificate-total strong {
+      font-size: 1.1rem;
+      color: var(--gold);
+      white-space: nowrap;
+    }
+
+    .paid-fields.visible {
+      display: none;
+    }
+
+    .paid-fields .form-group:first-child {
+      margin-top: 0;
+    }
+
+
+
+    .auto-receipt-box {
+      display: none;
+      margin: 14px 0 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.28);
+      color: var(--navy);
+      line-height: 1.8;
+    }
+
+    .auto-receipt-box.visible {
+      display: block;
+    }
+
+    .auto-receipt-title {
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--navy);
+    }
+
+    .auto-receipt-text {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .auto-receipt-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .auto-receipt-check input {
+      margin-top: 7px;
+      accent-color: var(--navy);
+    }
+
+    .receipt-result-box {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #166534;
+      line-height: 1.8;
+    }
+
+    .receipt-result-box.visible {
+      display: block;
+    }
+
+    .btn-receipt {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 22px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: var(--navy);
+      font-weight: 800;
+    }
+
+    .btn-submit {
+      display: block;
+      width: 100%;
+      padding: 16px 24px;
+      margin-top: 8px;
+      background: var(--gold);
+      color: var(--navy);
+      font-family: inherit;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
+      box-shadow: 0 4px 20px rgba(200, 169, 110, 0.35);
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--gold-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(200, 169, 110, 0.45);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-submit.is-loading {
+      opacity: 0.85;
+      cursor: wait;
+    }
+
+    .form-error {
+      display: none;
+      background: rgba(196, 92, 92, 0.1);
+      border: 1px solid rgba(196, 92, 92, 0.3);
+      color: #c45c5c;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      margin-bottom: 16px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .form-error.visible {
+      display: block;
+    }
+
+    .sql-help {
+      display: none;
+      margin-bottom: 16px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .sql-help.visible {
+      display: block;
+    }
+
+    .sql-help p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .sql-help textarea {
+      width: 100%;
+      min-height: 160px;
+      font-family: Consolas, monospace;
+      font-size: 0.78rem;
+      direction: ltr;
+      text-align: left;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      resize: vertical;
+    }
+
+    .btn-copy-sql {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .btn-copy-sql:hover {
+      background: var(--navy-light);
+    }
+
+    .success-message {
+      display: none;
+      max-width: 560px;
+      margin: 0 auto;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .success-message.visible {
+      display: block;
+    }
+
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      background: rgba(200, 169, 110, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+    }
+
+    .success-message h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .success-message p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    .btn-back {
+      display: inline-block;
+      padding: 12px 28px;
+      background: var(--navy);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    .btn-back:hover {
+      background: var(--navy-light);
+    }
+
+    .form-card.hidden {
+      display: none;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--navy);
+      padding: 32px 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.88rem;
+    }
+
+    footer .company-name {
+      display: block;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav {
+        display: none;
+        position: absolute;
+        top: 72px;
+        right: 0;
+        left: 0;
+        flex-direction: column;
+        background: var(--navy);
+        padding: 16px 20px 24px;
+        gap: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      nav.open {
+        display: flex;
+      }
+
+      .menu-toggle {
+        display: block;
+      }
+
+      header {
+        position: relative;
+      }
+
+      .page-hero {
+        padding: 44px 16px 36px;
+      }
+
+      .form-card {
+        padding: 28px 20px;
+      }
+
+  
+
+    .auto-receipt-box {
+      display: none;
+      margin: 14px 0 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.28);
+      color: var(--navy);
+      line-height: 1.8;
+    }
+
+    .auto-receipt-box.visible {
+      display: block;
+    }
+
+    .auto-receipt-title {
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--navy);
+    }
+
+    .auto-receipt-text {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .auto-receipt-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .auto-receipt-check input {
+      margin-top: 7px;
+      accent-color: var(--navy);
+    }
+
+    .receipt-result-box {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #166534;
+      line-height: 1.8;
+    }
+
+    .receipt-result-box.visible {
+      display: block;
+    }
+
+    .btn-receipt {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 22px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: var(--navy);
+      font-weight: 800;
+    }
+
+    .btn-submit {
+        font-size: 1.05rem;
+        padding: 15px 20px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-inner {
+        height: 64px;
+      }
+
+      nav {
+        top: 64px;
+      }
+
+      .logo-img {
+        height: 40px;
+        max-width: 180px;
+      }
+
+      .register-section {
+        padding: 36px 0 48px;
+      }
+
+      .radio-group {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- الهيدر -->
+  <header>
+    <div class="container header-inner">
+      <a href="index.html" class="logo-wrap">
+        <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo logo-img" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+      </a>
+      <nav id="nav">
+        <a href="index.html">الرئيسية</a>
+        <a href="index.html#courses">الدورات</a>
+        <a href="register.html" class="active">التسجيل</a>
+        <a href="account.html">حسابي</a>
+      </nav>
+      <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- عنوان الصفحة -->
+  <section class="page-hero">
+    <h1>سجّل في دورتك الآن</h1>
+  </section>
+
+  <!-- نموذج التسجيل -->
+  <section class="register-section">
+    <div class="container">
+      <div class="form-card" id="formCard">
+        <form id="registerForm" novalidate>
+          <div class="form-group">
+            <label for="fullName">الاسم الكامل <span class="required">*</span></label>
+            <input type="text" id="fullName" name="fullName" required placeholder="أدخل اسمك الكامل">
+          </div>
+
+          <div class="form-group">
+            <label for="phone">رقم الجوال <span class="required">*</span></label>
+            <input type="tel" id="phone" name="phone" required placeholder="05xxxxxxxx" dir="ltr" style="text-align: right;">
+          </div>
+
+          <div class="form-group">
+            <label for="email">البريد الإلكتروني <span class="required">*</span></label>
+            <input type="email" id="email" name="email" required placeholder="example@email.com" dir="ltr" style="text-align: right;">
+          </div>
+
+          <div class="form-group">
+            <label for="country">الدولة <span class="required">*</span></label>
+            <input type="text" id="country" name="country" required placeholder="مثال: الإمارات العربية المتحدة">
+          </div>
+
+          <div class="form-group">
+            <label for="specialty">التخصص <span class="required">*</span></label>
+            <input type="text" id="specialty" name="specialty" required placeholder="مثال: معلم لغة عربية / مدرب / إداري">
+          </div>
+
+          <div class="form-group">
+            <label for="course">اختيار الدورة <span class="required">*</span></label>
+            <select id="course" name="course" required>
+              <option value="" disabled selected>— جاري تحميل الدورات —</option>
+            </select>
+            <div class="course-price-box" id="coursePriceBox"></div>
+          </div>
+
+          <div class="form-group" id="regTypeGroup" style="display:none;">
+            <label>نوع التسجيل <span class="required">*</span></label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="regType" value="free" checked>
+                مجاني
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="regType" value="paid">
+                مدفوع
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="reg-type-note" id="regTypeNote">اختر دورة لعرض السعر ونوع التسجيل</div>
+          </div>
+
+          <div class="form-group hidden" id="certificateGroup">
+            <label class="main-label" id="certificateGroupTitle">اختيار الشهادات</label>
+            <p class="certificate-hint" id="certificateGroupHint">يمكنك اختيار أكثر من شهادة — يُحسب السعر الإجمالي تلقائياً.</p>
+            <div class="certificate-options" id="certificateOptions"></div>
+            <div class="certificate-total" id="certificateTotalBox">
+              <span id="certificateTotalLabel">مجموع الشهادات المختارة</span>
+              <strong id="certificateTotalAmount">0 د.إ</strong>
+            </div>
+          </div>
+
+          <div class="sql-help" id="sqlHelp">
+            <p><strong>خطوة مطلوبة في Supabase:</strong> افتح SQL Editor → New query → الصق السكربت → Run → ثم أعد المحاولة.</p>
+            <textarea id="sqlScript" readonly></textarea>
+            <button type="button" class="btn-copy-sql" id="copySqlBtn">نسخ السكربت</button>
+          </div>
+          <div class="form-error" id="formError"></div>
+          <button type="submit" class="btn-submit" id="submitBtn">إرسال التسجيل والدفع</button>
+        </form>
+      </div>
+
+      <div class="success-message" id="successMessage">
+        <div class="success-icon">✓</div>
+        <h2 id="successTitle">تم تسجيلك بنجاح!</h2>
+        <p id="successText">شكراً لانضمامك إلى منصة التميز الابتكاري. تحقّق من بريدك الإلكتروني للاطلاع على تفاصيل التسجيل.</p>
+        <div class="receipt-result-box" id="receiptResultBox"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- الفوتر -->
+  <footer>
+    <span class="company-name">التميز الابتكاري INEXC</span>
+    <p>© 2026 جميع الحقوق محفوظة</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="js/course-certificates-api.js"></script>
+  <script src="js/course-load-utils.js"></script>
+  <script src="js/certificate-system.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="js/registration-email-template.js"></script>
+  <script src="js/registration-email.js"></script>
+  <script src="js/auto-welcome-email.js"></script>
+  <script>
+    /*
+     * EmailJS — قالب Contact Us: template_fq8l9x8
+     * https://dashboard.emailjs.com/admin/templates/fq8l9x8
+     * Service: service_58hjcoc | Public Key: gc0MqAK4Mwebs_GOg
+     */
+    const EMAILJS_PUBLIC_KEY = window.EMAILJS_PUBLIC_KEY || 'gc0MqAK4Mwebs_GOg';
+    const EMAILJS_SERVICE_ID = window.EMAILJS_SERVICE_ID || 'service_58hjcoc';
+    const EMAILJS_TEMPLATE_IDS = [
+      window.EMAILJS_TEMPLATE_ID || 'template_fq8l9x8',
+      window.EMAILJS_TEMPLATE_ID_FALLBACK || 'template_o9jfkzn'
+    ].filter((id, index, list) => id && list.indexOf(id) === index);
+    const EMAILJS_TEMPLATE_ID = EMAILJS_TEMPLATE_IDS[0];
+
+    const SUPABASE_FIX_SQL = `ALTER TABLE public.registrations DISABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT ALL ON public.registrations TO anon;
+GRANT ALL ON SEQUENCE registrations_id_seq TO anon;
+NOTIFY pgrst, 'reload schema';`;
+
+    try {
+      if (typeof emailjs !== 'undefined') {
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+      } else {
+        console.warn('EmailJS غير محمّل — التسجيل يعمل لكن رسالة الترحيب قد لا تُرسل');
+      }
+    } catch (emailInitErr) {
+      console.warn('EmailJS init failed:', emailInitErr);
+    }
+
+    if (!window.supabaseClient) {
+      document.addEventListener('DOMContentLoaded', () => {
+        const errEl = document.getElementById('formError');
+        if (errEl) {
+          errEl.textContent = 'تعذّر الاتصال بقاعدة البيانات. تأكد من تحميل supabase-config.js واتصال الإنترنت.';
+          errEl.classList.add('visible');
+        }
+      });
+    }
+
+    const REGISTRATION_SUCCESS_WITH_EMAIL = 'تم تسجيلك بنجاح، وتم إرسال تفاصيل التسجيل إلى بريدك الإلكتروني.';
+    const REGISTRATION_SUCCESS_NO_EMAIL = 'تم تسجيلك بنجاح، وسيتواصل معك فريقنا قريبًا.';
+    const EMAIL_UI_WAIT_MS = 5000;
+    let certificateTypesCache = [];
+
+    const CERTIFICATE_TYPE_FALLBACKS = [
+      { key: 'attendance', name: 'شهادة حضور', subtitle: 'شهادة تثبت حضور البرنامج التدريبي' },
+      { key: 'uae_university', name: 'شهادة صادرة من إحدى الجامعات الإماراتية', subtitle: 'شهادة أكاديمية معتمدة حسب الدورة' },
+      { key: 'american_board', name: 'شهادة من البورد الأمريكي', subtitle: 'شهادة دولية مرتبطة بالبورد الأمريكي' },
+      { key: 'inexc', name: 'شهادة من شركة التميز الابتكاري', subtitle: 'شهادة صادرة من INEXC' },
+      { key: 'ediola', name: 'شهادة من منصة إديола', subtitle: 'شهادة صادرة من منصة Eduella' },
+      { key: 'trainer_card', name: 'بطاقة مدرب معتمد', subtitle: 'بطاقة اعتماد احترافية للمدربين' }
+    ];
+
+    async function loadCertificateTypes() {
+      if (!window.supabaseClient) {
+        console.error('loadCertificateTypes: supabaseClient missing');
+        certificateTypesCache = [];
+        return;
+      }
+      const { data, error } = await supabaseClient
+        .from('certificate_types')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('certificate_types error:', error);
+        certificateTypesCache = [];
+        return;
+      }
+
+      certificateTypesCache = data || [];
+    }
+
+    function getUrlCourseParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        courseId: (params.get('course_id') || params.get('courseId') || '').trim(),
+        courseName: decodeURIComponent((params.get('course_name') || params.get('courseName') || params.get('course') || '').trim())
+      };
+    }
+
+    function buildRegisterCourseEntry(row, courseCerts) {
+      const normalized = window.InexcCourseLoad
+        ? InexcCourseLoad.normalizeCourseFields(row)
+        : row;
+      const paid = normalized.type === 'paid';
+      const price = paid ? (Number(normalized.price) || 0) : 0;
+      return {
+        id: normalized.id,
+        name: normalized.name,
+        description: normalized.description || '',
+        price,
+        paid,
+        hours: normalized.hours || '',
+        level: normalized.level || '',
+        cert: normalized.cert || '',
+        objectives: normalized.objectives || '',
+        outcomes: normalized.outcomes || '',
+        what_you_learn: normalized.what_you_learn || '',
+        course_method: normalized.course_method || '',
+        target_audience: normalized.target_audience || '',
+        requirements: normalized.requirements || '',
+        certificates: courseCerts || []
+      };
+    }
+
+    function cacheCourseRow(row, certsByCourse) {
+      let certs = (certsByCourse && certsByCourse[row.id]) || [];
+      if (window.InexcCertificateSystem) {
+        certs = InexcCertificateSystem.dedupeCourseCertificates(certs);
+      }
+      coursesById[row.id] = buildRegisterCourseEntry(row, certs);
+      return coursesById[row.id];
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function resolveCertTypeKey(type) {
+      return type.key || type.type_key || type.certificate_type || type.code || '';
+    }
+
+    function resolveCertTypeName(type) {
+      const key = resolveCertTypeKey(type);
+      return type.name || type.label || type.title || key;
+    }
+
+    function getCertificateTypeCatalog() {
+      const fromDb = (certificateTypesCache || [])
+        .map(t => ({
+          key: resolveCertTypeKey(t),
+          name: resolveCertTypeName(t),
+          subtitle: t.short_description || t.subtitle || t.description || ''
+        }))
+        .filter(t => t.key);
+
+      if (fromDb.length) return fromDb;
+      return CERTIFICATE_TYPE_FALLBACKS;
+    }
+
+    function getActiveCertificateTypes() {
+      const fromDb = (certificateTypesCache || [])
+        .filter(t => !t.status || t.status === 'active')
+        .map(t => ({
+          key: resolveCertTypeKey(t),
+          name: resolveCertTypeName(t),
+          subtitle: t.short_description || t.subtitle || t.description || ''
+        }))
+        .filter(t => t.key);
+
+      if (fromDb.length) return fromDb;
+      return CERTIFICATE_TYPE_FALLBACKS;
+    }
+
+    function buildCourseCertPriceMap(certificates) {
+      const certMap = {};
+      (certificates || []).forEach(c => {
+        const price = Number(c.certificate_price) || 0;
+        if (price > 0) {
+          certMap[c.certificate_type] = price;
+        }
+      });
+      return certMap;
+    }
+
+    function getConfiguredCourseCertificates(courseCertificates) {
+      if (window.InexcCertificateSystem) {
+        return InexcCertificateSystem.getVisibleForStudent(courseCertificates || []);
+      }
+      return (courseCertificates || []).filter(c => c && c.is_enabled !== false && c.show_to_student !== false);
+    }
+
+    function getCourseCertUiKey(cert) {
+      return String(cert?.id || '');
+    }
+
+    function getVisibleCertificates(courseCertificates) {
+      return getConfiguredCourseCertificates(courseCertificates);
+    }
+
+    function renderCertificateOptionsForCourse(courseCertificates, preserveSelection, isPaidCourseSelected) {
+      const container = document.getElementById('certificateOptions');
+      const group = document.getElementById('certificateGroup');
+      const groupTitle = document.getElementById('certificateGroupTitle');
+      const groupHint = document.getElementById('certificateGroupHint');
+      const totalBox = document.getElementById('certificateTotalBox');
+      if (!container || !group) return;
+
+      if (isPaidCourseSelected) {
+        const visible = getVisibleCertificates(courseCertificates);
+        if (!visible.length) {
+          container.innerHTML = '';
+          group.classList.add('hidden');
+          return;
+        }
+
+        if (groupTitle) groupTitle.textContent = 'الشهادات المرتبطة بالدورة';
+        if (groupHint) {
+          groupHint.textContent = 'هذه الدورة مدفوعة — الشهادات المشمولة ضمن السعر. الشهادات الاختيارية تظهر للمعرفة فقط ما لم تُحدَّد كمدفوعة إضافية من لوحة التحكم.';
+        }
+
+        container.innerHTML = visible.map(cert => {
+          const name = escapeHtml(cert.certificate_name || cert.name);
+          const issuer = escapeHtml(cert.issuer_name || '');
+          const desc = escapeHtml(cert.description || '');
+          const included = window.InexcCertificateSystem
+            ? InexcCertificateSystem.isIncludedInCourse(cert)
+            : !!cert.included_in_course;
+          const optional = window.InexcCertificateSystem
+            ? InexcCertificateSystem.isOptionalPurchase(cert)
+            : !!cert.is_optional_purchase;
+          const price = Number(cert.price) || 0;
+          const badge = included
+            ? 'الشهادة مشمولة مع الدورة'
+            : (optional && price > 0
+              ? price.toLocaleString('ar-SA') + ' د.إ (اختيارية)'
+              : (optional ? 'اختيارية' : '—'));
+          return `
+            <div class="certificate-option included-cert readonly-cert">
+              <div class="certificate-content">
+                <div class="certificate-title">${name}</div>
+                ${issuer ? `<div class="certificate-issuer">الجهة المصدرة: ${issuer}</div>` : ''}
+                ${desc ? `<div class="certificate-subtitle">${desc}</div>` : ''}
+              </div>
+              <div class="certificate-price included-badge">${badge}</div>
+            </div>`;
+        }).join('');
+
+        if (totalBox) totalBox.classList.remove('visible');
+        group.classList.remove('hidden');
+        return;
+      }
+
+      const typesToShow = getSelectableCertificates(courseCertificates);
+      if (!typesToShow.length) {
+        container.innerHTML = '';
+        group.classList.add('hidden');
+        if (totalBox) totalBox.classList.remove('visible');
+        return;
+      }
+
+      if (groupTitle) groupTitle.textContent = 'اختر الشهادة التي ترغب بالحصول عليها';
+      if (groupHint) {
+        groupHint.textContent = 'الدورة مجانية — الشهادة اختيارية ومدفوعة. يمكنك اختيار شهادة أو أكثر.';
+      }
+
+      const prevSelectedKeys = preserveSelection
+        ? Array.from(document.querySelectorAll('input.cert-type-checkbox:checked'))
+            .map(input => input.closest('.certificate-option')?.dataset.certKey)
+            .filter(Boolean)
+        : [];
+
+      const noneOption = `
+        <label class="certificate-option active-option" id="certNoneOption">
+          <input type="checkbox" class="cert-none-checkbox" id="certNoneInput" checked>
+          <div class="certificate-content">
+            <div class="certificate-title">بدون شهادة</div>
+            <div class="certificate-subtitle">تسجيل مجاني بدون إصدار شهادة</div>
+          </div>
+          <div class="certificate-price free-price">—</div>
+        </label>`;
+
+      const typeOptions = typesToShow.map(type => {
+        const key = escapeHtml(getCourseCertUiKey(type));
+        const name = escapeHtml(type.certificate_name || type.name);
+        const issuer = escapeHtml(type.issuer_name || '');
+        const desc = escapeHtml(type.description || type.subtitle || '');
+        const price = Number(type.price) || 0;
+        return `
+          <label class="certificate-option" data-cert-key="${key}" data-cert-id="${key}">
+            <input type="checkbox" class="cert-type-checkbox" value="${name}">
+            <div class="certificate-content">
+              <div class="certificate-title">${name}</div>
+              ${issuer ? `<div class="certificate-issuer">الجهة المصدرة: ${issuer}</div>` : ''}
+              ${desc ? `<div class="certificate-subtitle">${desc}</div>` : ''}
+            </div>
+            <div class="certificate-price">${price > 0 ? price.toLocaleString('ar-SA') + ' د.إ' : 'مجانية'}</div>
+          </label>`;
+      }).join('');
+
+      container.innerHTML = noneOption + typeOptions;
+
+      if (prevSelectedKeys.length) {
+        const noneInput = document.getElementById('certNoneInput');
+        if (noneInput) noneInput.checked = false;
+        container.querySelectorAll('.certificate-option[data-cert-key]').forEach(label => {
+          const input = label.querySelector('.cert-type-checkbox');
+          if (input && prevSelectedKeys.includes(label.dataset.certKey)) input.checked = true;
+        });
+      }
+
+      group.classList.remove('hidden');
+      bindCertificateOptionEvents();
+      highlightCertificateOption();
+      updateCertificateTotalBox();
+    }
+
+    function bindCertificateOptionEvents() {
+      const noneInput = document.getElementById('certNoneInput');
+
+      noneInput?.addEventListener('change', () => {
+        if (noneInput.checked) {
+          document.querySelectorAll('.cert-type-checkbox').forEach(cb => { cb.checked = false; });
+        }
+        onCertificateSelectionChange();
+      });
+
+      document.querySelectorAll('.cert-type-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked && noneInput) noneInput.checked = false;
+          if (!document.querySelector('.cert-type-checkbox:checked') && noneInput) {
+            noneInput.checked = true;
+          }
+          onCertificateSelectionChange();
+        });
+      });
+    }
+
+    function onCertificateSelectionChange() {
+      highlightCertificateOption();
+      updateCertificateTotalBox();
+      updateCourseSelectionUI(true);
+    }
+
+    function getSelectedCertificates() {
+      const info = getSelectedCourseInfo();
+      if (isPaidCourse(info)) return [];
+
+      const noneInput = document.getElementById('certNoneInput');
+      if (noneInput?.checked) return [];
+
+      const selected = [];
+      document.querySelectorAll('.cert-type-checkbox:checked').forEach(input => {
+        const label = input.closest('.certificate-option');
+        const certKey = label?.dataset.certKey;
+        if (!certKey) return;
+
+        const match = (info.certificates || []).find(c => getCourseCertUiKey(c) === String(certKey));
+        const price = Number(match?.price) || 0;
+
+        selected.push({
+          id: match?.id || null,
+          certificate_type: match?.certificate_name || input.value,
+          certificate_type_id: match?.id || null,
+          certificate_price: price,
+          price,
+          label: input.value,
+          issuer_name: match?.issuer_name || '',
+          name: match?.certificate_name || match?.name || input.value
+        });
+      });
+
+      return selected;
+    }
+
+    function getCertificatesTotalPrice(certs) {
+      return (certs || []).reduce((sum, cert) => sum + (Number(cert.price ?? cert.certificate_price) || 0), 0);
+    }
+
+    function updateCertificateTotalBox() {
+      const box = document.getElementById('certificateTotalBox');
+      const amountEl = document.getElementById('certificateTotalAmount');
+      const labelEl = document.getElementById('certificateTotalLabel');
+      if (!box || !amountEl) return;
+
+      const info = getSelectedCourseInfo();
+      const certs = getSelectedCertificates();
+      const total = getCertificatesTotalPrice(certs);
+
+      if (certs.length === 0) {
+        box.classList.remove('visible');
+        return;
+      }
+
+      box.classList.add('visible');
+      amountEl.textContent = total + ' د.إ';
+      if (labelEl) {
+        const prefix = isPaidCourse(info) ? 'مجموع الشهادات الإضافية' : 'مجموع الشهادات المختارة';
+        labelEl.textContent = certs.length > 1
+          ? `${prefix} (${certs.length})`
+          : prefix;
+      }
+    }
+
+    async function loadCoursesIntoSelect() {
+      const courseSelect = document.getElementById('course');
+      const note = document.getElementById('regTypeNote');
+      if (!courseSelect) {
+        console.error('loadCoursesIntoSelect: #course select not found');
+        return false;
+      }
+      if (!window.supabaseClient) {
+        console.error('loadCoursesIntoSelect: supabaseClient missing');
+        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+        if (note) note.textContent = 'تعذّر الاتصال بقاعدة البيانات.';
+        return false;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('courses')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: true });
+
+        courseSelect.innerHTML = '<option value="" disabled selected>— اختر الدورة —</option>';
+        coursesById = {};
+
+        if (error) {
+          console.error('Courses load error:', error);
+          courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+          if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+          return false;
+        }
+
+        if (!data?.length) {
+          courseSelect.innerHTML = '<option value="" disabled selected>— لا توجد دورات متاحة —</option>';
+          if (note) note.textContent = 'لا توجد دورات متاحة للتسجيل حالياً.';
+          return true;
+        }
+
+        const uniqueCourses = window.InexcCourseLoad
+          ? InexcCourseLoad.dedupeCoursesByName(data)
+          : data;
+
+        let certsByCourse = {};
+        try {
+          const certResult = window.InexcCourseCertificatesApi
+            ? await InexcCourseCertificatesApi.fetchCourseCertificates(supabaseClient, {})
+            : { data: [], error: null };
+
+          if (certResult.error) {
+            console.error('course_certificates load warning:', certResult.error.message || certResult.error);
+          } else {
+            (certResult.data || []).forEach(normalized => {
+              const cid = normalized.course_id;
+              if (!cid) return;
+              if (!certsByCourse[cid]) certsByCourse[cid] = [];
+              const duplicate = normalized.id
+                && certsByCourse[cid].some(item => String(item.id) === String(normalized.id));
+              if (duplicate) return;
+              certsByCourse[cid].push(normalized);
+            });
+          }
+        } catch (certLoadErr) {
+          console.error('course_certificates load failed (non-fatal):', certLoadErr);
+        }
+
+        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+
+        uniqueCourses.forEach(row => {
+          const entry = cacheCourseRow(row, certsByCourse);
+          const opt = document.createElement('option');
+          opt.value = row.id;
+          opt.textContent = entry.name;
+          opt.dataset.price = entry.price;
+          courseSelect.appendChild(opt);
+        });
+        return true;
+      } catch (e) {
+        console.error('Courses load error:', e);
+        coursesById = {};
+        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+        if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+        return false;
+      }
+    }
+
+    async function resolveCourseFromUrl() {
+      const { courseId, courseName } = getUrlCourseParams();
+      if (!courseId && !courseName) return null;
+
+      if (courseId && coursesById[courseId]) return courseId;
+
+      if (courseName) {
+        const byName = Object.values(coursesById).find(c => c.name === courseName);
+        if (byName) return byName.id;
+      }
+
+      if (!window.supabaseClient) {
+        console.error('resolveCourseFromUrl: supabaseClient missing');
+        return null;
+      }
+
+      try {
+        if (courseId) {
+          const { data, error } = await supabaseClient
+            .from('courses')
+            .select('*')
+            .eq('id', courseId)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (error) {
+            console.error('resolveCourseFromUrl by id:', error);
+            return null;
+          }
+          if (data) {
+            let courseCerts = coursesById[data.id]?.certificates || [];
+            if (!courseCerts.length) {
+              try {
+                const certResult = window.InexcCourseCertificatesApi
+                  ? await InexcCourseCertificatesApi.fetchCourseCertificates(supabaseClient, { courseId: data.id })
+                  : { data: [], error: null };
+                courseCerts = certResult.data || [];
+              } catch (certErr) {
+                console.error('resolveCourseFromUrl certs:', certErr);
+              }
+            }
+            cacheCourseRow(data, { [data.id]: courseCerts });
+            appendCourseOptionIfMissing(data.id);
+            return data.id;
+          }
+        }
+
+        if (courseName) {
+          const { data, error } = await supabaseClient
+            .from('courses')
+            .select('*')
+            .eq('name', courseName)
+            .eq('status', 'active')
+            .limit(1)
+            .maybeSingle();
+
+          if (error) {
+            console.error('resolveCourseFromUrl by name:', error);
+            return null;
+          }
+          if (data) {
+            cacheCourseRow(data, {});
+            appendCourseOptionIfMissing(data.id);
+            return data.id;
+          }
+        }
+      } catch (e) {
+        console.error('resolveCourseFromUrl:', e);
+      }
+
+      return null;
+    }
+
+    function appendCourseOptionIfMissing(courseId) {
+      const courseSelect = document.getElementById('course');
+      const entry = coursesById[courseId];
+      if (!courseSelect || !entry) return;
+      if (courseSelect.querySelector('option[value="' + courseId + '"]')) return;
+      const opt = document.createElement('option');
+      opt.value = courseId;
+      opt.textContent = entry.name;
+      opt.dataset.price = entry.price;
+      courseSelect.appendChild(opt);
+    }
+
+    function getSelectedCertificate() {
+      const certs = getSelectedCertificates();
+      return certs.length ? certs[0] : null;
+    }
+
+    function isPaidCourse(info) {
+      if (window.InexcCertificateSystem) return InexcCertificateSystem.isPaidCourse(info);
+      return !!(info.paid && Number(info.price) > 0);
+    }
+
+    function getCheckoutAmount(info) {
+      const selected = getSelectedCertificates();
+      if (window.InexcCertificateSystem) {
+        return InexcCertificateSystem.calculateCheckoutAmount(info, selected);
+      }
+      if (isPaidCourse(info)) return Number(info.price) || 0;
+      return getCertificatesTotalPrice(selected);
+    }
+
+    function requiresPayment(info) {
+      if (window.InexcCertificateSystem) {
+        return InexcCertificateSystem.requiresPayment(info, getSelectedCertificates());
+      }
+      return getCheckoutAmount(info) > 0;
+    }
+
+    function requiresCertificatePayment(info) {
+      if (isPaidCourse(info)) return false;
+      const selectable = getSelectableCertificates(info.certificates || []);
+      const selected = getSelectedCertificates();
+      return selectable.length > 0 && selected.length > 0 && getCertificatesTotalPrice(selected) > 0;
+    }
+
+    function getSelectableCertificates(courseCertificates) {
+      if (window.InexcCertificateSystem) {
+        return InexcCertificateSystem.getSelectableForFreeCourse(courseCertificates || []);
+      }
+      return getConfiguredCourseCertificates(courseCertificates);
+    }
+
+    function getIncludedCertificates(courseCertificates) {
+      if (window.InexcCertificateSystem) {
+        return InexcCertificateSystem.getIncludedForPaidCourse(courseCertificates || []);
+      }
+      return getVisibleCertificates(courseCertificates);
+    }
+
+    function getSelectedCourseInfo() {
+      const courseSelect = document.getElementById('course');
+      const courseId = courseSelect.value;
+      if (courseId && coursesById[courseId]) {
+        return { ...coursesById[courseId] };
+      }
+      return { name: '', price: 0, paid: false };
+    }
+
+    function getSelectedCoursePrice() {
+      return Number(getSelectedCourseInfo().price) || 0;
+    }
+
+    let submitBtnDefaultText = 'إرسال التسجيل';
+
+    function updateCourseSelectionUI(fromCertChange) {
+      const info = getSelectedCourseInfo();
+      const box = document.getElementById('coursePriceBox');
+      const note = document.getElementById('regTypeNote');
+      const paidRadio = document.querySelector('input[name="regType"][value="paid"]');
+      const freeRadio = document.querySelector('input[name="regType"][value="free"]');
+      const submitButton = document.getElementById('submitBtn');
+
+      if (!info.name) {
+        if (box) {
+          box.classList.remove('visible', 'free');
+          box.textContent = '';
+        }
+        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+        submitBtnDefaultText = 'إرسال التسجيل';
+        document.getElementById('certificateGroup')?.classList.add('hidden');
+        if (submitButton) submitButton.textContent = submitBtnDefaultText;
+        return;
+      }
+
+      if (isPaidCourse(info)) {
+        renderCertificateOptionsForCourse(info.certificates || [], !!fromCertChange, true);
+        const coursePrice = Number(info.price) || 0;
+        if (box) {
+          box.classList.add('visible');
+          box.classList.remove('free');
+          box.textContent = coursePrice.toLocaleString('ar-SA') + ' د.إ (شامل الدورة والشهادات المفعّلة)';
+        }
+        if (note) note.textContent = 'دورة مدفوعة — السعر شامل للدورة والشهادات المفعّلة. سيتم تحويلك إلى Stripe.';
+        if (paidRadio) paidRadio.checked = true;
+        submitBtnDefaultText = 'إرسال التسجيل والدفع';
+      } else {
+        renderCertificateOptionsForCourse(info.certificates || [], !!fromCertChange, false);
+        const certs = getSelectedCertificates();
+        const certTotal = getCertificatesTotalPrice(certs);
+        if (box) {
+          box.classList.add('visible');
+          if (certs.length && certTotal > 0) {
+            box.classList.remove('free');
+            const countNote = certs.length > 1 ? ` (${certs.length} شهادات)` : '';
+            box.textContent = certTotal + ' د.إ (مجموع الشهادات)' + countNote;
+          } else {
+            box.classList.add('free');
+            box.textContent = 'مجانية';
+          }
+        }
+        if (note) {
+          if (certs.length && certTotal > 0) {
+            note.textContent = 'دورة مجانية — سيتم تحويلك إلى Stripe لدفع مجموع الشهادات المختارة';
+            submitBtnDefaultText = 'إرسال التسجيل ودفع الشهادات';
+          } else {
+            note.textContent = 'دورة مجانية — سيتم تسجيلك مباشرة بدون دفع';
+            submitBtnDefaultText = 'إرسال التسجيل';
+          }
+        }
+        if (freeRadio) freeRadio.checked = true;
+      }
+      if (submitButton) submitButton.textContent = submitBtnDefaultText;
+    }
+
+    function highlightCertificateOption() {
+      document.querySelectorAll('.certificate-option').forEach(label => {
+        const input = label.querySelector('input[type="checkbox"]');
+        label.classList.toggle('active-option', !!input?.checked);
+      });
+    }
+
+    if (window.location.protocol === 'file:') {
+      console.warn('تحذير: افتح الصفحة عبر خادم محلي (مثل Live Server) وليس file://');
+    }
+
+    const nav = document.getElementById('nav');
+    const menuToggle = document.getElementById('menuToggle');
+    const registerForm = document.getElementById('registerForm');
+    const formCard = document.getElementById('formCard');
+    const successMessage = document.getElementById('successMessage');
+    const formError = document.getElementById('formError');
+    const sqlHelp = document.getElementById('sqlHelp');
+    const sqlScript = document.getElementById('sqlScript');
+    const copySqlBtn = document.getElementById('copySqlBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const courseSelect = document.getElementById('course');
+
+    if (menuToggle && nav) {
+      menuToggle.addEventListener('click', () => {
+        nav.classList.toggle('open');
+      });
+    }
+
+    if (nav) {
+      nav.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => nav.classList.remove('open'));
+      });
+    }
+
+    if (courseSelect) {
+      courseSelect.addEventListener('change', () => updateCourseSelectionUI(false));
+    }
+
+    if (sqlScript) sqlScript.value = SUPABASE_FIX_SQL;
+
+    if (copySqlBtn && sqlScript) {
+      copySqlBtn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(SUPABASE_FIX_SQL);
+        copySqlBtn.textContent = 'تم النسخ ✓';
+        setTimeout(() => { copySqlBtn.textContent = 'نسخ السكربت'; }, 2000);
+      });
+    }
+
+    function showFormError(message, showSqlHelp) {
+      if (!formError) {
+        console.error('Form error:', message);
+        return;
+      }
+      formError.textContent = message;
+      formError.classList.add('visible');
+      if (sqlHelp) sqlHelp.classList.toggle('visible', !!showSqlHelp);
+    }
+
+    function hideFormError() {
+      if (!formError) return;
+      formError.textContent = '';
+      formError.classList.remove('visible');
+      if (sqlHelp) sqlHelp.classList.remove('visible');
+    }
+
+    function setSubmitting(isSubmitting, statusText) {
+      if (!submitBtn) return;
+      submitBtn.disabled = isSubmitting;
+      submitBtn.classList.toggle('is-loading', isSubmitting);
+      submitBtn.textContent = isSubmitting
+        ? (statusText || 'جارٍ إرسال التسجيل...')
+        : submitBtnDefaultText;
+    }
+
+    function generateAccessToken() {
+      if (window.crypto?.randomUUID) return crypto.randomUUID();
+      return 'tok_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 12);
+    }
+
+    async function linkRegistrationToProfile(registrationId, email) {
+      if (!registrationId || !email) return;
+      try {
+        const { data: profile } = await supabaseClient
+          .from('trainee_profiles')
+          .select('id')
+          .eq('email', email.trim())
+          .maybeSingle();
+        if (!profile?.id) return;
+        await supabaseClient
+          .from('registrations')
+          .update({ trainee_profile_id: profile.id })
+          .eq('id', registrationId);
+      } catch (err) {
+        console.warn('link registration profile:', err);
+      }
+    }
+
+    async function saveToSupabase(record) {
+      let payload = { ...record };
+      let { data, error } = await supabaseClient
+        .from('registrations')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (msg.includes('course_id') && Object.prototype.hasOwnProperty.call(payload, 'course_id')) {
+          const { course_id, trainee_profile_id, ...rest } = payload;
+          ({ data, error } = await supabaseClient
+            .from('registrations')
+            .insert([rest])
+            .select()
+            .single());
+        }
+      }
+
+      if (error) throw error;
+      return data;
+    }
+
+    function getSupabaseErrorMessage(error) {
+      const msg = (error?.message || '').toLowerCase();
+      const code = error?.code || '';
+
+      if (msg.includes('invalid api key')) {
+        return { text: 'مفتاح Supabase (Anon Key) غير صحيح. انسخ المفتاح من Project Settings → API.', showSql: false };
+      }
+      if (msg.includes('api disabled') || code === 'PGRST002') {
+        return { text: 'جدول registrations معطّل على Data API. فعّل API Access من Table Editor.', showSql: false };
+      }
+      if (code === '42501' || msg.includes('permission denied') || msg.includes('row-level security')) {
+        return { text: 'لا توجد صلاحية إدراج في Supabase. نفّذ السكربت أدناه في SQL Editor ثم أعد المحاولة.', showSql: true };
+      }
+      if (msg.includes('column') && msg.includes('does not exist')) {
+        return { text: 'عمود ناقص في الجدول.', showSql: true };
+      }
+
+      const parts = [error?.message, error?.details, error?.hint].filter(Boolean);
+      return { text: parts.join(' — ') || 'تعذّر حفظ بيانات التسجيل. يرجى المحاولة مرة أخرى.', showSql: false };
+    }
+
+    async function sendAutoWelcomeEmail(params) {
+      if (typeof InexcAutoWelcomeEmail === 'undefined') {
+        console.error('Welcome email failed: js/auto-welcome-email.js not loaded');
+        return { sent: false };
+      }
+      return InexcAutoWelcomeEmail.sendWelcomeEmail(params);
+    }
+
+    function getRegistrationSuccessText(emailSent) {
+      return emailSent ? REGISTRATION_SUCCESS_WITH_EMAIL : REGISTRATION_SUCCESS_NO_EMAIL;
+    }
+
+    function showSuccessScreen({ title, text, receiptUrl, waitingReceipt } = {}) {
+      const successTitle = document.getElementById('successTitle');
+      const successText = document.getElementById('successText');
+      const receiptResultBox = document.getElementById('receiptResultBox');
+
+      if (successTitle) successTitle.textContent = title || 'تم تسجيلك بنجاح!';
+      if (successText) successText.textContent = text || 'شكراً لانضمامك إلى منصة التميز الابتكاري. تحقّق من بريدك الإلكتروني للاطلاع على تفاصيل التسجيل.';
+
+      if (receiptResultBox) {
+        if (receiptUrl) {
+          receiptResultBox.innerHTML = `تم استلام دفعتك بنجاح، وأصبح وصل الدفع جاهزًا للتحميل.<br><a class="btn-receipt" href="${receiptUrl}" target="_blank" rel="noopener">تحميل وصل الدفع</a>`;
+          receiptResultBox.classList.add('visible');
+        } else if (waitingReceipt) {
+          receiptResultBox.innerHTML = 'تم استلام دفعتك بنجاح. يجري الآن تجهيز رابط وصل الدفع، وسيظهر في النظام بعد تأكيد Stripe الكامل.';
+          receiptResultBox.classList.add('visible');
+        } else {
+          receiptResultBox.innerHTML = '';
+          receiptResultBox.classList.remove('visible');
+        }
+      }
+
+      formCard.classList.add('hidden');
+      successMessage.classList.add('visible');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    if (registerForm) {
+      registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideFormError();
+
+      const courseInfo = getSelectedCourseInfo();
+      if (!courseInfo.name) {
+        showFormError('يرجى اختيار دورة');
+        return;
+      }
+
+      const isPaid = isPaidCourse(courseInfo);
+      const selectedCerts = isPaid
+        ? (window.InexcCertificateSystem
+          ? InexcCertificateSystem.buildIncludedRegistrationPayload(courseInfo.certificates || [])
+          : getIncludedCertificates(courseInfo.certificates || []).map(c => ({
+              id: c.id,
+              certificate_type: c.certificate_name || c.name,
+              certificate_type_id: c.id,
+              label: c.certificate_name || c.name,
+              certificate_price: 0,
+              price: 0,
+              issuer_name: c.issuer_name || ''
+            })))
+        : getSelectedCertificates();
+      const certTotal = isPaid ? 0 : getCertificatesTotalPrice(selectedCerts);
+      const checkoutAmount = getCheckoutAmount(courseInfo);
+      const courseAmount = checkoutAmount;
+      const needsPayment = requiresPayment(courseInfo);
+
+      if (requiresCertificatePayment(courseInfo) && checkoutAmount <= 0) {
+        showFormError('لم يُحدَّد سعر لإحدى الشهادات المختارة في لوحة التحكم. يرجى اختيار «بدون شهادة» أو شهادات لها أسعار محدّدة.');
+        return;
+      }
+
+      const fullName = document.getElementById('fullName').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const country = document.getElementById('country').value.trim();
+      const specialty = document.getElementById('specialty').value.trim();
+      const courseName = courseInfo.name;
+      const hasCerts = selectedCerts.length > 0;
+      const certLabels = selectedCerts.map(c => c.label).join('، ');
+      const registrationType = isPaid
+        ? (selectedCerts.length ? 'مدفوع — شامل الشهادات' : 'مدفوع')
+        : (hasCerts && checkoutAmount > 0 ? 'مجاني مع شهادة' : 'مجاني');
+      const stripeLabel = isPaid
+        ? courseName
+        : (hasCerts ? courseName + ' — ' + certLabels : courseName);
+
+      const accessToken = generateAccessToken();
+      const certificateTypesPayload = selectedCerts.map(c => ({
+        key: String(c.id || c.certificate_type_id || ''),
+        certificate_type_id: c.id || c.certificate_type_id || null,
+        label: c.label || c.certificate_type,
+        issuer_name: c.issuer_name || '',
+        price: Number(c.price ?? c.certificate_price) || 0,
+        included: isPaid || c.included === true
+      }));
+      const supabaseRecord = {
+        full_name: fullName,
+        phone,
+        email,
+        country,
+        specialty,
+        course_name: courseName,
+        course_id: courseInfo.id || null,
+        registration_type: registrationType,
+        payment_method: needsPayment ? 'Stripe' : null,
+        status: 'pending',
+        notes: needsPayment
+          ? [
+              isPaid ? ('سعر الدورة: ' + (Number(courseInfo.price) || 0) + ' د.إ') : null,
+              hasCerts ? ('الشهادات: ' + certLabels + ' — ' + certTotal + ' د.إ') : null,
+              isPaid ? 'في انتظار الدفع عبر Stripe' : 'في انتظار دفع الشهادات عبر Stripe'
+            ].filter(Boolean).join(' | ')
+          : null,
+        access_token: accessToken,
+        wants_certificate: hasCerts,
+        certificate_type: hasCerts ? certLabels : null,
+        certificate_types: hasCerts ? certificateTypesPayload : null,
+        certificate_price: certTotal > 0 ? certTotal : 0,
+        certificate_payment_status: !isPaid && hasCerts && checkoutAmount > 0 ? 'pending' : (isPaid && hasCerts ? 'included' : 'not_required')
+      };
+
+      setSubmitting(true, 'جارٍ إرسال التسجيل...');
+      let savedToSupabase = false;
+      let emailSent = false;
+
+      try {
+        const savedRegistration = await saveToSupabase(supabaseRecord);
+        savedToSupabase = true;
+        linkRegistrationToProfile(savedRegistration?.id, email);
+
+        const welcomeParams = {
+          registration_id: savedRegistration?.id,
+          to_name: fullName,
+          full_name: fullName,
+          email,
+          course_name: courseName,
+          registration_type: registrationType,
+          phone
+        };
+
+        setSubmitting(true, 'جارٍ معالجة طلبك...');
+        const emailResult = await Promise.race([
+          sendAutoWelcomeEmail(welcomeParams),
+          new Promise(resolve => setTimeout(() => resolve({ sent: false, timeout: true }), EMAIL_UI_WAIT_MS))
+        ]);
+        emailSent = emailResult && emailResult.sent === true;
+
+        if (emailResult && emailResult.timeout) {
+          sendAutoWelcomeEmail(welcomeParams).then(r => {
+            if (r && r.sent) console.log('Registration email sent in background (service_58hjcoc)');
+            else if (r && !r.sent) console.error('Registration email failed in background (service_58hjcoc):', r.error);
+          });
+        }
+
+        if (!needsPayment) {
+          showSuccessScreen({
+            title: 'تم تسجيلك بنجاح!',
+            text: getRegistrationSuccessText(emailSent)
+          });
+          return;
+        }
+
+        const response = await fetch(
+          SUPABASE_URL + '/functions/v1/swift-action',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+              registration_id: savedRegistration.id,
+              full_name: fullName,
+              email: email,
+              phone: phone,
+              course_name: courseName,
+              course_id: courseInfo.id || null,
+              amount: courseAmount,
+              currency: 'aed'
+            })
+          }
+        );
+
+        const rawText = await response.text();
+        let data = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch (_) {
+          throw new Error('استجابة غير صالحة من خادم الدفع');
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || 'تعذر فتح صفحة الدفع');
+        }
+
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+
+        throw new Error(data.error || 'تعذر فتح صفحة الدفع');
+      } catch (error) {
+        console.error('Registration error:', error);
+
+        if (!savedToSupabase) {
+          const errInfo = getSupabaseErrorMessage(error);
+          showFormError(errInfo.text, errInfo.showSql);
+        } else if (needsPayment) {
+          showFormError(error?.message || 'تعذر فتح صفحة الدفع، يرجى المحاولة مرة أخرى.');
+        } else {
+          showSuccessScreen({
+            title: 'تم تسجيلك بنجاح!',
+            text: getRegistrationSuccessText(emailSent)
+          });
+        }
+      } finally {
+        setSubmitting(false);
+      }
+      });
+    } else {
+      console.error('registerForm not found');
+    }
+
+    (async function initRegisterPage() {
+      if (!window.supabaseClient) {
+        console.error('Register init: supabaseClient is not available');
+        showFormError('تعذّر الاتصال بقاعدة البيانات. تحقّق من تحميل supabase-config.js');
+        return;
+      }
+
+      try {
+        await loadCertificateTypes();
+      } catch (certTypeErr) {
+        console.warn('Register init: certificate_types failed (non-fatal):', certTypeErr);
+      }
+
+      const coursesOk = await loadCoursesIntoSelect();
+      if (!coursesOk) {
+        showFormError('تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.');
+        return;
+      }
+
+      const { courseId, courseName } = getUrlCourseParams();
+      if (courseId || courseName) {
+        const resolvedId = await resolveCourseFromUrl();
+        if (resolvedId && courseSelect) {
+          courseSelect.value = resolvedId;
+        } else {
+          console.warn('Register init: course from URL not found', { courseId, courseName });
+          showFormError('لم يتم العثور على الدورة في الرابط. يمكنك اختيار دورة من القائمة.');
+        }
+      }
+
+      try {
+        updateCourseSelectionUI();
+        highlightCertificateOption();
+      } catch (uiErr) {
+        console.error('Register init: UI update failed:', uiErr);
+      }
+    })();
+  </script>
+
+<script src="whatsapp-float.js"></script>
+</body>
+</html>
