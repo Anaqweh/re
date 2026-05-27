@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>INEXC — عرض الرسالة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --gold: #C8A96E;
+      --bg: #eef1f6;
+      --surface: #fff;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(145deg, #0c1528, #1B2A4A 50%, #2E4A7A);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      max-width: 640px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .card-header {
+      background: linear-gradient(135deg, var(--navy), #2E4A7A);
+      color: #fff;
+      padding: 28px 32px;
+    }
+    .card-header h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; }
+    .card-header p { font-size: 0.88rem; opacity: 0.8; }
+    .card-body { padding: 28px 32px 32px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .chip {
+      font-size: 0.78rem;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .subject {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 2px dashed var(--border);
+    }
+    .body-text {
+      font-size: 0.95rem;
+      line-height: 1.9;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+    .loading, .error {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+    .logo { color: var(--gold); font-weight: 800; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="loading" id="loading">جاري تحميل الرسالة...</div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const messageId = params.get('id');
+
+    async function markOpened(id) {
+      const now = new Date().toISOString();
+      const { data: existing } = await supabaseClient
+        .from('trainee_messages')
+        .select('open_count, opened_at')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!existing) return;
+
+      await supabaseClient
+        .from('trainee_messages')
+        .update({
+          opened_at: existing.opened_at || now,
+          open_count: (existing.open_count || 0) + 1,
+          status: 'opened'
+        })
+        .eq('id', id);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    async function loadMessage() {
+      const card = document.getElementById('card');
+      if (!messageId) {
+        card.innerHTML = '<div class="error">رابط الرسالة غير صالح</div>';
+        return;
+      }
+
+      const { data, error } = await supabaseClient
+        .from('trainee_messages')
+        .select('*')
+        .eq('id', messageId)
+        .maybeSingle();
+
+      if (error || !data) {
+        card.innerHTML = '<div class="error">تعذّر العثور على الرسالة</div>';
+        return;
+      }
+
+      await markOpened(messageId);
+
+      const dateStr = data.created_at
+        ? new Date(data.created_at).toLocaleString('ar-SA')
+        : '—';
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="logo">INEXC</div>
+          <h1>رسالة من منصة التميز الابتكاري</h1>
+          <p>مرحبًا ${escapeHtml(data.trainee_name || '')}</p>
+        </div>
+        <div class="card-body">
+          <div class="meta">
+            <span class="chip">📅 ${dateStr}</span>
+            ${data.course_name && data.course_name !== '—' ? `<span class="chip">📚 ${escapeHtml(data.course_name)}</span>` : ''}
+          </div>
+          <div class="subject">${escapeHtml(data.subject || '—')}</div>
+          <div class="body-text">${escapeHtml(data.message_body || '')}</div>
+        </div>`;
+    }
+
+    loadMessage();
+  </script>
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>قالب بريد INEXC — قطاع التدريب والتطوير</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #eef2f7;
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      padding: 30px 16px;
+    }
+    .wrapper {
+      max-width: 620px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 28px rgba(13,31,60,0.13);
+    }
+
+    /* ── HEADER ── */
+    .header { background: #0D1F3C; padding: 34px 30px 26px; text-align: center; }
+    .header-logo-img {
+      height: 60px;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 14px;
+      background: transparent;
+      border: none;
+    }
+    .header-brand { font-size: 30px; font-weight: 800; color: #C8A96E; letter-spacing: 5px; margin-bottom: 4px; }
+    .header-sub { font-size: 13px; color: #e8d9b8; margin-bottom: 10px; }
+    .header-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(200,169,110,0.14); border: 1px solid rgba(200,169,110,0.45);
+      border-radius: 20px; padding: 5px 18px; font-size: 11px; color: #C8A96E; letter-spacing: 1.5px;
+    }
+    .header-line { width: 55px; height: 2px; background: #C8A96E; margin: 16px auto 0; border-radius: 1px; }
+
+    /* ── GOLD BAR ── */
+    .gold-bar { height: 4px; background: linear-gradient(to left, #b8872a, #e8c98a, #C8A96E, #e8c98a, #b8872a); }
+
+    /* ── BODY ── */
+    .body { background: #ffffff; padding: 44px 36px 36px; }
+    .icon-circle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 62px; height: 62px; background: #f0f4ff;
+      border-radius: 50%; border: 2px solid #C8A96E; font-size: 28px; margin-bottom: 18px;
+    }
+    .main-title { color: #0D1F3C; font-size: 22px; font-weight: 800; margin-bottom: 6px; text-align: center; }
+    .main-sub { color: #7a8ba0; font-size: 13px; text-align: center; margin-bottom: 30px; }
+    .greeting { color: #222; font-size: 15px; margin-bottom: 10px; }
+    .body-text { color: #555; font-size: 14px; line-height: 1.85; margin-bottom: 26px; }
+
+    /* ── DETAILS CARD ── */
+    .details-card {
+      background: #f7faff; border-radius: 10px;
+      border: 1px solid #dce8f5; border-right: 3px solid #C8A96E;
+      padding: 20px 22px 18px; margin-bottom: 26px;
+    }
+    .details-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #0D1F3C; font-size: 14px; margin-bottom: 16px; }
+    .detail-row { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 10px; }
+    .detail-row:last-child { margin-bottom: 0; }
+    .detail-label { color: #778899; min-width: 95px; }
+    .detail-value { color: #0D1F3C; font-weight: 600; }
+
+    /* ── CTA ── */
+    .cta-wrap { text-align: center; margin: 30px 0 34px; }
+    .cta-btn {
+      display: inline-block; background: #0D1F3C; color: #C8A96E;
+      padding: 15px 44px; border-radius: 9px; text-decoration: none;
+      font-weight: 700; font-size: 15px; letter-spacing: 0.5px; border: 1.5px solid #C8A96E;
+    }
+    .divider { border: none; border-top: 1px solid #eef0f4; margin: 0 0 30px; }
+
+    /* ── INEXC AI SECTION ── */
+    .ai-section { border-radius: 14px; border: 1px solid #1a3a6e; overflow: hidden; margin-bottom: 30px; }
+    .ai-section-header {
+      background: #0D1F3C; padding: 20px 24px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .ai-logo-box {
+      width: 50px; height: 50px; border-radius: 12px;
+      background: rgba(200,169,110,0.15); border: 1px solid rgba(200,169,110,0.4);
+      display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+    }
+    .ai-title { font-size: 18px; font-weight: 800; color: #C8A96E; margin-bottom: 3px; letter-spacing: 1px; }
+    .ai-tagline { font-size: 12px; color: #8fa8cc; }
+    .ai-section-body { background: #f5f8ff; padding: 22px 24px; }
+    .ai-intro { color: #2a3a5a; font-size: 14px; line-height: 1.9; margin-bottom: 20px; }
+    .ai-intro strong { color: #0D1F3C; }
+    .ai-stats {
+      display: flex; justify-content: space-around;
+      background: #0D1F3C; border-radius: 10px;
+      padding: 16px 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
+    }
+    .ai-stat { text-align: center; }
+    .ai-stat-num { font-size: 20px; font-weight: 800; color: #C8A96E; display: block; }
+    .ai-stat-label { font-size: 11px; color: #8fa8cc; margin-top: 3px; display: block; }
+    .ai-pillars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .ai-pillar {
+      background: #ffffff; border-radius: 10px; border: 1px solid #d0dff5;
+      padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .ai-pillar-icon { font-size: 22px; }
+    .ai-pillar-title { font-size: 13px; font-weight: 700; color: #0D1F3C; }
+    .ai-pillar-desc { font-size: 12px; color: #5a7090; line-height: 1.6; }
+    .ai-features { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .ai-feature {
+      background: #ffffff; border: 1px solid #c5ddf0; border-radius: 20px;
+      padding: 5px 14px; font-size: 12px; color: #1a5080;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .ai-cta-wrap { text-align: center; }
+    .ai-cta {
+      display: inline-block; background: #0D1F3C; color: #C8A96E;
+      padding: 12px 32px; border-radius: 8px; text-decoration: none;
+      font-weight: 700; font-size: 14px; border: 1.5px solid #C8A96E;
+    }
+
+    /* ── EDUELLA SECTION ── */
+    .eduella-section {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e8f3fb 100%);
+      border-radius: 14px; border: 1px solid #c8dff5;
+      padding: 26px 24px; margin-bottom: 30px; position: relative; overflow: hidden;
+    }
+    .eduella-section::before {
+      content: ''; position: absolute; top: 0; right: 0;
+      width: 100px; height: 100px;
+      background: radial-gradient(circle, rgba(200,169,110,0.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .eduella-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .eduella-logo-box {
+      width: 46px; height: 46px; border-radius: 10px; background: #0D1F3C;
+      display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+    }
+    .eduella-title { font-size: 17px; font-weight: 800; color: #0D1F3C; margin-bottom: 2px; }
+    .eduella-tagline { font-size: 12px; color: #4a7fa5; }
+    .eduella-desc { color: #3a5570; font-size: 14px; line-height: 1.85; margin-bottom: 18px; }
+    .eduella-features { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .eduella-feature {
+      background: #ffffff; border: 1px solid #c5ddf0; border-radius: 20px;
+      padding: 5px 14px; font-size: 12px; color: #1a5080;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .eduella-cta {
+      display: inline-block; background: #0D1F3C; color: #C8A96E;
+      padding: 12px 30px; border-radius: 8px; text-decoration: none;
+      font-weight: 700; font-size: 14px; border: 1.5px solid #C8A96E;
+    }
+
+    /* ── WHISPER ── */
+    .whisper-box {
+      background: #fdf8f0; border-radius: 13px; padding: 24px 22px;
+      position: relative; border: 1px solid #e8d9b0; margin-bottom: 4px;
+    }
+    .whisper-inner { display: flex; align-items: flex-start; gap: 15px; }
+    .whisper-avatar {
+      flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%;
+      background: #0D1F3C; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; color: #C8A96E; border: 2px solid #C8A96E;
+    }
+    .whisper-label { font-size: 11px; color: #a08040; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 10px; }
+    .whisper-quote { color: #3a2a0a; font-size: 14px; line-height: 1.95; margin-bottom: 14px; font-style: italic; }
+    .whisper-name { font-weight: 700; font-size: 13px; color: #7a5010; }
+    .whisper-role { font-size: 12px; color: #a08040; margin-top: 2px; }
+    .whisper-mark {
+      position: absolute; top: 8px; left: 16px; font-size: 58px;
+      color: #C8A96E; opacity: 0.14; font-family: Georgia, serif; line-height: 1; pointer-events: none;
+    }
+
+    /* ── FOOTER ── */
+    .footer { background: #0D1F3C; padding: 28px 30px 22px; text-align: center; }
+    .footer-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 18px; margin-bottom: 18px; }
+    .footer-link { color: #C8A96E; text-decoration: none; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+    .footer-divider { border: none; border-top: 1px solid #1e3d6e; margin: 0 0 16px; }
+    .footer-brand { color: #C8A96E; font-size: 14px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+    .footer-sector { color: #4a6a9a; font-size: 11px; margin-bottom: 5px; }
+    .footer-license { color: #3a5580; font-size: 11px; margin-bottom: 5px; }
+    .footer-copy { color: #253f68; font-size: 10px; }
+
+    @media (max-width: 480px) {
+      .body { padding: 30px 20px 26px; }
+      .ai-pillars { grid-template-columns: 1fr; }
+      .ai-stats { gap: 16px; }
+      .footer-links { gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <div class="header">
+    <img
+      src="assets/images/inexc-logo-white.png"
+      alt="INEXC — Innovative Excellence"
+      class="header-logo-img"
+      style="height:60px;width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 14px;background:transparent;border:none;"
+    />
+    <!-- للبريد الفعلي: استبدل src برابط عام كامل، مثال https://yourdomain.com/assets/images/inexc-logo-white.png -->
+    <div class="header-sub">شركة التميز الابتكاري</div>
+    <div class="header-badge">🎓 قطاع التدريب والتطوير</div>
+    <div class="header-line"></div>
+  </div>
+
+  <div class="gold-bar"></div>
+
+  <!-- ══════════════ BODY ══════════════ -->
+  <div class="body">
+
+    <div style="text-align:center;">
+      <div class="icon-circle">🎓</div>
+    </div>
+
+    <h1 class="main-title">تم تسجيلك بنجاح!</h1>
+    <p class="main-sub">مرحباً بك في قطاع التدريب والتطوير — شركة التميز الابتكاري INEXC</p>
+
+    <p class="greeting">عزيزي/عزيزتي <strong style="color:#0D1F3C;">{{to_name}}</strong>،</p>
+    <p class="body-text">
+      يسعدنا إبلاغك بأنه تم استلام طلب تسجيلك بنجاح في قطاع التدريب والتطوير
+      بشركة التميز الابتكاري INEXC. نحن سعداء بانضمامك إلى مجتمعنا المتميز،
+      ونتطلع إلى أن تكون هذه البداية مقدمةً لمسيرة تعليمية واحترافية استثنائية.
+    </p>
+
+    <!-- تفاصيل التسجيل -->
+    <div class="details-card">
+      <div class="details-title"><span>📋</span> تفاصيل تسجيلك</div>
+      <div class="detail-row">
+        <span>🎓</span>
+        <span class="detail-label">الدورة:</span>
+        <span class="detail-value">{{course_name}}</span>
+      </div>
+      <div class="detail-row">
+        <span>📌</span>
+        <span class="detail-label">نوع التسجيل:</span>
+        <span class="detail-value">{{registration_type}}</span>
+      </div>
+      <div class="detail-row">
+        <span>📱</span>
+        <span class="detail-label">رقم الجوال:</span>
+        <span class="detail-value">{{phone}}</span>
+      </div>
+    </div>
+
+    <p class="body-text">
+      سيتواصل معك فريق التدريب والتطوير قريباً لتأكيد التسجيل وإرشادك للخطوات التالية.
+      نتطلع إلى رحلة تعليمية مميزة تُضاف إلى مسيرتك الاحترافية.
+    </p>
+
+    <div class="cta-wrap">
+      <a href="https://www.inexc.com" class="cta-btn">🚀 &nbsp;ابدأ رحلتك التدريبية</a>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══════════════ INEXC AI SECTION ══════════════ -->
+    <div class="ai-section">
+      <div class="ai-section-header">
+        <div class="ai-logo-box">🧠</div>
+        <div>
+          <div class="ai-title">INEXC AI</div>
+          <div class="ai-tagline">منهج الذكاء الاصطناعي التطبيقي المتكامل</div>
+        </div>
+      </div>
+      <div class="ai-section-body">
+        <p class="ai-intro">
+          <strong>INEXC AI</strong> هو منهج تعليمي متكامل صُمِّم بعناية لتمكين <strong>الطلبة والمعلمين</strong>
+          من فهم أدوات الذكاء الاصطناعي واستخدامها بأسلوب <strong>عملي وتطبيقي</strong>،
+          يشمل التعليم وبناء المشاريع والابتكار — من خلال محتوى تدريجي يبدأ من الأساسيات ويصل إلى الاحتراف.
+        </p>
+        <div class="ai-stats">
+          <div class="ai-stat">
+            <span class="ai-stat-num">5</span>
+            <span class="ai-stat-label">أجزاء المنهج</span>
+          </div>
+          <div class="ai-stat">
+            <span class="ai-stat-num">100%</span>
+            <span class="ai-stat-label">تطبيقي وعملي</span>
+          </div>
+          <div class="ai-stat">
+            <span class="ai-stat-num">2</span>
+            <span class="ai-stat-label">اللغة عربي / إنجليزي</span>
+          </div>
+          <div class="ai-stat">
+            <span class="ai-stat-num">∞</span>
+            <span class="ai-stat-label">إمكانات الابتكار</span>
+          </div>
+        </div>
+        <p style="font-weight:700; color:#0D1F3C; font-size:14px; margin-bottom:12px;">🎯 أجزاء المنهج الخمسة</p>
+        <div class="ai-pillars">
+          <div class="ai-pillar">
+            <span class="ai-pillar-icon">📘</span>
+            <div class="ai-pillar-title">كتاب الطالب</div>
+            <div class="ai-pillar-desc">محتوى علمي تدريجي مُصمَّم لفهم الذكاء الاصطناعي من الصفر حتى الاحتراف</div>
+          </div>
+          <div class="ai-pillar">
+            <span class="ai-pillar-icon">⚡</span>
+            <div class="ai-pillar-title">كتاب الأنشطة</div>
+            <div class="ai-pillar-desc">تمارين ومهام عملية تُرسِّخ المفاهيم وتبني مهارات حقيقية قابلة للتطبيق</div>
+          </div>
+          <div class="ai-pillar">
+            <span class="ai-pillar-icon">🏫</span>
+            <div class="ai-pillar-title">دليل المعلم</div>
+            <div class="ai-pillar-desc">مرجع متخصص يُمكِّن المعلمين من توظيف الذكاء الاصطناعي في التدريس باحترافية</div>
+          </div>
+          <div class="ai-pillar">
+            <span class="ai-pillar-icon">📊</span>
+            <div class="ai-pillar-title">منصة المستويات</div>
+            <div class="ai-pillar-desc">منصة رقمية تقيس مستوى الطالب وتتابع تقدّمه عبر مراحل المنهج المختلفة</div>
+          </div>
+          <div class="ai-pillar">
+            <span class="ai-pillar-icon">💡</span>
+            <div class="ai-pillar-title">منصة المشاريع</div>
+            <div class="ai-pillar-desc">بيئة تفاعلية لبناء مشاريع حقيقية بالذكاء الاصطناعي وتحويل الأفكار إلى ابتكارات</div>
+          </div>
+        </div>
+        <div class="ai-features">
+          <div class="ai-feature">🎓 مناسب للطلاب والمعلمين</div>
+          <div class="ai-feature">🔬 تعلّم تطبيقي عملي</div>
+          <div class="ai-feature">💡 بناء المشاريع والابتكار</div>
+          <div class="ai-feature">📈 محتوى تدريجي</div>
+          <div class="ai-feature">🌐 عربي وإنجليزي</div>
+        </div>
+        <div class="ai-cta-wrap">
+          <a href="https://www.inexc.com" class="ai-cta">🧠 &nbsp;اكتشف منهج INEXC AI</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══════════════ EDUELLA SECTION ══════════════ -->
+    <div class="eduella-section">
+      <div class="eduella-header">
+        <div class="eduella-logo-box">🖥️</div>
+        <div>
+          <div class="eduella-title">منصة Eduella</div>
+          <div class="eduella-tagline">منصتك التعليمية الرقمية المتكاملة</div>
+        </div>
+      </div>
+      <p class="eduella-desc">
+        شريكك الرقمي في رحلة التعلم! <strong>Eduella</strong> هي المنصة التعليمية الإلكترونية المعتمدة
+        لدى شركة التميز الابتكاري، تجمع بين سهولة الوصول وجودة المحتوى لتمنحك تجربة تعلّم
+        احترافية متكاملة من أي مكان وفي أي وقت.
+      </p>
+      <div class="eduella-features">
+        <div class="eduella-feature">📚 دورات تدريبية متنوعة</div>
+        <div class="eduella-feature">🎯 تعلّم بوتيرتك الخاصة</div>
+        <div class="eduella-feature">📜 شهادات معتمدة</div>
+        <div class="eduella-feature">👨‍🏫 مدربون متخصصون</div>
+        <div class="eduella-feature">🌐 تعلّم أونلاين 24/7</div>
+      </div>
+      <p class="eduella-desc">
+        يمكنك الآن تسجيل دوراتك التدريبية مباشرةً عبر المنصة، متابعة تقدّمك،
+        والحصول على شهاداتك إلكترونياً بكل يسر وسهولة.
+      </p>
+      <div style="text-align:center;">
+        <a href="https://eduella.com/ar" class="eduella-cta">🔗 &nbsp;انضم إلى Eduella الآن</a>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══════════════ SHARE SECTION ══════════════ -->
+    <div style="background:#f8faff; border-radius:12px; border:1px solid #dce8f5; padding:20px 22px; margin-bottom:30px; text-align:center;">
+      <p style="font-weight:700; color:#0D1F3C; font-size:14px; margin-bottom:6px;">📤 شارك هذا البريد مع زملائك</p>
+      <p style="color:#7a8ba0; font-size:12px; margin-bottom:16px;">انشر فرصة التعلّم — شارك الرسالة عبر البريد الإلكتروني أو واتساب</p>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <!-- مشاركة عبر البريد: يفتح تطبيق البريد مع نص جاهز -->
+        <a href="mailto:?subject=دعوة للتسجيل في قطاع التدريب والتطوير — INEXC&body=السلام عليكم،%0A%0Aأودّ مشاركتك هذه الفرصة التدريبية المميزة من شركة التميز الابتكاري INEXC.%0A%0Aيمكنك التسجيل والاستفسار عبر:%0Aالموقع: https://www.inexc.com%0Aالبريد: info@inexc.com%0Aواتساب: https://wa.me/971543475500%0A%0Aمنصة التعلم: https://eduella.com/ar"
+           style="display:inline-flex; align-items:center; gap:8px; background:#0D1F3C; color:#C8A96E; padding:11px 24px; border-radius:8px; text-decoration:none; font-weight:700; font-size:13px; border:1.5px solid #C8A96E;">
+          ✉️ مشاركة عبر البريد
+        </a>
+        <!-- مشاركة عبر واتساب -->
+        <a href="https://wa.me/?text=السلام عليكم 👋%0Aأودّ مشاركتك فرصة تدريبية مميزة من شركة التميز الابتكاري INEXC 🎓%0A%0Aللتسجيل والاستفسار:%0A🌐 https://www.inexc.com%0A📧 info@inexc.com%0A%0Aمنصة التعلم الإلكتروني:%0A🖥️ https://eduella.com/ar"
+           target="_blank"
+           style="display:inline-flex; align-items:center; gap:8px; background:#25D366; color:#ffffff; padding:11px 24px; border-radius:8px; text-decoration:none; font-weight:700; font-size:13px;">
+          💬 مشاركة عبر واتساب
+        </a>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══════════════ WHISPER ══════════════ -->
+    <div class="whisper-box">
+      <div class="whisper-mark">"</div>
+      <div class="whisper-inner">
+        <div class="whisper-avatar">أع</div>
+        <div>
+          <div class="whisper-label">✦ همسة</div>
+          <p class="whisper-quote">
+            "النجاح في ريادة الأعمال لا يبدأ بفكرة عظيمة — بل يبدأ بقرار جريء ألّا تتوقف.
+            كل خطوة تتعلمها اليوم هي اللبنة التي ستبني عليها غداً مشروعك الذي يصنع الفارق.
+            استثمر في نفسك أولاً، فالمعرفة هي رأس مالك الذي لا يُنزع."
+          </p>
+          <div class="whisper-name">أحمد عناقوة</div>
+          <div class="whisper-role">المدير التنفيذي — شركة التميز الابتكاري INEXC</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="gold-bar"></div>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <div class="footer">
+    <div class="footer-links">
+      <a href="https://www.inexc.com" class="footer-link">🌐 www.inexc.com</a>
+      <a href="mailto:info@inexc.com" class="footer-link">✉️ info@inexc.com</a>
+      <a href="tel:+971543475500" class="footer-link">📞 +971 54 347 5500</a>
+      <a href="https://eduella.com/ar" class="footer-link">🖥️ eduella.com</a>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-brand">شركة التميز الابتكاري — INEXC</p>
+    <p class="footer-sector">قطاع التدريب والتطوير &nbsp;|&nbsp; Training & Development Sector</p>
+    <p class="footer-license">رقم الرخصة: 1393230</p>
+    <p class="footer-copy">© 2026 جميع الحقوق محفوظة — Innovative Excellence Company</p>
+  </div>
+
+  <!-- ══════════════ OUR PROJECTS ══════════════ -->
+  <div style="background:#081526; padding:24px 30px 20px; text-align:center; border-top:1px solid #1a3a6e;">
+    <p style="font-size:11px; color:#8fa8cc; letter-spacing:2px; margin-bottom:14px; font-weight:600;">✦ &nbsp;من مشاريعنا &nbsp;✦</p>
+    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:8px;">
+      <a href="https://www.inexc.com" style="display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:7px 13px; text-decoration:none; color:#C8A96E; font-size:11px; font-weight:600;">🧠 منهج الذكاء الاصطناعي INEXC AI</a>
+      <a href="https://eduella.com/ar" style="display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:7px 13px; text-decoration:none; color:#C8A96E; font-size:11px; font-weight:600;">🖥️ منصة Eduella</a>
+      <a href="https://www.inexc.com" style="display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:7px 13px; text-decoration:none; color:#C8A96E; font-size:11px; font-weight:600;">📊 منصة المستويات</a>
+      <a href="https://www.inexc.com" style="display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:7px 13px; text-decoration:none; color:#C8A96E; font-size:11px; font-weight:600;">💡 منصة المشاريع</a>
+      <a href="https://www.inexc.com" style="display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:7px 13px; text-decoration:none; color:#C8A96E; font-size:11px; font-weight:600;">📈 منصة تحليل الاختبارات المحلية والدولية</a>
+    </div>
+  </div>
+
+  <!-- ══════════════ UNSUBSCRIBE ══════════════ -->
+  <div style="background:#f5f5f5; padding:12px 30px; text-align:center; border-top:1px solid #e0e0e0;">
+    <p style="font-size:11px; color:#999; margin-bottom:5px;">
+      تلقّيت هذه الرسالة لأنك سجّلت في أحد برامج شركة التميز الابتكاري INEXC.
+    </p>
+    <p style="font-size:11px; color:#999; margin:0;">
+      إذا كنت لا ترغب في استقبال رسائلنا البريدية مستقبلاً،
+      <a href="mailto:info@inexc.com?subject=%D8%A5%D9%84%D8%BA%D8%A7%D8%A1%20%D8%A7%D9%84%D8%A7%D8%B4%D8%AA%D8%B1%D8%A7%D9%83%20%D8%A7%D9%84%D8%A8%D8%B1%D9%8A%D8%AF%D9%8A&body=%D8%A3%D8%B1%D8%AC%D9%88%20%D8%A5%D9%84%D8%BA%D8%A7%D8%A1%20%D8%A7%D8%B4%D8%AA%D8%B1%D8%A7%D9%83%D9%8A%20%D9%81%D9%8A%20%D8%A7%D9%84%D9%82%D8%A7%D8%A6%D9%85%D8%A9%20%D8%A7%D9%84%D8%A8%D8%B1%D9%8A%D8%AF%D9%8A%D8%A9%20%D9%84%D8%B4%D8%B1%D9%83%D8%A9%20%D8%A7%D9%84%D8%AA%D9%85%D9%8A%D8%B2%20%D8%A7%D9%84%D8%A7%D8%A8%D8%AA%D9%83%D8%A7%D8%B1%D9%8A%20INEXC.%0A%D8%A7%D9%84%D8%A7%D8%B3%D9%85:%20{{to_name}}%0A%D8%A7%D9%84%D8%AC%D9%88%D8%A7%D9%84:%20{{phone}}"
+         style="color:#C8A96E; font-weight:600; text-decoration:underline;">
+        اضغط هنا لإلغاء الاشتراك
+      </a>
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

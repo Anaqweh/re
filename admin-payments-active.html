@@ -1,0 +1,3192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="INEXC Command Center — نظام إدارة منصة التميز الابتكاري التعليمية الذكية">
+  <title>INEXC Command Center — نظام إدارة المنصة الذكية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --navy-deep: #0c1528;
+      --navy-light: #2E4A7A;
+      --gold: #C8A96E;
+      --gold-hover: #b89960;
+      --gold-soft: rgba(200, 169, 110, 0.18);
+      --bg: #eef1f6;
+      --surface: #ffffff;
+      --text: #1B2A4A;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
+      --shadow-hover: 0 12px 40px rgba(15, 23, 42, 0.12);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --success: #059669;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --sidebar-width: 272px;
+      --topbar-height: 68px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ========== Login — Enterprise Split ========== */
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .login-brand {
+      background: linear-gradient(145deg, var(--navy-deep) 0%, var(--navy) 45%, var(--navy-light) 100%);
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-brand::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 80%, rgba(200, 169, 110, 0.15) 0%, transparent 45%),
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .login-brand-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-brand .logo-mark {
+      width: 64px;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(200, 169, 110, 0.4);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold);
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      margin-bottom: 32px;
+    }
+
+    .login-brand h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.35;
+      margin-bottom: 12px;
+    }
+
+    .login-brand .tagline {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.65);
+      max-width: 380px;
+      line-height: 1.8;
+    }
+
+    .login-features {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .login-feature {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.92rem;
+    }
+
+    .login-feature-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .login-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 32px;
+      background: var(--bg);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      box-shadow: var(--shadow-hover);
+      border: 1px solid var(--border);
+    }
+
+    .login-logo {
+      margin-bottom: 28px;
+    }
+
+    .login-logo h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .login-logo p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--navy-light);
+      box-shadow: 0 0 0 3px rgba(46, 74, 122, 0.12);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .login-error {
+      display: none;
+      background: rgba(196, 92, 92, 0.1);
+      border: 1px solid rgba(196, 92, 92, 0.3);
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+
+    .login-error.visible {
+      display: block;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 22px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
+    }
+
+    .btn-gold {
+      background: var(--gold);
+      color: var(--navy);
+      box-shadow: 0 4px 16px rgba(200, 169, 110, 0.35);
+    }
+
+    .btn-gold:hover {
+      background: var(--gold-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-navy {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .btn-navy:hover {
+      background: var(--navy-light);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--navy);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      background: var(--bg);
+      border-color: var(--navy-light);
+    }
+
+    .btn-danger {
+      background: rgba(196, 92, 92, 0.12);
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: rgba(196, 92, 92, 0.22);
+    }
+
+    .btn-sm {
+      padding: 7px 14px;
+      font-size: 0.85rem;
+    }
+
+    .btn-block {
+      width: 100%;
+      padding: 14px 24px;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    /* ========== App Shell ========== */
+    #dashboard {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: linear-gradient(180deg, var(--navy-deep) 0%, var(--navy) 100%);
+      padding: 0;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 300;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .sidebar-brand {
+      padding: 24px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .sidebar-brand .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-brand .logo-mark {
+      width: 44px;
+      height: 44px;
+      background: rgba(200, 169, 110, 0.15);
+      border: 1px solid rgba(200, 169, 110, 0.35);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold);
+      font-weight: 800;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+
+    .sidebar-brand .company-ar {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .sidebar-brand .company-en {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 2px;
+    }
+
+    .sidebar-platform-tag {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 6px 12px;
+      border-radius: 50px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 12px 24px;
+    }
+
+    .nav-group-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 1.2px;
+      padding: 16px 14px 8px;
+      text-transform: uppercase;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+    }
+
+    .sidebar-nav li {
+      margin-bottom: 2px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 11px 14px;
+      border: none;
+      background: none;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: right;
+      position: relative;
+    }
+
+    .sidebar-link:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+
+    .sidebar-link.active {
+      background: rgba(200, 169, 110, 0.12);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .sidebar-link.active::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 60%;
+      background: var(--gold);
+      border-radius: 3px 0 0 3px;
+    }
+
+    .sidebar-link .icon {
+      font-size: 1.05rem;
+      width: 22px;
+      text-align: center;
+      opacity: 0.9;
+    }
+
+    .sidebar-link .badge-count {
+      margin-right: auto;
+      background: var(--gold);
+      color: var(--navy-deep);
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 50px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .sidebar-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .sidebar-user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--gold), #e8c88a);
+      color: var(--navy-deep);
+      font-weight: 800;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sidebar-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-user-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-user-role {
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .dashboard-main {
+      flex: 1;
+      margin-right: var(--sidebar-width);
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: var(--topbar-height);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      gap: 16px;
+    }
+
+    .topbar-start {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .breadcrumb strong {
+      color: var(--navy);
+      font-weight: 700;
+    }
+
+    .breadcrumb-sep {
+      opacity: 0.4;
+    }
+
+    .topbar-search {
+      position: relative;
+      width: 280px;
+    }
+
+    .topbar-search input {
+      width: 100%;
+      padding: 10px 16px 10px 40px;
+      font-family: inherit;
+      font-size: 0.88rem;
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .topbar-search input:focus {
+      outline: none;
+      border-color: var(--navy-light);
+      box-shadow: 0 0 0 3px rgba(46, 74, 122, 0.1);
+    }
+
+    .topbar-search-icon {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.9rem;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .topbar-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .topbar-btn:hover {
+      background: var(--bg);
+    }
+
+    .notif-dot {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 8px;
+      height: 8px;
+      background: var(--danger);
+      border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 28px;
+      overflow-x: auto;
+    }
+
+    .data-load-banner {
+      background: rgba(196, 92, 92, 0.1);
+      border: 1px solid rgba(196, 92, 92, 0.28);
+      color: #b91c1c;
+      padding: 12px 18px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .data-load-banner.hidden {
+      display: none;
+    }
+
+    .action-error-banner {
+      background: rgba(196, 92, 92, 0.1);
+      border: 1px solid rgba(196, 92, 92, 0.28);
+      color: #b91c1c;
+      padding: 10px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 0.88rem;
+    }
+
+    .action-error-banner.hidden {
+      display: none;
+    }
+
+    .page-section {
+      display: none;
+    }
+
+    .page-section.active {
+      display: block;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .page-header h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.02em;
+    }
+
+    .page-header p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .page-header-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 50px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .meta-chip.live {
+      color: var(--success);
+      border-color: rgba(5, 150, 105, 0.25);
+      background: rgba(5, 150, 105, 0.06);
+    }
+
+    /* ========== Welcome Banner ========== */
+    .welcome-banner {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .welcome-banner::after {
+      content: '';
+      position: absolute;
+      left: -60px;
+      top: -60px;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(200, 169, 110, 0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .welcome-banner h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      position: relative;
+    }
+
+    .welcome-banner p {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.65);
+      position: relative;
+    }
+
+    .welcome-stats {
+      display: flex;
+      gap: 24px;
+      position: relative;
+    }
+
+    .welcome-stat {
+      text-align: center;
+    }
+
+    .welcome-stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--gold);
+    }
+
+    .welcome-stat-label {
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 2px;
+    }
+
+    /* ========== KPI Cards ========== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.3s, transform 0.3s;
+      position: relative;
+    }
+
+    .stat-card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    .stat-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .stat-card .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .stat-trend {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .stat-trend.up {
+      color: var(--success);
+      background: rgba(5, 150, 105, 0.1);
+    }
+
+    .stat-trend.neutral {
+      color: var(--text-muted);
+      background: var(--bg);
+    }
+
+    .stat-card .stat-icon.navy {
+      background: rgba(27, 42, 74, 0.08);
+    }
+
+    .stat-card .stat-icon.gold {
+      background: rgba(200, 169, 110, 0.15);
+    }
+
+    .stat-card .stat-icon.green {
+      background: rgba(45, 138, 94, 0.12);
+    }
+
+    .stat-card .stat-icon.blue {
+      background: rgba(46, 74, 122, 0.12);
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: var(--navy);
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .stat-card .stat-unit {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* ========== Dashboard Panels ========== */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .panel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-header h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .panel-header span {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .panel-body {
+      padding: 20px 22px;
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      height: 160px;
+      padding-top: 8px;
+    }
+
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .bar-fill {
+      width: 100%;
+      max-width: 36px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, var(--navy-light), var(--navy));
+      transition: height 0.6s ease;
+      min-height: 4px;
+    }
+
+    .bar-fill.highlight {
+      background: linear-gradient(180deg, var(--gold), #e8c88a);
+    }
+
+    .bar-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .activity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .activity-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .activity-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    .activity-icon.reg { background: rgba(27, 42, 74, 0.08); }
+    .activity-icon.pay { background: rgba(200, 169, 110, 0.15); }
+    .activity-icon.msg { background: rgba(5, 150, 105, 0.1); }
+
+    .activity-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .activity-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 2px;
+    }
+
+    .activity-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .activity-time {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      text-align: center;
+    }
+
+    .quick-action:hover {
+      border-color: var(--gold);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+
+    .quick-action-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .quick-action span {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .health-item {
+      padding: 16px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      text-align: center;
+    }
+
+    .health-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .health-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .table-toolbar-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    .table-filters {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-chip {
+      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-chip:hover,
+    .filter-chip.active {
+      border-color: var(--navy);
+      color: var(--navy);
+      background: rgba(27, 42, 74, 0.04);
+    }
+
+    /* ========== Tables ========== */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    thead {
+      background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    }
+
+    th {
+      padding: 14px 18px;
+      text-align: right;
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(244, 246, 249, 0.6);
+    }
+
+    .table-empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+
+    .table-empty .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .status-active {
+      background: rgba(45, 138, 94, 0.12);
+      color: var(--success);
+    }
+
+    .status-pending {
+      background: rgba(200, 148, 58, 0.15);
+      color: var(--warning);
+    }
+
+    .status-inactive {
+      background: rgba(107, 124, 138, 0.15);
+      color: var(--text-muted);
+    }
+
+    .type-free {
+      background: rgba(200, 169, 110, 0.15);
+      color: #9a7d4a;
+    }
+
+    .type-paid {
+      background: rgba(27, 42, 74, 0.08);
+      color: var(--navy);
+    }
+
+    .actions-cell {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ========== Messages ========== */
+    .messages-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.2s;
+    }
+
+    .message-item.unread {
+      border-right: 4px solid var(--gold);
+    }
+
+    .message-item:hover {
+      box-shadow: var(--shadow-hover);
+    }
+
+    .message-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .message-from {
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    .message-date {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .message-subject {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .message-body {
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .message-actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ========== Modal ========== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(27, 42, 74, 0.5);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--bg);
+      color: var(--navy);
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-start;
+      padding: 16px 24px 22px;
+      border-top: 1px solid var(--border);
+    }
+
+    .detail-row {
+      display: flex;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      font-weight: 600;
+      color: var(--navy);
+      min-width: 130px;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+    }
+
+    .detail-value {
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    /* ========== Responsive ========== */
+    .sidebar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .sidebar-toggle span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--navy);
+      margin: 5px 0;
+      border-radius: 2px;
+    }
+
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 250;
+    }
+
+    .sidebar-overlay.visible {
+      display: block;
+    }
+
+    @media (max-width: 1200px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quick-actions {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .topbar-search {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .login-screen {
+        grid-template-columns: 1fr;
+      }
+
+      .login-brand {
+        display: none;
+      }
+
+      .sidebar-toggle {
+        display: block;
+      }
+
+      .sidebar {
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .dashboard-main {
+        margin-right: 0;
+      }
+
+      .main-content {
+        padding: 20px 16px;
+      }
+
+      .stats-grid,
+      .health-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quick-actions {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .welcome-banner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .welcome-stats {
+        width: 100%;
+        justify-content: space-around;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- شاشة تسجيل الدخول -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-brand">
+      <div class="login-brand-inner">
+        <div class="logo-mark">IX</div>
+        <h1>INEXC Command Center</h1>
+        <p class="tagline">نظام إدارة متكامل لمنصة التميز الابتكاري — راقب التسجيلات، الدورات، المدفوعات، والتحليلات من مركز قيادة واحد مدعوم بالذكاء الاصطناعي.</p>
+        <div class="login-features">
+          <div class="login-feature">
+            <span class="login-feature-icon">🎯</span>
+            <span>إدارة دورات ذكية وتتبع أداء المتدربين</span>
+          </div>
+          <div class="login-feature">
+            <span class="login-feature-icon">💳</span>
+            <span>مراقبة المدفوعات واعتماد التسجيلات فوراً</span>
+          </div>
+          <div class="login-feature">
+            <span class="login-feature-icon">📊</span>
+            <span>تحليلات لحظية ومؤشرات أداء المنصة</span>
+          </div>
+        </div>
+      </div>
+      <p style="position:relative;z-index:1;font-size:0.75rem;color:rgba(255,255,255,0.35);">© 2026 INEXC — التميز الابتكاري</p>
+    </div>
+    <div class="login-panel">
+      <div class="login-card">
+        <div class="login-logo">
+          <h2>تسجيل الدخول</h2>
+          <p>مرحباً بك — أدخل بيانات المسؤول للوصول إلى لوحة القيادة</p>
+        </div>
+        <div class="login-error" id="loginError">اسم المستخدم أو كلمة المرور غير صحيحة</div>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="username">اسم المستخدم</label>
+            <input type="text" id="username" name="username" required autocomplete="username" placeholder="admin">
+          </div>
+          <div class="form-group">
+            <label for="password">كلمة المرور</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+          </div>
+          <button type="submit" class="btn btn-gold btn-block">دخول إلى لوحة القيادة</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- لوحة التحكم -->
+  <div id="dashboard" class="hidden">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-wrap">
+          <div class="logo-mark">IX</div>
+          <div class="logo-text">
+            <span class="company-ar">التميز الابتكاري</span>
+            <span class="company-en">INEXC</span>
+          </div>
+        </div>
+        <div class="sidebar-platform-tag">
+          <span class="status-dot"></span>
+          المنصة نشطة — AI Ready
+        </div>
+      </div>
+
+      <div class="sidebar-scroll">
+        <div class="nav-group-label">نظرة عامة</div>
+        <ul class="sidebar-nav">
+          <li>
+            <button class="sidebar-link active" data-page="stats" data-title="لوحة القيادة">
+              <span class="icon">◉</span>
+              لوحة القيادة
+            </button>
+          </li>
+          <li>
+            <button class="sidebar-link" data-page="analytics" data-title="التحليلات">
+              <span class="icon">📈</span>
+              التحليلات
+            </button>
+          </li>
+        </ul>
+
+        <div class="nav-group-label">إدارة التعلم</div>
+        <ul class="sidebar-nav">
+          <li>
+            <button class="sidebar-link" data-page="trainees" data-title="المتدربون">
+              <span class="icon">👥</span>
+              المتدربون
+            </button>
+          </li>
+          <li>
+            <button class="sidebar-link" data-page="courses" data-title="الدورات">
+              <span class="icon">📚</span>
+              الدورات
+            </button>
+          </li>
+          <li>
+            <button class="sidebar-link" data-page="certificates" data-title="الشهادات">
+              <span class="icon">🎓</span>
+              الشهادات
+            </button>
+          </li>
+        </ul>
+
+        <div class="nav-group-label">العمليات</div>
+        <ul class="sidebar-nav">
+          <li>
+            <button class="sidebar-link" data-page="payments" data-title="المدفوعات">
+              <span class="icon">💳</span>
+              المدفوعات
+              <span class="badge-count hidden" id="paymentsBadge">0</span>
+            </button>
+          </li>
+          <li>
+            <button class="sidebar-link" data-page="messages" data-title="الرسائل">
+              <span class="icon">✉️</span>
+              الرسائل
+              <span class="badge-count hidden" id="messagesBadge">0</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-user-avatar">A</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name">المسؤول</div>
+            <div class="sidebar-user-role">Super Admin</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="dashboard-main">
+      <header class="topbar">
+        <div class="topbar-start">
+          <button class="sidebar-toggle" id="sidebarToggle" aria-label="فتح القائمة">
+            <span></span><span></span><span></span>
+          </button>
+          <nav class="breadcrumb">
+            <span>INEXC</span>
+            <span class="breadcrumb-sep">›</span>
+            <strong id="breadcrumbPage">لوحة القيادة</strong>
+          </nav>
+        </div>
+        <div class="topbar-search">
+          <span class="topbar-search-icon">🔍</span>
+          <input type="search" id="globalSearch" placeholder="بحث في المتدربين، الدورات، الرسائل...">
+        </div>
+        <div class="topbar-actions">
+          <button type="button" class="topbar-btn" id="notifBtn" title="الإشعارات">
+            🔔
+            <span class="notif-dot hidden" id="notifDot"></span>
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" id="logoutBtn">تسجيل خروج</button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div class="data-load-banner hidden" id="dataLoadBanner" role="alert"></div>
+        <div class="action-error-banner hidden" id="actionErrorBanner" role="alert"></div>
+
+        <!-- لوحة القيادة -->
+        <section class="page-section active" id="page-stats">
+          <div class="welcome-banner">
+            <div>
+              <h3>مرحباً بك في مركز قيادة INEXC</h3>
+              <p>نظرة شاملة على أداء منصتك التعليمية الذكية — آخر تحديث: <span id="lastUpdate">—</span></p>
+            </div>
+            <div class="welcome-stats">
+              <div class="welcome-stat">
+                <div class="welcome-stat-value" id="welcomeActive">0</div>
+                <div class="welcome-stat-label">متدرب نشط</div>
+              </div>
+              <div class="welcome-stat">
+                <div class="welcome-stat-value" id="welcomePending">0</div>
+                <div class="welcome-stat-label">بانتظار المراجعة</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button type="button" class="quick-action" data-goto="trainees">
+              <span class="quick-action-icon">👥</span>
+              <span>المتدربون</span>
+            </button>
+            <button type="button" class="quick-action" data-goto="courses">
+              <span class="quick-action-icon">📚</span>
+              <span>إضافة دورة</span>
+            </button>
+            <button type="button" class="quick-action" data-goto="payments">
+              <span class="quick-action-icon">💳</span>
+              <span>مراجعة المدفوعات</span>
+            </button>
+            <button type="button" class="quick-action" data-goto="analytics">
+              <span class="quick-action-icon">📊</span>
+              <span>التحليلات</span>
+            </button>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon navy">👥</div>
+                <span class="stat-trend up" id="trendTrainees">+0%</span>
+              </div>
+              <div class="stat-label">إجمالي المتدربين</div>
+              <div class="stat-value" id="statTrainees">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon gold">💳</div>
+                <span class="stat-trend neutral">مدفوع</span>
+              </div>
+              <div class="stat-label">الدورات المدفوعة</div>
+              <div class="stat-value" id="statPaidCourses">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon green">🎓</div>
+                <span class="stat-trend neutral">مجاني</span>
+              </div>
+              <div class="stat-label">الدورات المجانية</div>
+              <div class="stat-value" id="statFreeCourses">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon blue">💰</div>
+                <span class="stat-trend up">↑</span>
+              </div>
+              <div class="stat-label">إجمالي الإيرادات</div>
+              <div class="stat-value" id="statRevenue">0 <span class="stat-unit">د.إ</span></div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3>التسجيلات — آخر 7 أيام</h3>
+                <span>مؤشر أسبوعي</span>
+              </div>
+              <div class="panel-body">
+                <div class="bar-chart" id="registrationsChart"></div>
+              </div>
+            </div>
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3>النشاط الأخير</h3>
+                <span>لحظي</span>
+              </div>
+              <div class="panel-body">
+                <div class="activity-list" id="activityFeed"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <h3>صحة المنصة</h3>
+              <span class="meta-chip live"><span class="status-dot"></span> جميع الأنظمة تعمل</span>
+            </div>
+            <div class="panel-body">
+              <div class="health-grid">
+                <div class="health-item">
+                  <div class="health-value" id="healthCompletion">—</div>
+                  <div class="health-label">معدل إتمام التسجيل</div>
+                </div>
+                <div class="health-item">
+                  <div class="health-value" id="healthResponse">≤ 2 س</div>
+                  <div class="health-label">متوسط وقت الاستجابة</div>
+                </div>
+                <div class="health-item">
+                  <div class="health-value" id="healthUptime">99.9%</div>
+                  <div class="health-label">توفر المنصة</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة المتدربون -->
+        <section class="page-section" id="page-trainees">
+          <div class="page-header">
+            <div>
+              <h2>المتدربون</h2>
+              <p>إدارة وعرض بيانات المتدربين المسجّلين في المنصة</p>
+            </div>
+            <div class="page-header-meta">
+              <span class="meta-chip" id="traineesCountChip">0 متدرب</span>
+            </div>
+          </div>
+          <div class="table-card">
+            <div class="table-toolbar">
+              <span class="table-toolbar-title">سجل المتدربين</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>اسم المتدرب</th>
+                    <th>رقم الجوال</th>
+                    <th>البريد</th>
+                    <th>الدورة المختارة</th>
+                    <th>نوع التسجيل</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="traineesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة الدورات -->
+        <section class="page-section" id="page-courses">
+          <div class="page-header">
+            <div>
+              <h2>الدورات</h2>
+              <p>إدارة محتوى الدورات التدريبية الذكية</p>
+            </div>
+            <button type="button" class="btn btn-gold" id="addCourseBtn">+ إضافة دورة جديدة</button>
+          </div>
+          <div class="table-card">
+            <div class="table-toolbar">
+              <span class="table-toolbar-title">سجل الدورات</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>اسم الدورة</th>
+                    <th>الوصف</th>
+                    <th>السعر</th>
+                    <th>النوع</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="coursesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة المدفوعات -->
+        <section class="page-section" id="page-payments">
+          <div class="page-header">
+            <div>
+              <h2>المدفوعات</h2>
+              <p>متابعة حالات الدفع واعتماد إيصالات المتدربين</p>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon gold">💰</div>
+              </div>
+              <div class="stat-label">إجمالي المدفوعات</div>
+              <div class="stat-value" id="payTotal">0 <span class="stat-unit">د.إ</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon green">✅</div>
+              </div>
+              <div class="stat-label">مدفوعات مؤكدة</div>
+              <div class="stat-value" id="payConfirmed">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon blue">⏳</div>
+              </div>
+              <div class="stat-label">بانتظار المراجعة</div>
+              <div class="stat-value" id="payPending">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon navy">📄</div>
+              </div>
+              <div class="stat-label">طلبات مدفوعة</div>
+              <div class="stat-value" id="payRequests">0</div>
+            </div>
+          </div>
+          <div class="table-card">
+            <div class="table-toolbar">
+              <span class="table-toolbar-title">سجل المدفوعات</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>اسم المتدرب</th>
+                    <th>الدورة</th>
+                    <th>المبلغ</th>
+                    <th>طريقة الدفع</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة الشهادات -->
+        <section class="page-section" id="page-certificates">
+          <div class="page-header">
+            <div>
+              <h2>الشهادات</h2>
+              <p>إدارة شهادات المتدربين وإنشاء أرقام تحقق</p>
+            </div>
+          </div>
+          <div class="table-card">
+            <div class="table-toolbar">
+              <span class="table-toolbar-title">الشهادات الصادرة</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>اسم المتدرب</th>
+                    <th>الدورة</th>
+                    <th>رقم الشهادة</th>
+                    <th>تاريخ الإصدار</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="certificatesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة التحليلات -->
+        <section class="page-section" id="page-analytics">
+          <div class="page-header">
+            <div>
+              <h2>التحليلات</h2>
+              <p>مؤشرات أداء الدورات والتسجيلات والتحويل</p>
+            </div>
+            <div class="page-header-meta">
+              <span class="meta-chip live"><span class="status-dot"></span> بيانات محدّثة</span>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon navy">👁️</div>
+              </div>
+              <div class="stat-label">إجمالي التسجيلات</div>
+              <div class="stat-value" id="analyticsRegistrations">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon gold">📌</div>
+              </div>
+              <div class="stat-label">أكثر دورة طلباً</div>
+              <div class="stat-value" id="analyticsTopCourse" style="font-size:1rem;">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon green">📈</div>
+              </div>
+              <div class="stat-label">نسبة التحويل (مدفوع)</div>
+              <div class="stat-value" id="analyticsConversion">0%</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <div class="stat-icon blue">⭐</div>
+              </div>
+              <div class="stat-label">معدل التفعيل</div>
+              <div class="stat-value" id="analyticsActivation">0%</div>
+            </div>
+          </div>
+          <div class="dashboard-grid">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3>توزيع الدورات</h3>
+              </div>
+              <div class="panel-body">
+                <div class="bar-chart" id="coursesChart"></div>
+              </div>
+            </div>
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3>ملخص الأداء</h3>
+              </div>
+              <div class="panel-body">
+                <div class="health-grid" id="analyticsSummary"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- صفحة الرسائل -->
+        <section class="page-section" id="page-messages">
+          <div class="page-header">
+            <div>
+              <h2>الرسائل</h2>
+              <p>رسائل التسجيل والتواصل الواردة من المنصة</p>
+            </div>
+          </div>
+          <div class="messages-list" id="messagesList"></div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- نافذة تفاصيل المتدرب -->
+  <div class="modal-overlay" id="traineeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>تفاصيل المتدرب</h3>
+        <button type="button" class="modal-close" data-close="traineeModal">&times;</button>
+      </div>
+      <div class="modal-body" id="traineeModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-navy btn-sm" data-close="traineeModal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة إضافة/تعديل دورة -->
+  <div class="modal-overlay" id="courseModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="courseModalTitle">إضافة دورة جديدة</h3>
+        <button type="button" class="modal-close" data-close="courseModal">&times;</button>
+      </div>
+      <form id="courseForm">
+        <div class="modal-body">
+          <input type="hidden" id="courseId">
+          <div class="form-group">
+            <label for="courseName">اسم الدورة</label>
+            <input type="text" id="courseName" required placeholder="أدخل اسم الدورة">
+          </div>
+          <div class="form-group">
+            <label for="courseDesc">الوصف</label>
+            <textarea id="courseDesc" required placeholder="أدخل وصف الدورة"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="courseType">النوع</label>
+            <select id="courseType" required>
+              <option value="free">مجاني</option>
+              <option value="paid">مدفوع</option>
+            </select>
+          </div>
+          <div class="form-group" id="priceGroup">
+            <label for="coursePrice">السعر (د.إ)</label>
+            <input type="number" id="coursePrice" min="0" step="1" value="0" placeholder="0">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-gold btn-sm">حفظ</button>
+          <button type="button" class="btn btn-sm" style="background: var(--bg); color: var(--text-muted);" data-close="courseModal">إلغاء</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script>
+    const STORAGE_KEYS = {
+      session: 'inexc_admin_session'
+    };
+
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'admin123';
+
+    let coursesCache = [];
+    let traineesCache = [];
+    let paymentsCache = [];
+    let messagesCache = [];
+    let messagesFromDb = false;
+    let visibleRegistrations = [];
+    const loadState = { courses: null, registrations: null, payments: null };
+
+    function isMissingTableError(error) {
+      const msg = (error?.message || '').toLowerCase();
+      const code = error?.code || '';
+      return code === '42P01' || code === 'PGRST205' || msg.includes('does not exist') || msg.includes('could not find');
+    }
+
+    function mapCourseFromDb(row) {
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description || '',
+        price: Number(row.price) || 0,
+        type: row.type || 'paid',
+        status: row.status || 'active',
+        hours: row.hours || '20 ساعة',
+        level: row.level || 'متوسط',
+        cert: row.cert || 'شهادة INEXC',
+        days: row.days || 20
+      };
+    }
+
+    function mapCourseToDb(course) {
+      const courseType = course.type || 'paid';
+      return {
+        name: course.name,
+        description: course.description,
+        price: courseType === 'paid' ? Number(course.price) || 0 : 0,
+        type: courseType
+      };
+    }
+
+    function mapRegistrationToTrainee(row) {
+      const regTypeRaw = (row.registration_type || '').toLowerCase();
+      const isPaid = regTypeRaw.includes('مدفوع') || regTypeRaw === 'paid';
+      const payRaw = row.payment_method || '';
+      let paymentMethod = '';
+      if (payRaw.includes('بنك') || payRaw === 'bank') paymentMethod = 'bank';
+      else if (payRaw.includes('بطاق') || payRaw === 'card') paymentMethod = 'card';
+      else if (/stripe/i.test(payRaw)) paymentMethod = 'Stripe';
+
+      let status = 'pending';
+      if (row.status === 'active') status = 'active';
+      else if (row.status === 'inactive') status = 'inactive';
+
+      return {
+        id: String(row.id),
+        name: row.full_name || '',
+        phone: row.phone || '',
+        email: row.email || '',
+        course: row.course_name || '',
+        regType: isPaid ? 'paid' : 'free',
+        status,
+        paymentMethod,
+        registeredAt: row.created_at
+      };
+    }
+
+    function mapRegistrationToMessage(row) {
+      const isPaid = (row.registration_type || '').includes('مدفوع');
+      return {
+        id: String(row.id),
+        from: row.full_name || '',
+        subject: 'تسجيل جديد — ' + (row.course_name || ''),
+        body: isPaid
+          ? 'تم استلام طلب تسجيل مدفوع جديد. يرجى مراجعة الدفع وتأكيد التسجيل.'
+          : 'تم تسجيل متدرب جديد في الدورة المجانية بنجاح.',
+        date: row.created_at,
+        read: row.admin_read === true
+      };
+    }
+
+    function mapPaymentFromDb(row) {
+      const rawStatus = (row.status || '').toLowerCase();
+      let status = 'pending';
+      if (['completed', 'succeeded', 'paid', 'active'].includes(rawStatus)) status = 'active';
+      else if (['failed', 'cancelled', 'canceled', 'inactive'].includes(rawStatus)) status = 'inactive';
+
+      const payRaw = row.payment_method || '';
+      let paymentMethod = payRaw;
+      if (payRaw.includes('بنك') || payRaw === 'bank') paymentMethod = 'bank';
+      else if (payRaw.includes('بطاق') || payRaw === 'card') paymentMethod = 'card';
+      else if (/stripe/i.test(payRaw)) paymentMethod = 'Stripe';
+
+      return {
+        id: String(row.id),
+        registrationId: row.registration_id ? String(row.registration_id) : null,
+        name: row.full_name || '',
+        course: row.course_name || '',
+        amount: Number(row.amount) || 0,
+        currency: row.currency || 'aed',
+        paymentMethod,
+        status,
+        createdAt: row.created_at
+      };
+    }
+
+    function mapMessageFromDb(row) {
+      return {
+        id: String(row.id),
+        from: row.sender_name || row.from_name || '',
+        subject: row.subject || '',
+        body: row.body || '',
+        date: row.created_at,
+        read: row.read === true || row.is_read === true
+      };
+    }
+
+    async function loadCoursesFromSupabase() {
+      const { data, error } = await supabaseClient
+        .from('courses')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        loadState.courses = { ok: false, error };
+        coursesCache = [];
+        return;
+      }
+
+      loadState.courses = { ok: true };
+      coursesCache = (data || []).map(mapCourseFromDb);
+    }
+
+    async function loadRegistrationsFromSupabase() {
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        loadState.registrations = { ok: false, error };
+        visibleRegistrations = [];
+        traineesCache = [];
+        return;
+      }
+
+      loadState.registrations = { ok: true };
+      visibleRegistrations = (data || []).filter(r => r.admin_hidden !== true);
+      traineesCache = visibleRegistrations.map(mapRegistrationToTrainee);
+    }
+
+    async function loadPaymentsFromSupabase() {
+      const { data, error } = await supabaseClient
+        .from('payments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          loadState.payments = { ok: true, missing: true };
+          paymentsCache = [];
+          return;
+        }
+        loadState.payments = { ok: false, error };
+        paymentsCache = [];
+        return;
+      }
+
+      loadState.payments = { ok: true };
+      paymentsCache = (data || []).map(mapPaymentFromDb);
+    }
+
+    async function loadMessagesFromSupabase() {
+      const { data, error } = await supabaseClient
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        messagesFromDb = false;
+        messagesCache = visibleRegistrations.map(mapRegistrationToMessage);
+        if (!isMissingTableError(error)) {
+          console.warn('messages table fallback:', error.message);
+        }
+        return;
+      }
+
+      messagesFromDb = true;
+      messagesCache = (data || [])
+        .filter(m => m.hidden !== true)
+        .map(mapMessageFromDb);
+    }
+
+    async function loadAllFromSupabase() {
+      loadState.courses = null;
+      loadState.registrations = null;
+      loadState.payments = null;
+
+      await loadCoursesFromSupabase();
+      await loadRegistrationsFromSupabase();
+      await loadPaymentsFromSupabase();
+      await loadMessagesFromSupabase();
+      updateDataLoadBanner();
+    }
+
+    function updateDataLoadBanner() {
+      const banner = document.getElementById('dataLoadBanner');
+      if (!banner) return;
+
+      const failed = [];
+      if (loadState.courses?.ok === false) failed.push('الدورات');
+      if (loadState.registrations?.ok === false) failed.push('المتدربين');
+      if (loadState.payments?.ok === false) failed.push('المدفوعات');
+
+      if (failed.length) {
+        banner.textContent = 'تعذّر تحميل: ' + failed.join('، ') + '. تحقق من الاتصال أو إعدادات Supabase.';
+        banner.classList.remove('hidden');
+      } else {
+        banner.textContent = '';
+        banner.classList.add('hidden');
+      }
+    }
+
+    function showActionError(message) {
+      const banner = document.getElementById('actionErrorBanner');
+      if (!banner) return;
+      banner.textContent = message;
+      banner.classList.remove('hidden');
+    }
+
+    function hideActionError() {
+      const banner = document.getElementById('actionErrorBanner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    async function reloadFromSupabase() {
+      await loadAllFromSupabase();
+      renderAll();
+    }
+
+    function showSupabaseError(error, context) {
+      console.error(context, error);
+      showActionError(error?.message || 'حدث خطأ. يرجى المحاولة مرة أخرى.');
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function regTypeLabel(type) {
+      return type === 'paid' ? 'مدفوع' : 'مجاني';
+    }
+
+    function statusLabel(status) {
+      const map = { active: 'نشط', pending: 'قيد المراجعة', inactive: 'غير نشط' };
+      return map[status] || status;
+    }
+
+    function statusClass(status) {
+      const map = { active: 'status-active', pending: 'status-pending', inactive: 'status-inactive' };
+      return map[status] || 'status-inactive';
+    }
+
+    function paymentLabel(method) {
+      const map = { bank: 'تحويل بنكي', card: 'بطاقة', Stripe: 'Stripe', stripe: 'Stripe' };
+      return map[method] || method || '—';
+    }
+
+    function courseStatusLabel(status) {
+      return status === 'inactive' ? 'معطّلة' : 'نشطة';
+    }
+
+    function courseStatusClass(status) {
+      return status === 'inactive' ? 'status-inactive' : 'status-active';
+    }
+
+    /* ========== Auth ========== */
+    const loginScreen = document.getElementById('loginScreen');
+    const dashboard = document.getElementById('dashboard');
+    const loginForm = document.getElementById('loginForm');
+    const loginError = document.getElementById('loginError');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    async function showDashboard() {
+      loginScreen.classList.add('hidden');
+      dashboard.classList.remove('hidden');
+      hideActionError();
+      try {
+        await loadAllFromSupabase();
+        renderAll();
+      } catch (error) {
+        showSupabaseError(error, 'load dashboard');
+        renderAll();
+      }
+    }
+
+    function showLogin() {
+      dashboard.classList.add('hidden');
+      loginScreen.classList.remove('hidden');
+      loginForm.reset();
+      loginError.classList.remove('visible');
+    }
+
+    function checkSession() {
+      if (localStorage.getItem(STORAGE_KEYS.session) === 'true') {
+        showDashboard();
+      }
+    }
+
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (username === ADMIN_USER && password === ADMIN_PASS) {
+        localStorage.setItem(STORAGE_KEYS.session, 'true');
+        loginError.classList.remove('visible');
+        showDashboard();
+      } else {
+        loginError.classList.add('visible');
+      }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEYS.session);
+      showLogin();
+    });
+
+    /* ========== Navigation ========== */
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    const pageSections = document.querySelectorAll('.page-section');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const breadcrumbPage = document.getElementById('breadcrumbPage');
+
+    function navigateTo(page, title) {
+      sidebarLinks.forEach(l => l.classList.toggle('active', l.dataset.page === page));
+      pageSections.forEach(s => s.classList.remove('active'));
+      const section = document.getElementById('page-' + page);
+      if (section) section.classList.add('active');
+      if (breadcrumbPage) breadcrumbPage.textContent = title || page;
+      sidebar.classList.remove('open');
+      if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
+    }
+
+    sidebarLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        navigateTo(link.dataset.page, link.dataset.title);
+      });
+    });
+
+    document.querySelectorAll('.quick-action[data-goto]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.dataset.goto;
+        const link = document.querySelector(`.sidebar-link[data-page="${page}"]`);
+        if (page === 'courses') {
+          navigateTo('courses', 'الدورات');
+          addCourseBtn.click();
+          return;
+        }
+        if (link) link.click();
+      });
+    });
+
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      if (sidebarOverlay) sidebarOverlay.classList.toggle('visible', sidebar.classList.contains('open'));
+    });
+
+    if (sidebarOverlay) {
+      sidebarOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('visible');
+      });
+    }
+
+    document.getElementById('notifBtn')?.addEventListener('click', () => {
+      const link = document.querySelector('.sidebar-link[data-page="messages"]');
+      if (link) link.click();
+    });
+
+    document.getElementById('globalSearch')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        navigateTo('trainees', 'المتدربون');
+      }
+    });
+
+
+    function getCoursePriceByName(courseName) {
+      const course = coursesCache.find(c => c.name === courseName);
+      return course ? Number(course.price) || 0 : 0;
+    }
+
+    function buildPaymentsViewRows() {
+      const rows = [...paymentsCache];
+      const paidRegistrationIds = new Set(
+        paymentsCache
+          .map(p => p.registrationId)
+          .filter(Boolean)
+          .map(String)
+      );
+
+      traineesCache
+        .filter(t => t.regType === 'paid' && !paidRegistrationIds.has(String(t.id)))
+        .forEach(t => {
+          rows.push({
+            id: 'reg-' + t.id,
+            registrationId: String(t.id),
+            name: t.name,
+            course: t.course,
+            amount: getCoursePriceByName(t.course),
+            currency: 'aed',
+            paymentMethod: t.paymentMethod || 'Stripe',
+            status: t.status === 'active' ? 'active' : 'pending',
+            createdAt: t.registeredAt,
+            source: 'registration'
+          });
+        });
+
+      return rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    /* ========== Stats ========== */
+    function renderStats() {
+      const trainees = traineesCache;
+      const courses = coursesCache;
+      const messages = messagesCache;
+
+      const paidCourses = courses.filter(c => c.type === 'paid').length;
+      const freeCourses = courses.filter(c => c.type === 'free').length;
+      const activeCount = trainees.filter(t => t.status === 'active').length;
+      const pendingCount = trainees.filter(t => t.status === 'pending').length;
+
+      let revenue = 0;
+      buildPaymentsViewRows().forEach(p => {
+        if (p.status === 'active') revenue += Number(p.amount) || 0;
+      });
+
+      document.getElementById('statTrainees').textContent = trainees.length;
+      document.getElementById('statPaidCourses').textContent = paidCourses;
+      document.getElementById('statFreeCourses').textContent = freeCourses;
+      document.getElementById('statRevenue').innerHTML =
+        revenue.toLocaleString('ar-SA') + ' <span class="stat-unit">د.إ</span>';
+
+      const welcomeActive = document.getElementById('welcomeActive');
+      const welcomePending = document.getElementById('welcomePending');
+      if (welcomeActive) welcomeActive.textContent = activeCount;
+      if (welcomePending) welcomePending.textContent = pendingCount;
+
+      const lastUpdate = document.getElementById('lastUpdate');
+      if (lastUpdate) {
+        lastUpdate.textContent = new Date().toLocaleString('ar-SA', {
+          hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short'
+        });
+      }
+
+      const trendEl = document.getElementById('trendTrainees');
+      if (trendEl && trainees.length) {
+        trendEl.textContent = '+' + Math.min(trainees.length * 12, 99) + '%';
+      }
+
+      const healthCompletion = document.getElementById('healthCompletion');
+      if (healthCompletion && trainees.length) {
+        healthCompletion.textContent = Math.round((activeCount / trainees.length) * 100) + '%';
+      } else if (healthCompletion) {
+        healthCompletion.textContent = '—';
+      }
+
+      renderRegistrationsChart(trainees);
+      renderActivityFeed(trainees, messages);
+    }
+
+    function renderRegistrationsChart(trainees) {
+      const chart = document.getElementById('registrationsChart');
+      if (!chart) return;
+
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d);
+      }
+
+      const counts = days.map(day => {
+        const key = day.toDateString();
+        return trainees.filter(t => {
+          if (!t.registeredAt) return false;
+          return new Date(t.registeredAt).toDateString() === key;
+        }).length;
+      });
+
+      const max = Math.max(...counts, 1);
+
+      chart.innerHTML = days.map((day, i) => {
+        const h = Math.round((counts[i] / max) * 100);
+        const label = day.toLocaleDateString('ar-SA', { weekday: 'short' });
+        const highlight = i === days.length - 1 ? ' highlight' : '';
+        return `<div class="bar-col">
+          <div class="bar-fill${highlight}" style="height:${Math.max(h, 8)}%"></div>
+          <span class="bar-label">${label}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderActivityFeed(trainees, messages) {
+      const feed = document.getElementById('activityFeed');
+      if (!feed) return;
+
+      const items = [];
+
+      trainees.slice(-5).reverse().forEach(t => {
+        items.push({
+          time: t.registeredAt,
+          icon: 'reg',
+          emoji: '👤',
+          title: 'تسجيل جديد — ' + t.name,
+          desc: t.course
+        });
+      });
+
+      messages.filter(m => !m.read).slice(0, 3).forEach(m => {
+        items.push({
+          time: m.date,
+          icon: 'msg',
+          emoji: '✉️',
+          title: m.subject,
+          desc: m.from
+        });
+      });
+
+      items.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+      if (!items.length) {
+        feed.innerHTML = '<p style="color:var(--text-muted);font-size:0.88rem;text-align:center;padding:24px;">لا يوجد نشاط حديث</p>';
+        return;
+      }
+
+      feed.innerHTML = items.slice(0, 6).map(item => `
+        <div class="activity-item">
+          <div class="activity-icon ${item.icon}">${item.emoji}</div>
+          <div class="activity-content">
+            <div class="activity-title">${escapeHtml(item.title)}</div>
+            <div class="activity-desc">${escapeHtml(item.desc)}</div>
+          </div>
+          <span class="activity-time">${formatDate(item.time).split('،')[0]}</span>
+        </div>
+      `).join('');
+    }
+
+    /* ========== Payments ========== */
+    function renderPayments() {
+      const payments = buildPaymentsViewRows();
+      const tbody = document.getElementById('paymentsTableBody');
+
+      let total = 0;
+      let confirmed = 0;
+      let pending = 0;
+
+      payments.forEach(p => {
+        if (p.status === 'active') {
+          confirmed++;
+          total += Number(p.amount) || 0;
+        } else if (p.status === 'pending') {
+          pending++;
+        }
+      });
+
+      document.getElementById('payTotal').innerHTML = total.toLocaleString('ar-SA') + ' <span class="stat-unit">د.إ</span>';
+      document.getElementById('payConfirmed').textContent = confirmed;
+      document.getElementById('payPending').textContent = pending;
+      document.getElementById('payRequests').textContent = payments.length;
+
+      const badge = document.getElementById('paymentsBadge');
+      if (badge) {
+        if (pending > 0) {
+          badge.textContent = pending;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+
+      if (!payments.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="table-empty"><div class="empty-icon">💳</div><p>لا توجد مدفوعات مسجّلة</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = payments.map(p => {
+        const amount = (Number(p.amount) || 0).toLocaleString('ar-SA') + ' د.إ';
+        return `<tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td>${escapeHtml(p.course)}</td>
+          <td>${amount}</td>
+          <td>${paymentLabel(p.paymentMethod)}</td>
+          <td><span class="status-badge ${statusClass(p.status)}">${statusLabel(p.status)}</span></td>
+          <td class="actions-cell">
+            ${p.status === 'pending' ? `<button type="button" class="btn btn-navy btn-sm" onclick="updatePaymentStatus('${p.id}', 'active')">اعتماد</button>` : ''}
+            ${p.registrationId ? `<button type="button" class="btn btn-navy btn-sm" onclick="viewTrainee('${p.registrationId}')">عرض</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    window.updatePaymentStatus = async function(id, status) {
+      hideActionError();
+      const dbStatus = status === 'active' ? 'completed' : status;
+
+      if (String(id).startsWith('reg-')) {
+        const registrationId = String(id).replace('reg-', '');
+        const trainee = traineesCache.find(t => String(t.id) === registrationId);
+        if (!trainee) {
+          showActionError('لم يتم العثور على بيانات المتدرب.');
+          return;
+        }
+
+        const amount = getCoursePriceByName(trainee.course);
+
+        const { error: insertError } = await supabaseClient
+          .from('payments')
+          .insert([{
+            registration_id: Number(registrationId),
+            full_name: trainee.name,
+            course_name: trainee.course,
+            amount,
+            currency: 'aed',
+            payment_method: trainee.paymentMethod || 'Stripe',
+            status: dbStatus
+          }]);
+
+        if (insertError) {
+          showSupabaseError(insertError, 'create payment from registration');
+          return;
+        }
+
+        const { error: regError } = await supabaseClient
+          .from('registrations')
+          .update({ status: status === 'active' ? 'active' : status })
+          .eq('id', registrationId);
+
+        if (regError) {
+          showSupabaseError(regError, 'update registration after virtual payment');
+          return;
+        }
+
+        try {
+          await reloadFromSupabase();
+        } catch (err) {
+          showSupabaseError(err, 'reload after creating payment');
+        }
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from('payments')
+        .update({ status: dbStatus })
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'update payment');
+        return;
+      }
+
+      if (status === 'active') {
+        const payment = paymentsCache.find(p => p.id === id);
+        if (payment?.registrationId) {
+          const { error: regError } = await supabaseClient
+            .from('registrations')
+            .update({ status: 'active' })
+            .eq('id', payment.registrationId);
+          if (regError) {
+            showSupabaseError(regError, 'update registration after payment');
+            return;
+          }
+        }
+      }
+
+      try {
+        await reloadFromSupabase();
+      } catch (err) {
+        showSupabaseError(err, 'reload after payment update');
+      }
+    };
+
+    /* ========== Certificates ========== */
+    function renderCertificates() {
+      const trainees = traineesCache;
+      const tbody = document.getElementById('certificatesTableBody');
+      const certified = trainees.filter(t => t.status === 'active');
+
+      if (!certified.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="table-empty"><div class="empty-icon">🎓</div><p>لا توجد شهادات صادرة بعد</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = certified.map((t, i) => {
+        const certId = 'INEXC-2026-' + String(i + 1).padStart(3, '0');
+        const issueDate = t.registeredAt ? new Date(t.registeredAt).toLocaleDateString('ar-SA') : '—';
+        return `<tr>
+          <td>${escapeHtml(t.name)}</td>
+          <td>${escapeHtml(t.course)}</td>
+          <td dir="ltr" style="text-align:right;font-weight:600;color:var(--navy);">${certId}</td>
+          <td>${issueDate}</td>
+          <td><span class="status-badge status-active">صادرة</span></td>
+          <td class="actions-cell">
+            <button type="button" class="btn btn-navy btn-sm">عرض</button>
+            <button type="button" class="btn btn-gold btn-sm">PDF</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    /* ========== Analytics ========== */
+    function renderAnalytics() {
+      const trainees = traineesCache;
+      const courses = coursesCache;
+
+      const courseCounts = {};
+      trainees.forEach(t => {
+        courseCounts[t.course] = (courseCounts[t.course] || 0) + 1;
+      });
+
+      let topCourse = '—';
+      let topCount = 0;
+      Object.entries(courseCounts).forEach(([name, count]) => {
+        if (count > topCount) { topCourse = name; topCount = count; }
+      });
+
+      const paidCount = trainees.filter(t => t.regType === 'paid').length;
+      const activeCount = trainees.filter(t => t.status === 'active').length;
+      const conversion = trainees.length ? Math.round((paidCount / trainees.length) * 100) : 0;
+      const activation = trainees.length ? Math.round((activeCount / trainees.length) * 100) : 0;
+
+      document.getElementById('analyticsRegistrations').textContent = trainees.length;
+      document.getElementById('analyticsTopCourse').textContent = topCourse;
+      document.getElementById('analyticsConversion').textContent = conversion + '%';
+      document.getElementById('analyticsActivation').textContent = activation + '%';
+
+      const chart = document.getElementById('coursesChart');
+      if (chart) {
+        const entries = Object.entries(courseCounts).slice(0, 5);
+        const max = Math.max(...entries.map(e => e[1]), 1);
+        if (!entries.length) {
+          chart.innerHTML = '<p style="color:var(--text-muted);font-size:0.88rem;text-align:center;">لا توجد بيانات</p>';
+        } else {
+          chart.innerHTML = entries.map(([name, count], i) => {
+            const h = Math.round((count / max) * 100);
+            const short = name.length > 8 ? name.slice(0, 8) + '…' : name;
+            return `<div class="bar-col">
+              <div class="bar-fill${i === 0 ? ' highlight' : ''}" style="height:${Math.max(h, 8)}%"></div>
+              <span class="bar-label">${escapeHtml(short)}</span>
+            </div>`;
+          }).join('');
+        }
+      }
+
+      const summary = document.getElementById('analyticsSummary');
+      if (summary) {
+        summary.innerHTML = `
+          <div class="health-item"><div class="health-value">${courses.length}</div><div class="health-label">دورة متاحة</div></div>
+          <div class="health-item"><div class="health-value">${paidCount}</div><div class="health-label">تسجيل مدفوع</div></div>
+          <div class="health-item"><div class="health-value">${trainees.length - activeCount}</div><div class="health-label">غير مفعّل</div></div>`;
+      }
+    }
+
+    /* ========== Trainees ========== */
+    function renderTrainees() {
+      const trainees = traineesCache;
+      const tbody = document.getElementById('traineesTableBody');
+      const chip = document.getElementById('traineesCountChip');
+      if (chip) chip.textContent = trainees.length + ' متدرب';
+
+      if (!trainees.length) {
+        tbody.innerHTML = `
+          <tr><td colspan="7">
+            <div class="table-empty">
+              <div class="empty-icon">👥</div>
+              <p>لا يوجد متدربون مسجّلون حالياً</p>
+            </div>
+          </td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = trainees.map(t => `
+        <tr>
+          <td>${escapeHtml(t.name)}</td>
+          <td dir="ltr" style="text-align: right;">${escapeHtml(t.phone)}</td>
+          <td dir="ltr" style="text-align: right;">${escapeHtml(t.email)}</td>
+          <td>${escapeHtml(t.course)}</td>
+          <td><span class="status-badge ${t.regType === 'paid' ? 'type-paid' : 'type-free'}">${regTypeLabel(t.regType)}</span></td>
+          <td><span class="status-badge ${statusClass(t.status)}">${statusLabel(t.status)}</span></td>
+          <td>
+            <button type="button" class="btn btn-navy btn-sm" onclick="viewTrainee('${t.id}')">عرض التفاصيل</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    window.viewTrainee = function(id) {
+      const trainees = traineesCache;
+      const trainee = trainees.find(t => t.id === id);
+      if (!trainee) return;
+
+      document.getElementById('traineeModalBody').innerHTML = `
+        <div class="detail-row"><span class="detail-label">الاسم الكامل</span><span class="detail-value">${escapeHtml(trainee.name)}</span></div>
+        <div class="detail-row"><span class="detail-label">رقم الجوال</span><span class="detail-value" dir="ltr">${escapeHtml(trainee.phone)}</span></div>
+        <div class="detail-row"><span class="detail-label">البريد الإلكتروني</span><span class="detail-value" dir="ltr">${escapeHtml(trainee.email)}</span></div>
+        <div class="detail-row"><span class="detail-label">الدورة المختارة</span><span class="detail-value">${escapeHtml(trainee.course)}</span></div>
+        <div class="detail-row"><span class="detail-label">نوع التسجيل</span><span class="detail-value">${regTypeLabel(trainee.regType)}</span></div>
+        <div class="detail-row"><span class="detail-label">طريقة الدفع</span><span class="detail-value">${paymentLabel(trainee.paymentMethod)}</span></div>
+        <div class="detail-row"><span class="detail-label">الحالة</span><span class="detail-value"><span class="status-badge ${statusClass(trainee.status)}">${statusLabel(trainee.status)}</span></span></div>
+        <div class="detail-row"><span class="detail-label">تاريخ التسجيل</span><span class="detail-value">${formatDate(trainee.registeredAt)}</span></div>
+        <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-navy btn-sm" onclick="updateTraineeStatus('${trainee.id}', 'active')">تفعيل</button>
+          <button type="button" class="btn btn-sm" style="background: rgba(200,148,58,0.15); color: var(--warning);" onclick="updateTraineeStatus('${trainee.id}', 'pending')">قيد المراجعة</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="updateTraineeStatus('${trainee.id}', 'inactive')">تعطيل</button>
+        </div>
+      `;
+      openModal('traineeModal');
+    };
+
+    window.updateTraineeStatus = async function(id, status) {
+      hideActionError();
+      const { error } = await supabaseClient
+        .from('registrations')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'update trainee');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+        closeModal('traineeModal');
+      } catch (err) {
+        showSupabaseError(err, 'reload after update');
+      }
+    };
+
+    /* ========== Courses ========== */
+    function renderCourses() {
+      const courses = coursesCache;
+      const tbody = document.getElementById('coursesTableBody');
+
+      if (!courses.length) {
+        tbody.innerHTML = `
+          <tr><td colspan="6">
+            <div class="table-empty">
+              <div class="empty-icon">📚</div>
+              <p>لا توجد دورات — أضف دورة جديدة</p>
+            </div>
+          </td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = courses.map(c => `
+        <tr${c.status === 'inactive' ? ' style="opacity:0.65;"' : ''}>
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td style="max-width: 280px;">${escapeHtml(c.description)}</td>
+          <td>${c.type === 'free' ? '<span style="color: #9a7d4a; font-weight: 600;">مجانية</span>' : c.price.toLocaleString('ar-SA') + ' د.إ'}</td>
+          <td><span class="status-badge ${c.type === 'paid' ? 'type-paid' : 'type-free'}">${c.type === 'paid' ? 'مدفوع' : 'مجاني'}</span></td>
+          <td><span class="status-badge ${courseStatusClass(c.status)}">${courseStatusLabel(c.status)}</span></td>
+          <td>
+            <div class="actions-cell">
+              <button type="button" class="btn btn-navy btn-sm" onclick="editCourse('${c.id}')">تعديل</button>
+              ${c.status === 'inactive'
+                ? `<button type="button" class="btn btn-gold btn-sm" onclick="reactivateCourse('${c.id}')">تفعيل</button>`
+                : `<button type="button" class="btn btn-danger btn-sm" onclick="deleteCourse('${c.id}')">تعطيل</button>`}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    const courseModal = document.getElementById('courseModal');
+    const courseForm = document.getElementById('courseForm');
+    const courseType = document.getElementById('courseType');
+    const priceGroup = document.getElementById('priceGroup');
+    const addCourseBtn = document.getElementById('addCourseBtn');
+
+    function togglePriceField() {
+      const isPaid = courseType.value === 'paid';
+      priceGroup.style.display = isPaid ? 'block' : 'none';
+      if (!isPaid) document.getElementById('coursePrice').value = 0;
+    }
+
+    courseType.addEventListener('change', togglePriceField);
+
+    addCourseBtn.addEventListener('click', () => {
+      document.getElementById('courseModalTitle').textContent = 'إضافة دورة جديدة';
+      document.getElementById('courseId').value = '';
+      courseForm.reset();
+      courseType.value = 'free';
+      togglePriceField();
+      openModal('courseModal');
+    });
+
+    window.editCourse = function(id) {
+      const courses = coursesCache;
+      const course = courses.find(c => c.id === id);
+      if (!course) return;
+
+      document.getElementById('courseModalTitle').textContent = 'تعديل الدورة';
+      document.getElementById('courseId').value = course.id;
+      document.getElementById('courseName').value = course.name;
+      document.getElementById('courseDesc').value = course.description;
+      document.getElementById('courseType').value = course.type;
+      document.getElementById('coursePrice').value = course.price;
+      togglePriceField();
+      openModal('courseModal');
+    };
+
+    window.deleteCourse = async function(id) {
+      if (!confirm('هل تريد تعطيل هذه الدورة؟ لن تظهر في الموقع لكنها تبقى في السجل.')) return;
+
+      hideActionError();
+      const { error } = await supabaseClient
+        .from('courses')
+        .update({ status: 'inactive' })
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'deactivate course');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+      } catch (err) {
+        showSupabaseError(err, 'reload after deactivate course');
+      }
+    };
+
+    window.reactivateCourse = async function(id) {
+      hideActionError();
+      const { error } = await supabaseClient
+        .from('courses')
+        .update({ status: 'active' })
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'reactivate course');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+      } catch (err) {
+        showSupabaseError(err, 'reload after reactivate course');
+      }
+    };
+
+    courseForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideActionError();
+      const id = document.getElementById('courseId').value;
+      const type = courseType.value;
+      const basePayload = mapCourseToDb({
+        name: document.getElementById('courseName').value.trim(),
+        description: document.getElementById('courseDesc').value.trim(),
+        type,
+        price: type === 'paid' ? Number(document.getElementById('coursePrice').value) || 0 : 0
+      });
+      const payload = id ? basePayload : { ...basePayload, status: 'active' };
+
+      let error;
+      if (id) {
+        ({ error } = await supabaseClient.from('courses').update(payload).eq('id', id));
+      } else {
+        ({ error } = await supabaseClient.from('courses').insert([payload]));
+      }
+
+      if (error) {
+        showSupabaseError(error, 'save course');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+        closeModal('courseModal');
+      } catch (err) {
+        showSupabaseError(err, 'reload after save course');
+      }
+    });
+
+    /* ========== Messages ========== */
+    function renderMessages() {
+      const messages = messagesCache;
+      const list = document.getElementById('messagesList');
+      const badge = document.getElementById('messagesBadge');
+      const unread = messages.filter(m => !m.read).length;
+
+      if (unread > 0) {
+        badge.textContent = unread;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      const notifDot = document.getElementById('notifDot');
+      if (notifDot) {
+        if (unread > 0) notifDot.classList.remove('hidden');
+        else notifDot.classList.add('hidden');
+      }
+
+      if (!messages.length) {
+        list.innerHTML = `
+          <div class="table-empty" style="background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div class="empty-icon">✉️</div>
+            <p>لا توجد رسائل</p>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = messages.map(m => `
+        <div class="message-item ${m.read ? '' : 'unread'}">
+          <div class="message-header">
+            <span class="message-from">${escapeHtml(m.from)}</span>
+            <span class="message-date">${formatDate(m.date)}</span>
+          </div>
+          <div class="message-subject">${escapeHtml(m.subject)}</div>
+          <div class="message-body">${escapeHtml(m.body)}</div>
+          <div class="message-actions">
+            ${!m.read ? `<button type="button" class="btn btn-navy btn-sm" onclick="markMessageRead('${m.id}')">تعليم كمقروءة</button>` : ''}
+            <button type="button" class="btn btn-danger btn-sm" onclick="deleteMessage('${m.id}')">حذف</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.markMessageRead = async function(id) {
+      hideActionError();
+      const table = messagesFromDb ? 'messages' : 'registrations';
+      const payload = messagesFromDb ? { read: true } : { admin_read: true };
+
+      const { error } = await supabaseClient
+        .from(table)
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'mark message read');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+      } catch (err) {
+        showSupabaseError(err, 'reload messages');
+      }
+    };
+
+    window.deleteMessage = async function(id) {
+      if (!confirm('هل تريد حذف هذه الرسالة؟')) return;
+
+      hideActionError();
+      const table = messagesFromDb ? 'messages' : 'registrations';
+      const payload = messagesFromDb ? { hidden: true } : { admin_hidden: true };
+
+      const { error } = await supabaseClient
+        .from(table)
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        showSupabaseError(error, 'delete message');
+        return;
+      }
+
+      try {
+        await reloadFromSupabase();
+      } catch (err) {
+        showSupabaseError(err, 'reload after delete message');
+      }
+    };
+
+    /* ========== Modals ========== */
+    function openModal(id) {
+      document.getElementById(id).classList.add('visible');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('visible');
+    }
+
+    document.querySelectorAll('[data-close]').forEach(btn => {
+      btn.addEventListener('click', () => closeModal(btn.dataset.close));
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal(overlay.id);
+      });
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderAll() {
+      renderStats();
+      renderTrainees();
+      renderCourses();
+      renderMessages();
+      renderPayments();
+      renderCertificates();
+      renderAnalytics();
+    }
+
+    checkSession();
+  </script>
+
+</body>
+</html>

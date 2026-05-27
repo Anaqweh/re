@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="سجّل في دورتك — التميز الابتكاري INEXC">
+  <title>التسجيل | INEXC — التميز الابتكاري</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --navy-light: #2E4A7A;
+      --gold: #C8A96E;
+      --gold-hover: #b89960;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #1B2A4A;
+      --text-muted: #6b7c8a;
+      --border: #e8ecf2;
+      --shadow: 0 2px 12px rgba(27, 42, 74, 0.08);
+      --shadow-hover: 0 8px 28px rgba(27, 42, 74, 0.12);
+      --radius: 14px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
+    header {
+      background: var(--navy);
+      padding: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+      gap: 20px;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo-mark {
+      width: 46px;
+      height: 46px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+    }
+
+    .logo-text .company-ar {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .logo-text .company-en {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 2px;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    nav a {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover,
+    nav a.active {
+      color: var(--gold);
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .menu-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: #fff;
+      margin: 5px 0;
+      border-radius: 2px;
+      transition: 0.3s;
+    }
+
+    /* Page hero */
+    .page-hero {
+      text-align: center;
+      padding: 56px 20px 48px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-light) 100%);
+    }
+
+    .page-hero h1 {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.4;
+    }
+
+    /* Register section */
+    .register-section {
+      flex: 1;
+      padding: 48px 0 64px;
+    }
+
+    .form-card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .form-group {
+      margin-bottom: 22px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+
+    .form-group label .required {
+      color: #c45c5c;
+      margin-right: 2px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="tel"],
+    .form-group input[type="email"],
+    .form-group select,
+    .form-group input[type="file"] {
+      width: 100%;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--navy-light);
+      box-shadow: 0 0 0 3px rgba(46, 74, 122, 0.12);
+    }
+
+    .form-group input[type="file"] {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .form-group input[type="file"]::file-selector-button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      margin-left: 12px;
+      border: none;
+      border-radius: 6px;
+      background: var(--navy);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .radio-option input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--navy);
+      cursor: pointer;
+    }
+
+    .paid-fields {
+      display: none;
+    }
+
+    .course-price-box {
+      display: none;
+      margin-top: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.25);
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .course-price-box.visible {
+      display: block;
+    }
+
+    .course-price-box.free {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.25);
+      color: #15803d;
+    }
+
+    .reg-type-note {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .paid-fields.visible {
+      display: none;
+    }
+
+    .paid-fields .form-group:first-child {
+      margin-top: 0;
+    }
+
+
+
+    .auto-receipt-box {
+      display: none;
+      margin: 14px 0 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.28);
+      color: var(--navy);
+      line-height: 1.8;
+    }
+
+    .auto-receipt-box.visible {
+      display: block;
+    }
+
+    .auto-receipt-title {
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--navy);
+    }
+
+    .auto-receipt-text {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .auto-receipt-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .auto-receipt-check input {
+      margin-top: 7px;
+      accent-color: var(--navy);
+    }
+
+    .receipt-result-box {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #166534;
+      line-height: 1.8;
+    }
+
+    .receipt-result-box.visible {
+      display: block;
+    }
+
+    .btn-receipt {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 22px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: var(--navy);
+      font-weight: 800;
+    }
+
+    .btn-submit {
+      display: block;
+      width: 100%;
+      padding: 16px 24px;
+      margin-top: 8px;
+      background: var(--gold);
+      color: var(--navy);
+      font-family: inherit;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
+      box-shadow: 0 4px 20px rgba(200, 169, 110, 0.35);
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--gold-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(200, 169, 110, 0.45);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .form-error {
+      display: none;
+      background: rgba(196, 92, 92, 0.1);
+      border: 1px solid rgba(196, 92, 92, 0.3);
+      color: #c45c5c;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      margin-bottom: 16px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .form-error.visible {
+      display: block;
+    }
+
+    .sql-help {
+      display: none;
+      margin-bottom: 16px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .sql-help.visible {
+      display: block;
+    }
+
+    .sql-help p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .sql-help textarea {
+      width: 100%;
+      min-height: 160px;
+      font-family: Consolas, monospace;
+      font-size: 0.78rem;
+      direction: ltr;
+      text-align: left;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      resize: vertical;
+    }
+
+    .btn-copy-sql {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .btn-copy-sql:hover {
+      background: var(--navy-light);
+    }
+
+    .success-message {
+      display: none;
+      max-width: 560px;
+      margin: 0 auto;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .success-message.visible {
+      display: block;
+    }
+
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      background: rgba(200, 169, 110, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+    }
+
+    .success-message h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .success-message p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    .btn-back {
+      display: inline-block;
+      padding: 12px 28px;
+      background: var(--navy);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    .btn-back:hover {
+      background: var(--navy-light);
+    }
+
+    .form-card.hidden {
+      display: none;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--navy);
+      padding: 32px 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.88rem;
+    }
+
+    footer .company-name {
+      display: block;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav {
+        display: none;
+        position: absolute;
+        top: 72px;
+        right: 0;
+        left: 0;
+        flex-direction: column;
+        background: var(--navy);
+        padding: 16px 20px 24px;
+        gap: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      nav.open {
+        display: flex;
+      }
+
+      .menu-toggle {
+        display: block;
+      }
+
+      header {
+        position: relative;
+      }
+
+      .page-hero {
+        padding: 44px 16px 36px;
+      }
+
+      .form-card {
+        padding: 28px 20px;
+      }
+
+  
+
+    .auto-receipt-box {
+      display: none;
+      margin: 14px 0 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(200, 169, 110, 0.12);
+      border: 1px solid rgba(200, 169, 110, 0.28);
+      color: var(--navy);
+      line-height: 1.8;
+    }
+
+    .auto-receipt-box.visible {
+      display: block;
+    }
+
+    .auto-receipt-title {
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--navy);
+    }
+
+    .auto-receipt-text {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .auto-receipt-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .auto-receipt-check input {
+      margin-top: 7px;
+      accent-color: var(--navy);
+    }
+
+    .receipt-result-box {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #166534;
+      line-height: 1.8;
+    }
+
+    .receipt-result-box.visible {
+      display: block;
+    }
+
+    .btn-receipt {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 22px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: var(--navy);
+      font-weight: 800;
+    }
+
+    .btn-submit {
+        font-size: 1.05rem;
+        padding: 15px 20px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-inner {
+        height: 64px;
+      }
+
+      nav {
+        top: 64px;
+      }
+
+      .logo-mark {
+        width: 40px;
+        height: 40px;
+        font-size: 0.8rem;
+      }
+
+      .logo-text .company-ar {
+        font-size: 0.95rem;
+      }
+
+      .register-section {
+        padding: 36px 0 48px;
+      }
+
+      .radio-group {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- الهيدر -->
+  <header>
+    <div class="container header-inner">
+      <a href="index.html" class="logo-wrap">
+        <div class="logo-mark">IX</div>
+        <div class="logo-text">
+          <span class="company-ar">التميز الابتكاري</span>
+          <span class="company-en">INEXC</span>
+        </div>
+      </a>
+      <nav id="nav">
+        <a href="index.html">الرئيسية</a>
+        <a href="index.html#courses">الدورات</a>
+        <a href="register.html" class="active">التسجيل</a>
+      </nav>
+      <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- عنوان الصفحة -->
+  <section class="page-hero">
+    <h1>سجّل في دورتك الآن</h1>
+  </section>
+
+  <!-- نموذج التسجيل -->
+  <section class="register-section">
+    <div class="container">
+      <div class="form-card" id="formCard">
+        <form id="registerForm" novalidate>
+          <div class="form-group">
+            <label for="fullName">الاسم الكامل <span class="required">*</span></label>
+            <input type="text" id="fullName" name="fullName" required placeholder="أدخل اسمك الكامل">
+          </div>
+
+          <div class="form-group">
+            <label for="phone">رقم الجوال <span class="required">*</span></label>
+            <input type="tel" id="phone" name="phone" required placeholder="05xxxxxxxx" dir="ltr" style="text-align: right;">
+          </div>
+
+          <div class="form-group">
+            <label for="email">البريد الإلكتروني <span class="required">*</span></label>
+            <input type="email" id="email" name="email" required placeholder="example@email.com" dir="ltr" style="text-align: right;">
+          </div>
+
+          <div class="form-group">
+            <label for="course">اختيار الدورة <span class="required">*</span></label>
+            <select id="course" name="course" required>
+              <option value="" disabled selected>— جاري تحميل الدورات —</option>
+            </select>
+            <div class="course-price-box" id="coursePriceBox"></div>
+          </div>
+
+          <div class="form-group" id="regTypeGroup" style="display:none;">
+            <label>نوع التسجيل <span class="required">*</span></label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="regType" value="free" checked>
+                مجاني
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="regType" value="paid">
+                مدفوع
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="reg-type-note" id="regTypeNote">اختر دورة لعرض السعر ونوع التسجيل</div>
+          </div>
+
+          <div class="auto-receipt-box" id="autoReceiptBox">
+            <div class="auto-receipt-title">إصدار وصل الدفع تلقائيًا</div>
+            <div class="auto-receipt-text">
+              عند اختيار دورة مدفوعة سيتم تحويلك إلى Stripe لإتمام الدفع أولًا. بعد نجاح الدفع سيُنشئ النظام وصل الدفع تلقائيًا، ثم يظهر لك رابط تحميل الوصل في صفحة التأكيد.
+            </div>
+            <label class="auto-receipt-check">
+              <input type="checkbox" id="requestReceipt" checked>
+              <span>أطلب إصدار وصل الدفع تلقائيًا بعد نجاح عملية الدفع.</span>
+            </label>
+          </div>
+
+          <div class="sql-help" id="sqlHelp">
+            <p><strong>خطوة مطلوبة في Supabase:</strong> افتح SQL Editor → New query → الصق السكربت → Run → ثم أعد المحاولة.</p>
+            <textarea id="sqlScript" readonly></textarea>
+            <button type="button" class="btn-copy-sql" id="copySqlBtn">نسخ السكربت</button>
+          </div>
+          <div class="form-error" id="formError"></div>
+          <button type="submit" class="btn-submit" id="submitBtn">إرسال التسجيل والدفع</button>
+        </form>
+      </div>
+
+      <div class="success-message" id="successMessage">
+        <div class="success-icon">✓</div>
+        <h2 id="successTitle">تم تسجيلك بنجاح!</h2>
+        <p id="successText">شكراً لانضمامك إلى منصة التميز الابتكاري. تحقّق من بريدك الإلكتروني للاطلاع على تفاصيل التسجيل.</p>
+        <div class="receipt-result-box" id="receiptResultBox"></div>
+        <a href="index.html" class="btn-back">العودة للرئيسية</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- الفوتر -->
+  <footer>
+    <span class="company-name">التميز الابتكاري INEXC</span>
+    <p>© 2026 جميع الحقوق محفوظة</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>
+    const EMAILJS_PUBLIC_KEY = 'gc0MqAK4Mwebs_GOg';
+    const EMAILJS_SERVICE_ID = 'service_58hjcoc';
+    const EMAILJS_TEMPLATE_ID = 'template_fq8l9x8';
+
+    const SUPABASE_FIX_SQL = `ALTER TABLE public.registrations DISABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT ALL ON public.registrations TO anon;
+GRANT ALL ON SEQUENCE registrations_id_seq TO anon;
+NOTIFY pgrst, 'reload schema';`;
+
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+
+    let coursesByName = {};
+
+    async function loadCoursesIntoSelect() {
+      const courseSelect = document.getElementById('course');
+      const note = document.getElementById('regTypeNote');
+      try {
+        const { data, error } = await supabaseClient
+          .from('courses')
+          .select('name, price, type, status')
+          .eq('status', 'active')
+          .order('created_at', { ascending: true });
+
+        courseSelect.innerHTML = '<option value="" disabled selected>— اختر الدورة —</option>';
+        coursesByName = {};
+
+        if (error) {
+          console.error('Courses load error:', error);
+          courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+          if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+          return;
+        }
+
+        if (!data?.length) {
+          courseSelect.innerHTML = '<option value="" disabled selected>— لا توجد دورات متاحة —</option>';
+          if (note) note.textContent = 'لا توجد دورات متاحة للتسجيل حالياً.';
+          return;
+        }
+
+        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+
+        data.forEach(row => {
+          const paid = row.type === 'paid';
+          const price = paid ? (Number(row.price) || 0) : 0;
+          coursesByName[row.name] = { price, paid };
+
+          const opt = document.createElement('option');
+          opt.value = row.name;
+          opt.textContent = row.name;
+          opt.dataset.price = price;
+          courseSelect.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Courses load error:', e);
+        coursesByName = {};
+        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
+        if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+      }
+    }
+
+    function getSelectedCourseInfo() {
+      const courseSelect = document.getElementById('course');
+      const name = courseSelect.value;
+      if (name && coursesByName[name]) {
+        return { name, ...coursesByName[name] };
+      }
+      return { name: '', price: 0, paid: false };
+    }
+
+    function isPaidCourse(info) {
+      return !!(info.paid && Number(info.price) > 0);
+    }
+
+    function getSelectedCoursePrice() {
+      return Number(getSelectedCourseInfo().price) || 0;
+    }
+
+    let submitBtnDefaultText = 'إرسال التسجيل';
+
+    function updateCourseSelectionUI() {
+      const info = getSelectedCourseInfo();
+      const box = document.getElementById('coursePriceBox');
+      const note = document.getElementById('regTypeNote');
+      const paidRadio = document.querySelector('input[name="regType"][value="paid"]');
+      const freeRadio = document.querySelector('input[name="regType"][value="free"]');
+      const submitButton = document.getElementById('submitBtn');
+      const autoReceiptBox = document.getElementById('autoReceiptBox');
+
+      if (!info.name) {
+        box.classList.remove('visible', 'free');
+        box.textContent = '';
+        note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+        submitBtnDefaultText = 'إرسال التسجيل';
+        if (autoReceiptBox) autoReceiptBox.classList.remove('visible');
+        if (submitButton) submitButton.textContent = submitBtnDefaultText;
+        return;
+      }
+
+      box.classList.add('visible');
+      if (isPaidCourse(info)) {
+        box.classList.remove('free');
+        box.textContent = info.price + ' د.إ';
+        note.textContent = 'دورة مدفوعة — سيتم تحويلك إلى Stripe Checkout بعد التسجيل';
+        if (paidRadio) paidRadio.checked = true;
+        submitBtnDefaultText = 'إرسال التسجيل والدفع';
+        if (autoReceiptBox) autoReceiptBox.classList.add('visible');
+      } else {
+        box.classList.add('free');
+        box.textContent = 'مجانية';
+        note.textContent = 'دورة مجانية — سيتم تسجيلك مباشرة بدون دفع';
+        if (freeRadio) freeRadio.checked = true;
+        submitBtnDefaultText = 'إرسال التسجيل';
+        if (autoReceiptBox) autoReceiptBox.classList.remove('visible');
+      }
+      if (submitButton) submitButton.textContent = submitBtnDefaultText;
+    }
+
+    if (window.location.protocol === 'file:') {
+      console.warn('تحذير: افتح الصفحة عبر خادم محلي (مثل Live Server) وليس file://');
+    }
+
+    const nav = document.getElementById('nav');
+    const menuToggle = document.getElementById('menuToggle');
+    const registerForm = document.getElementById('registerForm');
+    const formCard = document.getElementById('formCard');
+    const successMessage = document.getElementById('successMessage');
+    const formError = document.getElementById('formError');
+    const sqlHelp = document.getElementById('sqlHelp');
+    const sqlScript = document.getElementById('sqlScript');
+    const copySqlBtn = document.getElementById('copySqlBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const courseSelect = document.getElementById('course');
+
+    menuToggle.addEventListener('click', () => {
+      nav.classList.toggle('open');
+    });
+
+    nav.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => nav.classList.remove('open'));
+    });
+
+    courseSelect.addEventListener('change', updateCourseSelectionUI);
+
+    sqlScript.value = SUPABASE_FIX_SQL;
+
+    copySqlBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(SUPABASE_FIX_SQL);
+      copySqlBtn.textContent = 'تم النسخ ✓';
+      setTimeout(() => { copySqlBtn.textContent = 'نسخ السكربت'; }, 2000);
+    });
+
+    function showFormError(message, showSqlHelp) {
+      formError.textContent = message;
+      formError.classList.add('visible');
+      sqlHelp.classList.toggle('visible', !!showSqlHelp);
+    }
+
+    function hideFormError() {
+      formError.textContent = '';
+      formError.classList.remove('visible');
+      sqlHelp.classList.remove('visible');
+    }
+
+    function setSubmitting(isSubmitting) {
+      submitBtn.disabled = isSubmitting;
+      submitBtn.textContent = isSubmitting ? 'جاري الإرسال...' : submitBtnDefaultText;
+    }
+
+    async function saveToSupabase(record) {
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .insert([record])
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    function getSupabaseErrorMessage(error) {
+      const msg = (error?.message || '').toLowerCase();
+      const code = error?.code || '';
+
+      if (msg.includes('invalid api key')) {
+        return { text: 'مفتاح Supabase (Anon Key) غير صحيح. انسخ المفتاح من Project Settings → API.', showSql: false };
+      }
+      if (msg.includes('api disabled') || code === 'PGRST002') {
+        return { text: 'جدول registrations معطّل على Data API. فعّل API Access من Table Editor.', showSql: false };
+      }
+      if (code === '42501' || msg.includes('permission denied') || msg.includes('row-level security')) {
+        return { text: 'لا توجد صلاحية إدراج في Supabase. نفّذ السكربت أدناه في SQL Editor ثم أعد المحاولة.', showSql: true };
+      }
+      if (msg.includes('column') && msg.includes('does not exist')) {
+        return { text: 'عمود ناقص في الجدول.', showSql: true };
+      }
+
+      const parts = [error?.message, error?.details, error?.hint].filter(Boolean);
+      return { text: parts.join(' — ') || 'تعذّر حفظ بيانات التسجيل. يرجى المحاولة مرة أخرى.', showSql: false };
+    }
+
+    async function sendConfirmationEmail(params) {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    }
+
+    function showSuccessScreen({ title, text, receiptUrl, waitingReceipt } = {}) {
+      const successTitle = document.getElementById('successTitle');
+      const successText = document.getElementById('successText');
+      const receiptResultBox = document.getElementById('receiptResultBox');
+
+      if (successTitle) successTitle.textContent = title || 'تم تسجيلك بنجاح!';
+      if (successText) successText.textContent = text || 'شكراً لانضمامك إلى منصة التميز الابتكاري. تحقّق من بريدك الإلكتروني للاطلاع على تفاصيل التسجيل.';
+
+      if (receiptResultBox) {
+        if (receiptUrl) {
+          receiptResultBox.innerHTML = `تم استلام دفعتك بنجاح، وأصبح وصل الدفع جاهزًا للتحميل.<br><a class="btn-receipt" href="${receiptUrl}" target="_blank" rel="noopener">تحميل وصل الدفع</a>`;
+          receiptResultBox.classList.add('visible');
+        } else if (waitingReceipt) {
+          receiptResultBox.innerHTML = 'تم استلام دفعتك بنجاح. يجري الآن تجهيز رابط وصل الدفع، وسيظهر في النظام بعد تأكيد Stripe الكامل.';
+          receiptResultBox.classList.add('visible');
+        } else {
+          receiptResultBox.innerHTML = '';
+          receiptResultBox.classList.remove('visible');
+        }
+      }
+
+      formCard.classList.add('hidden');
+      successMessage.classList.add('visible');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function loadReceiptAfterStripeReturn() {
+      const params = new URLSearchParams(window.location.search);
+      const paymentSuccess = params.get('payment') === 'success' || params.get('success') === 'true' || params.has('session_id');
+      if (!paymentSuccess) return;
+
+      const sessionId = params.get('session_id');
+      showSuccessScreen({
+        title: 'تم الدفع بنجاح',
+        text: 'وصلتنا إشارة الدفع من Stripe. سنحاول الآن إظهار رابط وصل الدفع تلقائيًا.',
+        waitingReceipt: true
+      });
+
+      if (!sessionId) return;
+
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const { data, error } = await supabaseClient
+          .from('payments')
+          .select('receipt_url, status')
+          .eq('stripe_session_id', sessionId)
+          .maybeSingle();
+
+        if (!error && data?.receipt_url) {
+          showSuccessScreen({
+            title: 'تم استلام دفعتك بنجاح',
+            text: 'تم إنشاء وصل الدفع تلقائيًا، ويمكنك تحميله من الرابط التالي.',
+            receiptUrl: data.receipt_url
+          });
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideFormError();
+
+      const courseInfo = getSelectedCourseInfo();
+      if (!courseInfo.name) {
+        showFormError('يرجى اختيار دورة');
+        return;
+      }
+
+      const isPaid = isPaidCourse(courseInfo);
+
+      const fullName = document.getElementById('fullName').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const courseName = courseInfo.name;
+      const registrationType = isPaid ? 'مدفوع' : 'مجاني';
+      const courseAmount = getSelectedCoursePrice();
+
+      const supabaseRecord = {
+        full_name: fullName,
+        phone,
+        email,
+        course_name: courseName,
+        registration_type: registrationType,
+        payment_method: isPaid ? 'Stripe' : null,
+        status: 'pending',
+        notes: isPaid ? 'في انتظار الدفع عبر Stripe' : null
+      };
+
+      const templateParams = {
+        to_name: fullName,
+        email,
+        course_name: courseName,
+        registration_type: registrationType,
+        phone
+      };
+
+      setSubmitting(true);
+      let savedToSupabase = false;
+
+      try {
+        const savedRegistration = await saveToSupabase(supabaseRecord);
+        savedToSupabase = true;
+
+        if (!isPaid) {
+          await sendConfirmationEmail(templateParams);
+          showSuccessScreen({
+            title: 'تم تسجيلك بنجاح!',
+            text: 'تم تسجيلك في الدورة المجانية بنجاح. تحقّق من بريدك الإلكتروني للاطلاع على تفاصيل التسجيل.'
+          });
+          return;
+        }
+
+        const response = await fetch(
+          SUPABASE_URL + '/functions/v1/swift-action',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+              registration_id: savedRegistration?.id || null,
+              full_name: fullName,
+              email,
+              phone,
+              course_name: courseName,
+              amount: courseAmount,
+              currency: 'aed',
+              request_receipt: document.getElementById('requestReceipt')?.checked === true,
+              success_url: window.location.origin + window.location.pathname + '?payment=success&session_id={CHECKOUT_SESSION_ID}',
+              cancel_url: window.location.origin + window.location.pathname + '?payment=cancelled'
+            })
+          }
+        );
+
+        const rawText = await response.text();
+        let data = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch (_) {
+          throw new Error('استجابة غير صالحة من خادم الدفع');
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || 'تعذر فتح صفحة الدفع');
+        }
+
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+
+        throw new Error(data.error || 'تعذر فتح صفحة الدفع');
+      } catch (error) {
+        console.error('Registration error:', error);
+
+        if (!savedToSupabase) {
+          const errInfo = getSupabaseErrorMessage(error);
+          showFormError(errInfo.text, errInfo.showSql);
+        } else if (isPaid) {
+          showFormError(error?.message || 'تعذر فتح صفحة الدفع، يرجى المحاولة مرة أخرى.');
+        } else {
+          showFormError(
+            'تم حفظ تسجيلك بنجاح، لكن تعذّر إرسال رسالة التأكيد إلى بريدك الإلكتروني. يرجى التحقق من صحة البريد أو التواصل مع الدعم.'
+          );
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    });
+
+    loadReceiptAfterStripeReturn();
+
+    loadCoursesIntoSelect().then(() => {
+      const params = new URLSearchParams(window.location.search);
+      const courseParam = params.get('course');
+      if (courseParam) {
+        for (const option of courseSelect.options) {
+          if (option.value === courseParam) {
+            courseSelect.value = courseParam;
+            break;
+          }
+        }
+      }
+      updateCourseSelectionUI();
+    });
+  </script>
+
+</body>
+</html>

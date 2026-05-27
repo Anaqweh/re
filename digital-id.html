@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="البطاقة الرقمية للمتدرب — INEXC Innovative Excellence">
+  <title>البطاقة الرقمية | INEXC</title>
+  <link rel="icon" type="image/png" href="assets/inexc-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/inexc-logo.css">
+  <link rel="stylesheet" href="css/trainee-portal.css">
+  <style>
+    body.public-id-body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, #0f1a30 0%, #1B2A4A 45%, #0046AA 100%);
+      padding: 32px 16px 48px;
+    }
+    .public-id-shell {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .public-id-header {
+      text-align: center;
+      color: #fff;
+      margin-bottom: 24px;
+    }
+    .public-id-header img { height: 48px; margin-bottom: 12px; }
+    .public-id-header h1 { font-size: 1.35rem; margin-bottom: 6px; }
+    .public-id-header p { opacity: 0.82; font-size: 0.92rem; }
+    .public-id-card-wrap {
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+    }
+    .public-id-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .public-id-actions a,
+    .public-id-actions button {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .public-id-status {
+      text-align: center;
+      margin-top: 16px;
+      color: rgba(255,255,255,0.85);
+      font-size: 0.88rem;
+    }
+    .public-id-error {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px 24px;
+      text-align: center;
+      color: #64748b;
+    }
+    .public-id-error h2 { color: #1B2A4A; margin-bottom: 10px; }
+  </style>
+</head>
+<body class="public-id-body">
+
+<div class="public-id-shell" id="publicIdRoot">
+  <div class="public-id-header">
+    <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+    <h1>التحقق من البطاقة الرقمية</h1>
+    <p>INEXC Innovative Excellence — Digital Trainee ID</p>
+  </div>
+  <div class="public-id-error">
+    <h2>جاري التحميل...</h2>
+    <p>يتم التحقق من البطاقة الرقمية</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="js/course-career-map.js"></script>
+<script src="js/trainee-auth.js"></script>
+<script>
+  (async function initPublicDigitalId() {
+    const root = document.getElementById('publicIdRoot');
+    const params = new URLSearchParams(location.search);
+    const profileId = params.get('id');
+
+    if (!profileId) {
+      root.innerHTML = `
+        <div class="public-id-header">
+          <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+          <h1>رابط غير صالح</h1>
+        </div>
+        <div class="public-id-error">
+          <h2>لم يتم العثور على البطاقة</h2>
+          <p>تأكد من مسح رمز QR أو فتح الرابط الصحيح من حساب المتدرب.</p>
+          <a href="index.html" class="btn-sm" style="margin-top:20px;display:inline-flex">العودة للرئيسية</a>
+        </div>`;
+      return;
+    }
+
+    try {
+      const payload = await TraineeAuth.loadPublicDigitalId(profileId);
+      if (!payload) throw new Error('البطاقة غير موجودة أو غير متاحة');
+
+      const p = payload.profile;
+      const d = payload.digitalId;
+      const { escapeHtml, initials } = TraineeAuth;
+
+      const avatarHtml = p.avatar_url
+        ? `<img src="${escapeHtml(p.avatar_url)}" alt="">`
+        : escapeHtml(initials(p.full_name || p.email));
+
+      const certsHtml = (payload.certificates || []).length
+        ? payload.certificates.map(c => `
+            <li>
+              <span>${escapeHtml(c.course_name || 'دورة INEXC')}</span>
+              <em>${escapeHtml(c.certificate_number || '')}</em>
+            </li>
+          `).join('')
+        : '<li class="did-empty">لا توجد شهادات معروضة</li>';
+
+      root.innerHTML = `
+        <div class="public-id-header">
+          <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+          <h1>بطاقة رقمية معتمدة ✓</h1>
+          <p>تم التحقق من هوية المتدرب في منصة INEXC</p>
+        </div>
+        <div class="public-id-card-wrap">
+          <div class="digital-id-card">
+            <div class="did-visual">
+              <div class="did-top">
+                <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo did-logo" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+                <span class="did-badge">Digital ID · Verified</span>
+              </div>
+              <div class="did-body">
+                <div class="did-photo">${avatarHtml}</div>
+                <div class="did-info">
+                  <div class="did-id-no">${escapeHtml(d.idNumber)}</div>
+                  <h4>${escapeHtml(p.full_name || 'متدرب INEXC')}</h4>
+                  <p class="did-specialty">${escapeHtml(p.specialty || p.country || 'INEXC Trainee')}</p>
+                  <span class="tier-badge ${d.tierKey} did-tier">${d.tierIcon} ${escapeHtml(d.tierLabel)}</span>
+                  <div class="did-stats">
+                    <div><strong>${d.certCount}</strong><span>شهادة</span></div>
+                    <div><strong>${d.trainingHours}</strong><span>ساعة تدريب</span></div>
+                    <div><strong>${payload.professionalValue?.overallReadiness || 0}%</strong><span>جاهزية</span></div>
+                  </div>
+                </div>
+                <div class="did-qr">
+                  <img src="${escapeHtml(d.qrUrl)}" alt="QR" width="108" height="108">
+                  <span>امسح للتحقق</span>
+                </div>
+              </div>
+              <div class="did-certs">
+                <h5>الشهادات المعتمدة</h5>
+                <ul>${certsHtml}</ul>
+              </div>
+              <div class="did-footer">
+                <span>${escapeHtml(d.idNumber)} · INEXC Innovative Excellence</span>
+              </div>
+            </div>
+          </div>
+          <div class="public-id-actions">
+            <a href="${escapeHtml(d.linkedInUrl)}" target="_blank" rel="noopener noreferrer" class="btn-sm linkedin-btn">مشاركة على LinkedIn</a>
+            <button type="button" class="btn-sm outline" id="copyPublicIdBtn">نسخ الرابط</button>
+            <button type="button" class="btn-sm" onclick="window.print()">طباعة / PDF</button>
+            <a href="index.html" class="btn-sm outline">منصة INEXC</a>
+          </div>
+        </div>
+        <p class="public-id-status">هذه الصفحة عامة للتحقق — لا تعرض بيانات اتصال خاصة</p>`;
+
+      document.getElementById('copyPublicIdBtn')?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(d.shareText || d.verifyUrl);
+          alert('تم نسخ رابط البطاقة');
+        } catch {
+          prompt('انسخ الرابط:', d.verifyUrl);
+        }
+      });
+    } catch (err) {
+      root.innerHTML = `
+        <div class="public-id-header">
+          <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+          <h1>تعذّر التحقق</h1>
+        </div>
+        <div class="public-id-error">
+          <h2>${TraineeAuth.escapeHtml(err.message || 'حدث خطأ')}</h2>
+          <p>تأكد من تنفيذ إعداد بوابة المتدرب في Supabase.</p>
+          <a href="login.html" class="btn-sm" style="margin-top:20px;display:inline-flex">تسجيل الدخول</a>
+        </div>`;
+    }
+  })();
+</script>
+<script src="whatsapp-float.js"></script>
+</body>
+</html>

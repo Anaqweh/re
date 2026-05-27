@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الحضور | INEXC</title>
+  <link rel="stylesheet" href="css/inexc-logo.css">
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --navy-deep: #0c1528;
+      --gold: #C8A96E;
+      --success: #059669;
+      --danger: #dc2626;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Tajawal, sans-serif; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, var(--navy-deep), var(--navy));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #fff;
+    }
+    .card {
+      width: min(480px, 100%);
+      background: #fff;
+      color: var(--navy);
+      border-radius: 24px;
+      padding: 32px 28px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+    }
+    .logo-wrap { text-align: center; margin-bottom: 20px; }
+    .logo-wrap img { height: 48px; }
+    h1 { font-size: 1.35rem; margin-bottom: 8px; text-align: center; }
+    .sub { text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .session-box {
+      background: rgba(27,42,74,0.05);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+    }
+    .session-box strong { display: block; margin-bottom: 4px; }
+    label { display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid rgba(27,42,74,0.15);
+      border-radius: 12px;
+      font-size: 1rem;
+      margin-bottom: 16px;
+    }
+    input:focus { outline: none; border-color: var(--gold); }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: var(--navy);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn:hover { background: #2E4A7A; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .msg {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      text-align: center;
+      display: none;
+    }
+    .msg.show { display: block; }
+    .msg.success { background: rgba(5,150,105,0.12); color: var(--success); }
+    .msg.error { background: rgba(220,38,38,0.1); color: var(--danger); }
+    .status-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+    .status-present { background: rgba(5,150,105,0.15); color: var(--success); }
+    .status-late { background: rgba(234,88,12,0.15); color: #c2410c; }
+    .status-partial { background: rgba(200,169,110,0.2); color: #92682a; }
+    .timer { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-wrap">
+      <img src="assets/images/inexc-logo-white.png" alt="INEXC" class="inexc-logo" onerror="this.style.display='none'">
+    </div>
+    <h1>تسجيل الحضور الذكي</h1>
+    <p class="sub">امسح رمز QR أو أدخل بريدك المسجّل لتسجيل حضورك</p>
+
+    <div class="session-box" id="sessionInfo" hidden>
+      <strong id="sessionTitle">—</strong>
+      <span id="sessionCourse">—</span>
+    </div>
+
+    <form id="checkinForm">
+      <label for="emailInput">البريد الإلكتروني</label>
+      <input type="email" id="emailInput" placeholder="example@email.com" dir="ltr" required autocomplete="email">
+      <button type="submit" class="btn" id="checkinBtn">تسجيل الحضور الآن</button>
+    </form>
+
+    <div class="msg" id="resultMsg"></div>
+    <p class="timer" id="tokenTimer"></p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="js/attendance-api.js"></script>
+  <script src="js/trainee-auth.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get('s');
+    const token = params.get('t');
+    let sessionData = null;
+    let tokenExpiresAt = null;
+
+    const form = document.getElementById('checkinForm');
+    const emailInput = document.getElementById('emailInput');
+    const resultMsg = document.getElementById('resultMsg');
+    const checkinBtn = document.getElementById('checkinBtn');
+    const sessionInfo = document.getElementById('sessionInfo');
+    const tokenTimer = document.getElementById('tokenTimer');
+
+    function showMsg(text, type) {
+      resultMsg.textContent = text;
+      resultMsg.className = 'msg show ' + (type || '');
+    }
+
+    function statusLabel(key) {
+      return (InexcAttendance.STATUS[key] || {}).label || key;
+    }
+
+    function statusClass(key) {
+      if (key === 'present') return 'status-present';
+      if (key === 'late') return 'status-late';
+      return 'status-partial';
+    }
+
+    async function init() {
+      if (!sessionId || !token) {
+        showMsg('رابط غير صالح — امسح رمز QR من قاعة التدريب', 'error');
+        form.hidden = true;
+        return;
+      }
+
+      const validation = await InexcAttendance.validateToken(sessionId, token);
+      if (!validation.ok) {
+        showMsg(validation.error, 'error');
+        form.hidden = true;
+        return;
+      }
+
+      sessionData = validation.session;
+      tokenExpiresAt = sessionData.qr_token_expires_at;
+      document.getElementById('sessionTitle').textContent = sessionData.title;
+      document.getElementById('sessionCourse').textContent = sessionData.course_name + (sessionData.trainer_name ? ' · ' + sessionData.trainer_name : '');
+      sessionInfo.hidden = false;
+
+      try {
+        const authSession = await TraineeAuth.getSession();
+        if (authSession?.user?.email) {
+          emailInput.value = authSession.user.email;
+        }
+      } catch (_) {}
+
+      updateTimer();
+      setInterval(updateTimer, 1000);
+    }
+
+    function updateTimer() {
+      if (!tokenExpiresAt) return;
+      const left = Math.max(0, Math.floor((new Date(tokenExpiresAt) - Date.now()) / 1000));
+      tokenTimer.textContent = 'صلاحية الرمز: ' + left + ' ثانية — إذا انتهت امسح الرمز من جديد';
+      if (left <= 0) {
+        showMsg('انتهت صلاحية الرمز — امسح QR الجديد من الشاشة', 'error');
+        checkinBtn.disabled = true;
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = emailInput.value.trim().toLowerCase();
+      if (!email) return;
+
+      checkinBtn.disabled = true;
+      checkinBtn.textContent = 'جاري التسجيل...';
+      resultMsg.className = 'msg';
+
+      try {
+        const revalidation = await InexcAttendance.validateToken(sessionId, token);
+        if (!revalidation.ok) throw new Error(revalidation.error);
+
+        const { data: regs, error: regErr } = await supabaseClient
+          .from('registrations')
+          .select('id, full_name, email, course_id, course_name, trainee_profile_id')
+          .ilike('email', email);
+
+        if (regErr) throw regErr;
+
+        const match = (regs || []).find(r => {
+          if (sessionData.course_id && r.course_id && String(r.course_id) === String(sessionData.course_id)) return true;
+          if (sessionData.course_name && r.course_name === sessionData.course_name) return true;
+          return false;
+        });
+
+        if (!match) {
+          throw new Error('لم يُعثر على تسجيلك في هذه الدورة — تحقق من البريد');
+        }
+
+        const record = await InexcAttendance.recordCheckIn({
+          session: sessionData,
+          registration_id: match.id,
+          trainee_profile_id: match.trainee_profile_id,
+          trainee_name: match.full_name,
+          trainee_email: match.email,
+          check_in_source: 'qr'
+        });
+
+        showMsg(
+          'تم تسجيل حضورك بنجاح — ' + statusLabel(record.status) +
+          '\n' + new Date(record.check_in_at).toLocaleString('ar-AE'),
+          'success'
+        );
+        checkinBtn.textContent = 'تم التسجيل ✓';
+      } catch (err) {
+        showMsg(err.message || 'تعذّر تسجيل الحضور', 'error');
+        checkinBtn.disabled = false;
+        checkinBtn.textContent = 'تسجيل الحضور الآن';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

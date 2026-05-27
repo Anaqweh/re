@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="تأكيد الدفع — INEXC">
+  <title>تأكيد الدفع | INEXC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/inexc-logo.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #1B2A4A;
+      --navy-light: #2E4A7A;
+      --gold: #C8A96E;
+      --gold-hover: #b89960;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #1B2A4A;
+      --text-muted: #6b7c8a;
+      --border: #e8ecf2;
+      --shadow: 0 2px 12px rgba(27, 42, 74, 0.08);
+      --radius: 14px;
+      --success: #15803d;
+      --error: #b91c1c;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { text-decoration: none; color: inherit; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+    header {
+      background: var(--navy);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 12px; background: transparent; }
+    .page-hero {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+      padding: 48px 20px 40px;
+      text-align: center;
+    }
+    .page-hero h1 { color: #fff; font-size: 1.6rem; font-weight: 700; }
+    main { flex: 1; padding: 40px 0 56px; }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .status-icon {
+      width: 72px; height: 72px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+    }
+    .status-icon.loading { background: rgba(200,169,110,0.15); }
+    .status-icon.success { background: rgba(34,197,94,0.15); color: var(--success); }
+    .status-icon.waiting { background: rgba(200,169,110,0.15); color: var(--gold); }
+    .status-icon.error { background: rgba(196,92,92,0.12); color: var(--error); }
+    .result-card h2 { font-size: 1.35rem; margin-bottom: 10px; color: var(--navy); }
+    .result-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; }
+    .details-box {
+      text-align: right;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.92rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--text-muted); }
+    .detail-value { font-weight: 600; color: var(--navy); }
+    .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    .btn {
+      display: inline-block;
+      padding: 14px 24px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: background 0.25s, transform 0.2s;
+      text-align: center;
+    }
+    .btn-gold { background: var(--gold); color: var(--navy); }
+    .btn-gold:hover { background: var(--gold-hover); transform: translateY(-1px); }
+    .btn-navy { background: var(--navy); color: #fff; }
+    .btn-navy:hover { background: var(--navy-light); }
+    .btn-outline {
+      background: transparent;
+      color: var(--navy);
+      border: 2px solid var(--border);
+    }
+    .btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+    .receipt-note {
+      background: rgba(200,169,110,0.12);
+      border: 1px solid rgba(200,169,110,0.25);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.9rem;
+      color: var(--navy);
+      margin-bottom: 16px;
+    }
+    footer {
+      background: var(--navy);
+      padding: 28px 20px;
+      text-align: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.88rem;
+    }
+    footer .company-name { display: block; color: #fff; font-weight: 600; margin-bottom: 4px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container header-inner">
+      <a href="index.html" class="logo-wrap">
+        <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo logo-img" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
+      </a>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <h1>تأكيد الدفع</h1>
+  </section>
+
+  <main>
+    <div class="container">
+      <div class="result-card" id="resultCard">
+        <div class="status-icon loading" id="statusIcon">⏳</div>
+        <h2 id="resultTitle">جاري التحقق من الدفع...</h2>
+        <p id="resultText">يرجى الانتظار بينما نتحقق من حالة عملية الدفع.</p>
+        <div class="details-box hidden" id="detailsBox"></div>
+        <div class="receipt-note hidden" id="receiptNote"></div>
+        <div class="actions" id="actionsBox"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span class="company-name">التميز الابتكاري INEXC</span>
+    <p>© 2026 جميع الحقوق محفوظة</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="js/registration-email-template.js"></script>
+  <script src="js/registration-email.js"></script>
+  <script src="js/auto-welcome-email.js"></script>
+  <script>
+    const EMAILJS_PUBLIC_KEY = 'gc0MqAK4Mwebs_GOg';
+    const EMAILJS_SERVICE_ID = 'service_58hjcoc';
+    const EMAILJS_TEMPLATE_ID = 'template_fq8l9x8';
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+
+    const PAID_STATUSES = new Set(['completed', 'paid', 'active', 'succeeded']);
+
+    function isPaidStatus(status) {
+      return PAID_STATUSES.has(String(status || '').toLowerCase());
+    }
+
+    function formatAmount(amount, currency) {
+      const value = Number(amount) || 0;
+      if (String(currency || 'aed').toLowerCase() === 'aed') {
+        return value.toLocaleString('ar-SA') + ' د.إ';
+      }
+      return value.toLocaleString('ar-SA') + ' ' + String(currency || '').toUpperCase();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function callSwiftAction(payload) {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify(payload)
+      });
+      const raw = await response.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
+      if (!response.ok) throw new Error(data.error || 'تعذّر الاتصال بخادم الدفع');
+      return data;
+    }
+
+    async function loadPaymentBySession(sessionId) {
+      const { data, error } = await supabaseClient
+        .from('payments')
+        .select('*')
+        .eq('stripe_session_id', sessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadRegistration(registrationId) {
+      if (!registrationId) return null;
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('full_name, email, phone, course_name, registration_type')
+        .eq('id', registrationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    }
+
+    async function sendRegistrationConfirmationEmail(registration) {
+      if (!registration?.email) return;
+      const recipientEmail = String(registration.email).trim();
+      const payload = InexcRegistrationEmail.getContactUsTemplateParams({
+        to_name: registration.full_name,
+        email: recipientEmail,
+        phone: registration.phone,
+        course_name: registration.course_name,
+        registration_type: registration.registration_type
+      });
+
+      try {
+        const res = await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            action: 'send_registration_email',
+            email: recipientEmail,
+            to_name: registration.full_name,
+            course_name: registration.course_name,
+            registration_type: registration.registration_type,
+            phone: registration.phone
+          })
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.ok) return;
+        }
+        console.warn('swift-action email:', await res.text());
+      } catch (err) {
+        console.warn('swift-action email error:', err);
+      }
+
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, payload);
+    }
+
+    async function maybeSendConfirmationEmail(payment) {
+      if (!payment?.registration_id) return;
+      const storageKey = 'inexc_welcome_email_' + payment.registration_id;
+      if (sessionStorage.getItem(storageKey)) return;
+      if (typeof InexcAutoWelcomeEmail !== 'undefined' && InexcAutoWelcomeEmail.wasWelcomeSent(payment.registration_id)) {
+        return;
+      }
+
+      try {
+        const registration = await loadRegistration(payment.registration_id);
+        if (!registration) return;
+        await sendRegistrationConfirmationEmail(registration);
+        sessionStorage.setItem(storageKey, '1');
+      } catch (err) {
+        console.warn('confirmation email:', err.message);
+      }
+    }
+
+    async function loadAccessToken(registrationId) {
+      if (!registrationId) return null;
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('access_token')
+        .eq('id', registrationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.access_token || null;
+    }
+
+    function setState({ icon, iconClass, title, text }) {
+      const statusIcon = document.getElementById('statusIcon');
+      statusIcon.textContent = icon;
+      statusIcon.className = 'status-icon ' + iconClass;
+      document.getElementById('resultTitle').textContent = title;
+      document.getElementById('resultText').textContent = text;
+    }
+
+    function renderDetails(payment) {
+      const box = document.getElementById('detailsBox');
+      box.innerHTML = `
+        <div class="detail-row"><span class="detail-label">اسم المتدرب</span><span class="detail-value">${escapeHtml(payment.full_name)}</span></div>
+        <div class="detail-row"><span class="detail-label">الدورة</span><span class="detail-value">${escapeHtml(payment.course_name)}</span></div>
+        <div class="detail-row"><span class="detail-label">المبلغ</span><span class="detail-value">${formatAmount(payment.amount, payment.currency)}</span></div>
+      `;
+      box.classList.remove('hidden');
+    }
+
+    function renderActions({ receiptUrl, accessToken, sessionId, showRefresh }) {
+      const actions = document.getElementById('actionsBox');
+      actions.innerHTML = '';
+
+      if (receiptUrl) {
+        const receiptBtn = document.createElement('a');
+        receiptBtn.href = receiptUrl;
+        receiptBtn.target = '_blank';
+        receiptBtn.rel = 'noopener';
+        receiptBtn.className = 'btn btn-gold';
+        receiptBtn.textContent = 'تحميل وصل الدفع';
+        actions.appendChild(receiptBtn);
+      }
+
+      if (showRefresh) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.className = 'btn btn-outline';
+        refreshBtn.id = 'refreshReceiptBtn';
+        refreshBtn.textContent = 'تحديث حالة الوصل';
+        refreshBtn.addEventListener('click', () => initPage(sessionId, true));
+        actions.appendChild(refreshBtn);
+      }
+
+      if (accessToken) {
+        const accountBtn = document.createElement('a');
+        accountBtn.href = 'account.html';
+        accountBtn.className = 'btn btn-navy';
+        accountBtn.textContent = 'الذهاب إلى حسابي';
+        actions.appendChild(accountBtn);
+      }
+    }
+
+    function showReceiptNote(message) {
+      const note = document.getElementById('receiptNote');
+      note.textContent = message;
+      note.classList.remove('hidden');
+    }
+
+    function hideReceiptNote() {
+      document.getElementById('receiptNote').classList.add('hidden');
+    }
+
+    async function initPage(sessionId, isRefresh) {
+      const actions = document.getElementById('actionsBox');
+      if (!isRefresh) {
+        setState({
+          icon: '⏳',
+          iconClass: 'loading',
+          title: 'جاري التحقق من الدفع...',
+          text: 'يرجى الانتظار بينما نتحقق من حالة عملية الدفع.'
+        });
+      } else {
+        const btn = document.getElementById('refreshReceiptBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'جاري التحديث...'; }
+      }
+
+      document.getElementById('detailsBox').classList.add('hidden');
+      hideReceiptNote();
+      actions.innerHTML = '';
+
+      try {
+        await callSwiftAction({ action: 'sync_session', session_id: sessionId });
+      } catch (err) {
+        console.warn('sync_session:', err.message);
+      }
+
+      const payment = await loadPaymentBySession(sessionId);
+
+      if (!payment) {
+        setState({
+          icon: '✕',
+          iconClass: 'error',
+          title: 'لم يُعثر على الدفع',
+          text: 'تعذّر العثور على سجل الدفع. إذا أكملت الدفع للتو، انتظر لحظات ثم حدّث الصفحة.'
+        });
+        renderActions({ showRefresh: true, sessionId });
+        return;
+      }
+
+      const accessToken = await loadAccessToken(payment.registration_id);
+
+      if (!isPaidStatus(payment.status)) {
+        setState({
+          icon: '⏳',
+          iconClass: 'waiting',
+          title: 'جاري تأكيد الدفع',
+          text: 'وصلتنا عملية الدفع وما زلنا ننتظر التأكيد النهائي من Stripe.'
+        });
+        renderDetails(payment);
+        showReceiptNote('يتم تجهيز وصل الدفع، يرجى تحديث الصفحة بعد لحظات.');
+        renderActions({ accessToken, sessionId, showRefresh: true });
+        return;
+      }
+
+      setState({
+        icon: '✓',
+        iconClass: 'success',
+        title: 'تم استلام دفعتك بنجاح',
+        text: 'شكراً لك. تم تأكيد عملية الدفع بنجاح.'
+      });
+      renderDetails(payment);
+      await maybeSendConfirmationEmail(payment);
+
+      if (payment.receipt_url) {
+        hideReceiptNote();
+        renderActions({ receiptUrl: payment.receipt_url, accessToken, sessionId, showRefresh: true });
+      } else {
+        showReceiptNote('يتم تجهيز وصل الدفع، يرجى تحديث الصفحة بعد لحظات.');
+        renderActions({ accessToken, sessionId, showRefresh: true });
+      }
+
+      if (accessToken) {
+        setTimeout(() => {
+          window.location.href = 'account.html';
+        }, 5000);
+        document.getElementById('resultText').textContent +=
+          ' سيتم تحويلك تلقائياً إلى حسابك خلال لحظات.';
+      }
+    }
+
+    (function bootstrap() {
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get('session_id');
+
+      if (!sessionId) {
+        setState({
+          icon: '✕',
+          iconClass: 'error',
+          title: 'رابط غير صالح',
+          text: 'لم يُعثر على معرّف جلسة الدفع في الرابط.'
+        });
+        return;
+      }
+
+      initPage(sessionId, false);
+    })();
+  </script>
+<script src="whatsapp-float.js"></script>
+</body>
+</html>

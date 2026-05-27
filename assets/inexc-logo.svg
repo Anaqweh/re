@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-label="INEXC Innovative Excellence">
+  <defs>
+    <style>
+      .word { fill: #0046AA; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+      .word-main { font-size: 27px; font-weight: 700; letter-spacing: 0.06em; }
+      .word-sub { font-size: 15.5px; font-weight: 500; letter-spacing: 0.02em; }
+    </style>
+  </defs>
+  <!-- Book -->
+  <path d="M14 78 C14 58 24 46 40 42 C52 39 62 39 72 42 C88 46 98 58 98 78 L98 92 L72 84 L56 92 L30 84 L14 92 Z" fill="none" stroke="#0046AA" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M56 42 L56 92" fill="none" stroke="#0046AA" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Network -->
+  <circle cx="56" cy="24" r="6" fill="#0046AA"/>
+  <circle cx="36" cy="34" r="4.2" fill="none" stroke="#0046AA" stroke-width="2.4"/>
+  <circle cx="76" cy="34" r="4.2" fill="none" stroke="#0046AA" stroke-width="2.4"/>
+  <circle cx="28" cy="50" r="3.6" fill="none" stroke="#0046AA" stroke-width="2.2"/>
+  <circle cx="84" cy="50" r="3.6" fill="none" stroke="#0046AA" stroke-width="2.2"/>
+  <circle cx="56" cy="12" r="3" fill="none" stroke="#0046AA" stroke-width="2"/>
+  <line x1="56" y1="24" x2="36" y2="34" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="56" y1="24" x2="76" y2="34" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="56" y1="24" x2="56" y2="12" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="36" y1="34" x2="28" y2="50" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="76" y1="34" x2="84" y2="50" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="36" y1="34" x2="76" y2="34" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="56" y1="24" x2="56" y2="42" stroke="#0046AA" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Divider -->
+  <line x1="112" y1="16" x2="112" y2="104" stroke="#0046AA" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- Wordmark -->
+  <text x="128" y="50" class="word word-main">INEXC</text>
+  <text x="128" y="76" class="word word-sub">Innovative</text>
+  <text x="128" y="100" class="word word-sub">Excellence</text>
+</svg>

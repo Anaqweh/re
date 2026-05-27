@@ -1,0 +1,96 @@
+/**
+ * INEXC — شعار أبيض شفاف (رأس الموقع، لوحة التحكم، البريد)
+ * PNG شفاف — بدون filter أو mix-blend-mode
+ */
+.inexc-logo,
+.logo-img,
+.login-brand .logo-img,
+.sidebar-brand .logo-img,
+.portal-header .logo-img,
+.auth-brand .logo-img,
+.cert-logo,
+.did-logo {
+  height: 60px;
+  width: auto;
+  max-width: min(100%, 320px);
+  object-fit: contain;
+  display: block;
+  background: transparent !important;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+  mix-blend-mode: normal;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.logo-wrap,
+.logo,
+.sidebar-brand .logo-wrap,
+.login-brand a {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  line-height: 0;
+}
+
+.inexc-logo--sm {
+  height: 44px;
+  max-width: min(100%, 220px);
+}
+
+.inexc-logo--lg {
+  height: 72px;
+  max-width: min(100%, 360px);
+}
+
+/* فاتورة / خلفية فاتحة — الشعار داخل شريط كحلي */
+.inexc-logo-on-navy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1B2A4A;
+  padding: 10px 16px;
+  border-radius: 8px;
+  line-height: 0;
+}
+
+.inexc-logo-on-navy .inexc-logo,
+.inexc-logo-on-navy img {
+  height: 56px;
+}
+
+@media (max-width: 768px) {
+  .inexc-logo,
+  .logo-img,
+  .login-brand .logo-img,
+  .sidebar-brand .logo-img,
+  .portal-header .logo-img,
+  .auth-brand .logo-img {
+    height: 48px;
+    max-width: min(100%, 220px);
+  }
+
+  .inexc-logo--lg {
+    height: 56px;
+  }
+}
+
+@media (max-width: 480px) {
+  .inexc-logo,
+  .logo-img {
+    height: 42px;
+    max-width: min(100%, 180px);
+  }
+}
+
+@media print {
+  .inexc-logo,
+  .logo-img {
+    height: 56px;
+    max-width: 280px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>تسجيل دخول المتدرب</title>
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:Tahoma,sans-serif;
+    }
+
+    body{
+      background:#eef2f7;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+    }
+
+    .login-box{
+      width:400px;
+      background:white;
+      padding:40px;
+      border-radius:20px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .logo{
+      text-align:center;
+      margin-bottom:25px;
+    }
+
+    .logo h1{
+      color:#102a5c;
+      font-size:30px;
+      margin-bottom:10px;
+    }
+
+    .logo p{
+      color:#777;
+      font-size:14px;
+    }
+
+    .input-group{
+      margin-bottom:20px;
+    }
+
+    .input-group label{
+      display:block;
+      margin-bottom:8px;
+      color:#333;
+      font-weight:bold;
+      font-size:14px;
+    }
+
+    .input-group input{
+      width:100%;
+      padding:14px;
+      border:1px solid #ddd;
+      border-radius:12px;
+      font-size:15px;
+      outline:none;
+      transition:0.3s;
+    }
+
+    .input-group input:focus{
+      border-color:#102a5c;
+    }
+
+    .login-btn{
+      width:100%;
+      padding:14px;
+      border:none;
+      border-radius:12px;
+      background:#102a5c;
+      color:white;
+      font-size:16px;
+      cursor:pointer;
+      transition:0.3s;
+    }
+
+    .login-btn:hover{
+      background:#0d224a;
+    }
+
+    .message{
+      margin-top:15px;
+      text-align:center;
+      font-size:14px;
+      color:red;
+    }
+
+    .footer{
+      margin-top:20px;
+      text-align:center;
+      font-size:13px;
+      color:#777;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="login-box">
+
+  <div class="logo">
+    <h1>INEXC AI</h1>
+    <p>تسجيل دخول المتدربين</p>
+  </div>
+
+  <div class="input-group">
+    <label>البريد الإلكتروني</label>
+    <input type="email" id="email" placeholder="example@email.com">
+  </div>
+
+  <div class="input-group">
+    <label>كلمة المرور</label>
+    <input type="password" id="password" placeholder="********">
+  </div>
+
+  <button class="login-btn" onclick="login()">
+    تسجيل الدخول
+  </button>
+
+  <div class="message" id="message"></div>
+
+  <div class="footer">
+    منصة التدريب والتطوير — INEXC
+  </div>
+
+</div>
+
+<script>
+
+class TraineeAuth {
+
+  static login(email,password){
+
+    const users = [
+      {
+        email:"admin@inexc.com",
+        password:"123456",
+        name:"Ahmed Ismail Anaqweh"
+      }
+    ];
+
+    return users.find(
+      user =>
+      user.email === email &&
+      user.password === password
+    );
+  }
+
+}
+
+function login(){
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const message = document.getElementById("message");
+
+  const user = TraineeAuth.login(email,password);
+
+  if(user){
+
+    localStorage.setItem(
+      "trainee",
+      JSON.stringify(user)
+    );
+
+    message.style.color = "green";
+    message.innerHTML = "تم تسجيل الدخول بنجاح";
+    window.location.href = "account.html";
+
+  } else {
+
+    message.style.color = "red";
+    message.innerHTML = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
