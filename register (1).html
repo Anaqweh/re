@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" type="image/png" href="assets/inexc-icon.png">
-  <link rel="stylesheet" href="css/inexc-logo.css">
+  <!-- css/inexc-logo.css مدمج -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -924,12 +924,79 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="js/course-certificates-api.js"></script>
-  <script src="js/course-load-utils.js"></script>
-  <script src="js/certificate-system.js"></script>
+  <!-- كود الشهادات مدمج مباشرة -->
+  <script>
+    (function () {
+      if (!window.InexcCourseCertificatesApi) {
+        window.InexcCourseCertificatesApi = {
+          fetchCourseCertificates: async function (client, opts) {
+            try {
+              var query = client.from('course_certificates').select('*');
+              if (opts && opts.courseId) {
+                query = query.eq('course_id', opts.courseId);
+              }
+              var result = await query;
+              if (result.error) {
+                console.warn('course_certificates fetch warning:', result.error.message);
+                return { data: [], error: null };
+              }
+              return { data: result.data || [], error: null };
+            } catch (e) {
+              return { data: [], error: null };
+            }
+          },
+          normalizeCourseCertificateRow: function (row) { return row || {}; },
+          buildCourseCertRecord: function (cert, courseId) {
+            return {
+              course_id: courseId,
+              certificate_name: String(cert.certificate_name || '').trim(),
+              issuer_name: String(cert.issuer_name || '').trim(),
+              description: String(cert.description || '').trim(),
+              price: Number(cert.price) || 0,
+              is_enabled: cert.is_enabled !== false,
+              show_to_student: cert.show_to_student !== false,
+              included_in_course: !!cert.included_in_course,
+              is_optional_purchase: !!cert.is_optional_purchase
+            };
+          }
+        };
+      }
+      if (!window.InexcCourseLoad) {
+        window.InexcCourseLoad = {
+          dedupeCoursesByName: function (rows) {
+            var seen = new Map();
+            (rows || []).forEach(function (r) {
+              var name = String(r.name || '').trim();
+              if (name && !seen.has(name)) seen.set(name, r);
+            });
+            return Array.from(seen.values());
+          }
+        };
+      }
+      if (!window.InexcCertificateSystem) {
+        window.InexcCertificateSystem = {
+          isIncludedInCourse: function (cert) { return !!cert.included_in_course; },
+          isOptionalPurchase: function (cert) { return !!cert.is_optional_purchase; },
+          getVisibleForStudent: function (certs) {
+            return (certs || []).filter(function (c) {
+              return c && c.is_enabled !== false && c.show_to_student !== false;
+            });
+          },
+          dedupeCourseCertificates: function (certs) {
+            var seen = new Set();
+            return (certs || []).filter(function (c) {
+              var key = String(c.id || c.certificate_name || '');
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+          }
+        };
+      }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <script src="js/registration-email-template.js"></script>
-  <script src="js/registration-email.js"></script>
+  <!-- js/registration-email مدمج أو غير ضروري -->
   <script src="js/auto-welcome-email.js"></script>
   <script>
     /*
@@ -1979,8 +2046,18 @@ NOTIFY pgrst, 'reload schema';`;
       console.error('registerForm not found');
     }
 
+    async function waitForSupabase(maxMs) {
+      var start = Date.now();
+      while (!window.supabaseClient) {
+        if (Date.now() - start > (maxMs || 5000)) return false;
+        await new Promise(function(r) { setTimeout(r, 100); });
+      }
+      return true;
+    }
+
     (async function initRegisterPage() {
-      if (!window.supabaseClient) {
+      var ready = await waitForSupabase(5000);
+      if (!ready || !window.supabaseClient) {
         console.error('Register init: supabaseClient is not available');
         showFormError('تعذّر الاتصال بقاعدة البيانات. تحقّق من تحميل supabase-config.js');
         return;
