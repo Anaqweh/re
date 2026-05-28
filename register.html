@@ -1668,7 +1668,13 @@ NOTIFY pgrst, 'reload schema';`;
       if (courseId && coursesById[courseId]) {
         return { ...coursesById[courseId] };
       }
-      return { name: '', price: 0, paid: false };
+      return {
+        id: null,
+        name: 'تسجيل تدريبي عام',
+        price: FIXED_PAYMENT_AMOUNT_AED,
+        paid: true,
+        certificates: []
+      };
     }
 
     function getSelectedCoursePrice() {
@@ -1920,11 +1926,6 @@ NOTIFY pgrst, 'reload schema';`;
       hideFormError();
 
       const courseInfo = getSelectedCourseInfo();
-      if (!courseInfo.name) {
-        showFormError('يرجى اختيار دورة');
-        return;
-      }
-
       const isPaid = isPaidCourse(courseInfo);
       const selectedCerts = isPaid
         ? (window.InexcCertificateSystem
