@@ -5,8 +5,11 @@
 -- 1) تجهيز جدول course_certificates ليقبل الحفظ من لوحة التحكم.
 -- 2) دعم الأعمدة القديمة والجديدة معًا حتى تظهر الشهادات في register.html.
 -- 3) ربط شهادة الدورة بنوع الشهادة من certificate_types عند توفره.
+-- 4) ضمان وجود عمود notes في registrations لحفظ ملاحظة المتدرب.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS public.course_certificates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

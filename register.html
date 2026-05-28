@@ -169,6 +169,7 @@
     .form-group input[type="tel"],
     .form-group input[type="email"],
     .form-group select,
+    .form-group textarea,
     .form-group input[type="file"] {
       width: 100%;
       padding: 12px 16px;
@@ -182,10 +183,17 @@
     }
 
     .form-group input:focus,
-    .form-group select:focus {
+    .form-group select:focus,
+    .form-group textarea:focus {
       outline: none;
       border-color: var(--navy-light);
       box-shadow: 0 0 0 3px rgba(46, 74, 122, 0.12);
+    }
+
+    .form-group textarea {
+      min-height: 110px;
+      resize: vertical;
+      line-height: 1.8;
     }
 
     .form-group input[type="file"] {
@@ -514,6 +522,39 @@
     .btn-submit.is-loading {
       opacity: 0.85;
       cursor: wait;
+    }
+
+    .registration-support {
+      margin: 18px 0 0;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(27, 42, 74, 0.05);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .registration-support p {
+      margin: 0 0 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    .whatsapp-support-btn {
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #25D366;
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.92rem;
+      transition: transform 0.2s, box-shadow 0.25s, background 0.25s;
+    }
+
+    .whatsapp-support-btn:hover {
+      background: #1ebe5d;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(37, 211, 102, 0.25);
     }
 
     .form-error {
@@ -861,15 +902,25 @@
             <input type="text" id="specialty" name="specialty" required placeholder="مثال: معلم لغة عربية / مدرب / إداري">
           </div>
 
-          <!-- قائمة الدورة -->
-          <div class="form-group">
-            <label for="course">الدورة التدريبية <span class="required">*</span></label>
-            <select id="course" name="course" required>
-              <option value="" disabled selected>— جاري تحميل الدورات —</option>
-            </select>
-            <div id="coursePriceBox" class="course-price-box"></div>
+          <select id="course" name="course" required style="display:none;">
+            <option value="" disabled selected></option>
+          </select>
+          <div id="coursePriceBox" style="display:none;"></div>
+
+          <div class="form-group" id="regTypeGroup" style="display:none;">
+            <label>نوع التسجيل <span class="required">*</span></label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="regType" value="free" checked>
+                مجاني
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="regType" value="paid">
+                مدفوع
+              </label>
+            </div>
           </div>
-          <div id="regTypeGroup" style="display:none;"></div>
+
           <div style="display:none;"><div id="regTypeNote"></div></div>
 
           <div class="form-group hidden" id="certificateGroup">
@@ -882,13 +933,24 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="additionalNote">ملاحظة إضافية</label>
+            <textarea id="additionalNote" name="additionalNote" placeholder="اكتب أي ملاحظة إضافية إذا رغبت"></textarea>
+          </div>
+
           <div class="sql-help" id="sqlHelp">
             <p><strong>خطوة مطلوبة في Supabase:</strong> افتح SQL Editor → New query → الصق السكربت → Run → ثم أعد المحاولة.</p>
             <textarea id="sqlScript" readonly></textarea>
             <button type="button" class="btn-copy-sql" id="copySqlBtn">نسخ السكربت</button>
           </div>
           <div class="form-error" id="formError"></div>
-          <button type="submit" class="btn-submit" id="submitBtn">إرسال التسجيل والدفع</button>
+          <button type="submit" class="btn-submit" id="submitBtn">الدفع الآن — 800 د.إ</button>
+          <div class="registration-support">
+            <p>إذا واجهتك أي مشكلة أثناء التسجيل أو الدفع، يمكنك التواصل معنا مباشرة عبر واتساب.</p>
+            <a href="https://wa.me/971543475500" target="_blank" rel="noopener" class="whatsapp-support-btn">
+              تواصل عبر واتساب
+            </a>
+          </div>
         </form>
       </div>
 
@@ -914,7 +976,7 @@
     (function () {
       if (window.supabaseClient) return;
       var SUPA_URL = 'https://mhrrktcrbpvaxqltdtgo.supabase.co';
-      var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ocnJrdGNyYnB2YXhxbHRkdGdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzUxNjYsImV4cCI6MjA5NTMxMTE2Nn0.v9KS8UEXiGBrLz-LOmtVaNa1DxrweVZM8OY4FP52x-s';
+      var SUPA_KEY = 'sb_publishable_6Xi7kG2uOpH3O3VttZ0jaA_92cYjkaJ';
       function tryInit() {
         if (window.supabaseClient) return;
         if (window.supabase && window.supabase.createClient) {
@@ -969,7 +1031,6 @@
       }
       if (!window.InexcCourseLoad) {
         window.InexcCourseLoad = {
-          EMPTY_INFO_TEXT: 'لم تتم إضافة معلومات بعد',
           dedupeCoursesByName: function (rows) {
             var seen = new Map();
             (rows || []).forEach(function (r) {
@@ -977,28 +1038,6 @@
               if (name && !seen.has(name)) seen.set(name, r);
             });
             return Array.from(seen.values());
-          },
-          normalizeCourseFields: function (row) {
-            if (!row) return {};
-            return {
-              id: row.id || null,
-              name: row.name || '',
-              description: row.description || '',
-              type: row.type || 'free',
-              price: Number(row.price) || 0,
-              status: row.status || 'active',
-              hours: row.hours || '20 ساعة',
-              level: row.level || 'متوسط',
-              cert: row.cert || 'شهادة INEXC',
-              days: row.days || 20,
-              career_paths: row.career_paths || null,
-              objectives: row.objectives || row.goals || '',
-              outcomes: row.outcomes || row.outputs || '',
-              what_you_learn: row.what_you_learn || row.learning_points || row.learn_content || '',
-              course_method: row.course_method || row.delivery_method || row.method || '',
-              target_audience: row.target_audience || row.audience || '',
-              requirements: row.requirements || ''
-            };
           }
         };
       }
@@ -1070,6 +1109,7 @@ NOTIFY pgrst, 'reload schema';`;
     const REGISTRATION_SUCCESS_WITH_EMAIL = 'تم تسجيلك بنجاح، وتم إرسال تفاصيل التسجيل إلى بريدك الإلكتروني.';
     const REGISTRATION_SUCCESS_NO_EMAIL = 'تم تسجيلك بنجاح، وسيتواصل معك فريقنا قريبًا.';
     const EMAIL_UI_WAIT_MS = 5000;
+    const FIXED_PAYMENT_AMOUNT_AED = 800;
     let certificateTypesCache = [];
 
     const CERTIFICATE_TYPE_FALLBACKS = [
@@ -1425,8 +1465,8 @@ NOTIFY pgrst, 'reload schema';`;
       }
       if (!window.supabaseClient) {
         console.error('loadCoursesIntoSelect: supabaseClient missing');
-        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-        if (note) note.textContent = 'تعذّر الاتصال بقاعدة البيانات.';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
+        if (note) note.textContent = '';
         return false;
       }
 
@@ -1434,22 +1474,22 @@ NOTIFY pgrst, 'reload schema';`;
         const { data, error } = await supabaseClient
           .from('courses')
           .select('*')
-          
-          .order.order('created_at', { ascending: true });
+          .eq('status', 'active')
+          .order('created_at', { ascending: true });
 
-        courseSelect.innerHTML = '<option value="" disabled selected>— اختر الدورة —</option>';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
         coursesById = {};
 
         if (error) {
           console.error('Courses load error:', error);
-          courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-          if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+          courseSelect.innerHTML = '<option value="" disabled selected></option>';
+          if (note) note.textContent = '';
           return false;
         }
 
         if (!data?.length) {
-          courseSelect.innerHTML = '<option value="" disabled selected>— لا توجد دورات متاحة —</option>';
-          if (note) note.textContent = 'لا توجد دورات متاحة للتسجيل حالياً.';
+          courseSelect.innerHTML = '<option value="" disabled selected></option>';
+          if (note) note.textContent = '';
           return true;
         }
 
@@ -1470,7 +1510,7 @@ NOTIFY pgrst, 'reload schema';`;
           console.warn('course_certificates load failed:', certLoadErr);
         }
 
-        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
+        if (note) note.textContent = '';
 
         uniqueCourses.forEach(row => {
           const entry = cacheCourseRow(row, certsByCourse);
@@ -1484,8 +1524,8 @@ NOTIFY pgrst, 'reload schema';`;
       } catch (e) {
         console.error('Courses load error:', e);
         coursesById = {};
-        courseSelect.innerHTML = '<option value="" disabled selected>— تعذّر تحميل الدورات —</option>';
-        if (note) note.textContent = 'تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.';
+        courseSelect.innerHTML = '<option value="" disabled selected></option>';
+        if (note) note.textContent = '';
         return false;
       }
     }
@@ -1512,8 +1552,8 @@ NOTIFY pgrst, 'reload schema';`;
             .from('courses')
             .select('*')
             .eq('id', courseId)
-            
-            .maybeSingle.maybeSingle();
+            .eq('status', 'active')
+            .maybeSingle();
 
           if (error) {
             console.error('resolveCourseFromUrl by id:', error);
@@ -1542,8 +1582,8 @@ NOTIFY pgrst, 'reload schema';`;
             .from('courses')
             .select('*')
             .eq('name', courseName)
-            
-            .limit.limit(1)
+            .eq('status', 'active')
+            .limit(1)
             .maybeSingle();
 
           if (error) {
@@ -1635,7 +1675,7 @@ NOTIFY pgrst, 'reload schema';`;
       return Number(getSelectedCourseInfo().price) || 0;
     }
 
-    let submitBtnDefaultText = 'إرسال التسجيل';
+    let submitBtnDefaultText = 'الدفع الآن — 800 د.إ';
 
     function updateCourseSelectionUI(fromCertChange) {
       const info = getSelectedCourseInfo();
@@ -1650,8 +1690,8 @@ NOTIFY pgrst, 'reload schema';`;
           box.classList.remove('visible', 'free');
           box.textContent = '';
         }
-        if (note) note.textContent = 'اختر دورة لعرض السعر ونوع التسجيل';
-        submitBtnDefaultText = 'إرسال التسجيل';
+        if (note) note.textContent = '';
+        submitBtnDefaultText = 'الدفع الآن — 800 د.إ';
         document.getElementById('certificateGroup')?.classList.add('hidden');
         if (submitButton) submitButton.textContent = submitBtnDefaultText;
         return;
@@ -1667,7 +1707,7 @@ NOTIFY pgrst, 'reload schema';`;
         }
         if (note) note.textContent = 'دورة مدفوعة — السعر شامل للدورة والشهادات المفعّلة. سيتم تحويلك إلى Stripe.';
         if (paidRadio) paidRadio.checked = true;
-        submitBtnDefaultText = 'إرسال التسجيل والدفع';
+        submitBtnDefaultText = 'الدفع الآن — 800 د.إ';
       } else {
         renderCertificateOptionsForCourse(info.certificates || [], !!fromCertChange, false);
         const certs = getSelectedCertificates();
@@ -1686,10 +1726,10 @@ NOTIFY pgrst, 'reload schema';`;
         if (note) {
           if (certs.length && certTotal > 0) {
             note.textContent = 'دورة مجانية — سيتم تحويلك إلى Stripe لدفع مجموع الشهادات المختارة';
-            submitBtnDefaultText = 'إرسال التسجيل ودفع الشهادات';
+            submitBtnDefaultText = 'الدفع الآن — 800 د.إ';
           } else {
             note.textContent = 'دورة مجانية — سيتم تسجيلك مباشرة بدون دفع';
-            submitBtnDefaultText = 'إرسال التسجيل';
+            submitBtnDefaultText = 'الدفع الآن — 800 د.إ';
           }
         }
         if (freeRadio) freeRadio.checked = true;
@@ -1730,10 +1770,6 @@ NOTIFY pgrst, 'reload schema';`;
       nav.querySelectorAll('a').forEach(link => {
         link.addEventListener('click', () => nav.classList.remove('open'));
       });
-    }
-
-    if (courseSelect) {
-      courseSelect.addEventListener('change', () => updateCourseSelectionUI(false));
     }
 
     if (sqlScript) sqlScript.value = SUPABASE_FIX_SQL;
@@ -1905,10 +1941,10 @@ NOTIFY pgrst, 'reload schema';`;
         : getSelectedCertificates();
       const certTotal = isPaid ? 0 : getCertificatesTotalPrice(selectedCerts);
       const checkoutAmount = getCheckoutAmount(courseInfo);
-      const courseAmount = checkoutAmount;
-      const needsPayment = requiresPayment(courseInfo);
+      const courseAmount = FIXED_PAYMENT_AMOUNT_AED;
+      const needsPayment = true;
 
-      if (requiresCertificatePayment(courseInfo) && checkoutAmount <= 0) {
+      if (requiresCertificatePayment(courseInfo) && courseAmount <= 0) {
         showFormError('لم يُحدَّد سعر لإحدى الشهادات المختارة في لوحة التحكم. يرجى اختيار «بدون شهادة» أو شهادات لها أسعار محدّدة.');
         return;
       }
@@ -1918,9 +1954,17 @@ NOTIFY pgrst, 'reload schema';`;
       const email = document.getElementById('email').value.trim();
       const country = document.getElementById('country').value.trim();
       const specialty = document.getElementById('specialty').value.trim();
+      const additionalNote = document.getElementById('additionalNote')?.value.trim() || '';
       const courseName = courseInfo.name;
       const hasCerts = selectedCerts.length > 0;
       const certLabels = selectedCerts.map(c => c.label).join('، ');
+      const notesParts = [
+        additionalNote ? ('ملاحظة المتدرب: ' + additionalNote) : null,
+        'مبلغ الدفع الثابت: ' + FIXED_PAYMENT_AMOUNT_AED + ' د.إ',
+        isPaid ? ('سعر الدورة الأصلي: ' + (Number(courseInfo.price) || 0) + ' د.إ') : null,
+        hasCerts ? ('الشهادات: ' + certLabels + ' — ' + certTotal + ' د.إ') : null,
+        'في انتظار الدفع عبر Stripe'
+      ].filter(Boolean);
       const registrationType = isPaid
         ? (selectedCerts.length ? 'مدفوع — شامل الشهادات' : 'مدفوع')
         : (hasCerts && checkoutAmount > 0 ? 'مجاني مع شهادة' : 'مجاني');
@@ -1948,19 +1992,13 @@ NOTIFY pgrst, 'reload schema';`;
         registration_type: registrationType,
         payment_method: needsPayment ? 'Stripe' : null,
         status: 'pending',
-        notes: needsPayment
-          ? [
-              isPaid ? ('سعر الدورة: ' + (Number(courseInfo.price) || 0) + ' د.إ') : null,
-              hasCerts ? ('الشهادات: ' + certLabels + ' — ' + certTotal + ' د.إ') : null,
-              isPaid ? 'في انتظار الدفع عبر Stripe' : 'في انتظار دفع الشهادات عبر Stripe'
-            ].filter(Boolean).join(' | ')
-          : null,
+        notes: notesParts.join(' | '),
         access_token: accessToken,
         wants_certificate: hasCerts,
         certificate_type: hasCerts ? certLabels : null,
         certificate_types: hasCerts ? certificateTypesPayload : null,
-        certificate_price: certTotal > 0 ? certTotal : 0,
-        certificate_payment_status: !isPaid && hasCerts && checkoutAmount > 0 ? 'pending' : (isPaid && hasCerts ? 'included' : 'not_required')
+        certificate_price: FIXED_PAYMENT_AMOUNT_AED,
+        certificate_payment_status: 'pending'
       };
 
       setSubmitting(true, 'جارٍ إرسال التسجيل...');
@@ -2090,8 +2128,7 @@ NOTIFY pgrst, 'reload schema';`;
 
       const coursesOk = await loadCoursesIntoSelect();
       if (!coursesOk) {
-        showFormError('تعذّر تحميل قائمة الدورات. يرجى تحديث الصفحة أو المحاولة لاحقاً.');
-        return;
+        console.warn('Register init: courses list did not load; continuing without showing a user-facing error.');
       }
 
       const { courseId, courseName } = getUrlCourseParams();
@@ -2101,7 +2138,6 @@ NOTIFY pgrst, 'reload schema';`;
           courseSelect.value = resolvedId;
         } else {
           console.warn('Register init: course from URL not found', { courseId, courseName });
-          showFormError('لم يتم العثور على الدورة في الرابط. يمكنك اختيار دورة من القائمة.');
         }
       }
 
@@ -2114,6 +2150,6 @@ NOTIFY pgrst, 'reload schema';`;
     })();
   </script>
 
-
+<script src="whatsapp-float.js"></script>
 </body>
 </html>
