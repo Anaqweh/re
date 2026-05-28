@@ -911,7 +911,7 @@
     (function () {
       if (window.supabaseClient) return;
       var SUPA_URL = 'https://mhrrktcrbpvaxqltdtgo.supabase.co';
-      var SUPA_KEY = 'sb_publishable_6Xi7kG2uOpH3O3VttZ0jaA_92cYjkaJ';
+      var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ocnJrdGNyYnB2YXhxbHRkdGdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzUxNjYsImV4cCI6MjA5NTMxMTE2Nn0.v9KS8UEXiGBrLz-LOmtVaNa1DxrweVZM8OY4FP52x-s';
       function tryInit() {
         if (window.supabaseClient) return;
         if (window.supabase && window.supabase.createClient) {
@@ -966,6 +966,7 @@
       }
       if (!window.InexcCourseLoad) {
         window.InexcCourseLoad = {
+          EMPTY_INFO_TEXT: 'لم تتم إضافة معلومات بعد',
           dedupeCoursesByName: function (rows) {
             var seen = new Map();
             (rows || []).forEach(function (r) {
@@ -973,6 +974,28 @@
               if (name && !seen.has(name)) seen.set(name, r);
             });
             return Array.from(seen.values());
+          },
+          normalizeCourseFields: function (row) {
+            if (!row) return {};
+            return {
+              id: row.id || null,
+              name: row.name || '',
+              description: row.description || '',
+              type: row.type || 'free',
+              price: Number(row.price) || 0,
+              status: row.status || 'active',
+              hours: row.hours || '20 ساعة',
+              level: row.level || 'متوسط',
+              cert: row.cert || 'شهادة INEXC',
+              days: row.days || 20,
+              career_paths: row.career_paths || null,
+              objectives: row.objectives || row.goals || '',
+              outcomes: row.outcomes || row.outputs || '',
+              what_you_learn: row.what_you_learn || row.learning_points || row.learn_content || '',
+              course_method: row.course_method || row.delivery_method || row.method || '',
+              target_audience: row.target_audience || row.audience || '',
+              requirements: row.requirements || ''
+            };
           }
         };
       }
