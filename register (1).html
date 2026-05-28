@@ -1016,6 +1016,30 @@
               seen.add(key);
               return true;
             });
+          },
+          isPaidCourse: function (info) {
+            return !!(info && info.paid && Number(info.price) > 0);
+          },
+          calculateCheckoutAmount: function (info, selected) {
+            if (info && info.paid && Number(info.price) > 0) return Number(info.price) || 0;
+            return (selected || []).reduce(function (sum, c) { return sum + (Number(c.price ?? c.certificate_price) || 0); }, 0);
+          },
+          requiresPayment: function (info, selected) {
+            var amount = (info && info.paid && Number(info.price) > 0)
+              ? Number(info.price) || 0
+              : (selected || []).reduce(function (sum, c) { return sum + (Number(c.price ?? c.certificate_price) || 0); }, 0);
+            return amount > 0;
+          },
+          getSelectableForFreeCourse: function (certs) {
+            return (certs || []).filter(function (c) { return c && c.is_enabled !== false && c.show_to_student !== false; });
+          },
+          getIncludedForPaidCourse: function (certs) {
+            return (certs || []).filter(function (c) { return c && c.is_enabled !== false && c.show_to_student !== false; });
+          },
+          buildIncludedRegistrationPayload: function (certs) {
+            return (certs || []).filter(function (c) { return c && c.included_in_course; }).map(function (c) {
+              return { id: c.id, certificate_type: c.certificate_name || c.name, certificate_type_id: c.id, label: c.certificate_name || c.name, certificate_price: 0, price: 0, issuer_name: c.issuer_name || '' };
+            });
           }
         };
       }
