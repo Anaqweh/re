@@ -7,6 +7,7 @@
   <title>تأكيد الدفع | INEXC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/inexc-logo.css">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -48,17 +49,7 @@
       justify-content: space-between;
       height: 72px;
     }
-    .logo-wrap { display: flex; align-items: center; gap: 12px; }
-    .logo-mark {
-      width: 46px; height: 46px;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 700; font-size: 0.9rem;
-    }
-    .logo-text .company-ar { display: block; font-size: 1.05rem; font-weight: 700; color: #fff; }
-    .logo-text .company-en { display: block; font-size: 0.72rem; color: var(--gold); letter-spacing: 2px; }
+    .logo-wrap { display: flex; align-items: center; gap: 12px; background: transparent; }
     .page-hero {
       background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
       padding: 48px 20px 40px;
@@ -154,11 +145,7 @@
   <header>
     <div class="container header-inner">
       <a href="index.html" class="logo-wrap">
-        <div class="logo-mark">IX</div>
-        <div class="logo-text">
-          <span class="company-ar">التميز الابتكاري</span>
-          <span class="company-en">INEXC</span>
-        </div>
+        <img src="assets/images/inexc-logo-white.png" data-fallback="assets/inexc-logo-white.png" alt="INEXC — Innovative Excellence" class="inexc-logo logo-img" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallback){this.dataset.fallbackTried='1';this.src=this.dataset.fallback}else{this.style.display='none'}">
       </a>
     </div>
   </header>
@@ -187,7 +174,16 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="js/registration-email-template.js"></script>
+  <script src="js/registration-email.js"></script>
+  <script src="js/auto-welcome-email.js"></script>
   <script>
+    const EMAILJS_PUBLIC_KEY = 'gc0MqAK4Mwebs_GOg';
+    const EMAILJS_SERVICE_ID = 'service_58hjcoc';
+    const EMAILJS_TEMPLATE_ID = 'template_fq8l9x8';
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+
     const PAID_STATUSES = new Set(['completed', 'paid', 'active', 'succeeded']);
 
     function isPaidStatus(status) {
@@ -233,6 +229,74 @@
         .maybeSingle();
       if (error) throw error;
       return data;
+    }
+
+    async function loadRegistration(registrationId) {
+      if (!registrationId) return null;
+      const { data, error } = await supabaseClient
+        .from('registrations')
+        .select('full_name, email, phone, course_name, registration_type')
+        .eq('id', registrationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    }
+
+    async function sendRegistrationConfirmationEmail(registration) {
+      if (!registration?.email) return;
+      const recipientEmail = String(registration.email).trim();
+      const payload = InexcRegistrationEmail.getContactUsTemplateParams({
+        to_name: registration.full_name,
+        email: recipientEmail,
+        phone: registration.phone,
+        course_name: registration.course_name,
+        registration_type: registration.registration_type
+      });
+
+      try {
+        const res = await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            action: 'send_registration_email',
+            email: recipientEmail,
+            to_name: registration.full_name,
+            course_name: registration.course_name,
+            registration_type: registration.registration_type,
+            phone: registration.phone
+          })
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.ok) return;
+        }
+        console.warn('swift-action email:', await res.text());
+      } catch (err) {
+        console.warn('swift-action email error:', err);
+      }
+
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, payload);
+    }
+
+    async function maybeSendConfirmationEmail(payment) {
+      if (!payment?.registration_id) return;
+      const storageKey = 'inexc_welcome_email_' + payment.registration_id;
+      if (sessionStorage.getItem(storageKey)) return;
+      if (typeof InexcAutoWelcomeEmail !== 'undefined' && InexcAutoWelcomeEmail.wasWelcomeSent(payment.registration_id)) {
+        return;
+      }
+
+      try {
+        const registration = await loadRegistration(payment.registration_id);
+        if (!registration) return;
+        await sendRegistrationConfirmationEmail(registration);
+        sessionStorage.setItem(storageKey, '1');
+      } catch (err) {
+        console.warn('confirmation email:', err.message);
+      }
     }
 
     async function loadAccessToken(registrationId) {
@@ -290,7 +354,7 @@
 
       if (accessToken) {
         const accountBtn = document.createElement('a');
-        accountBtn.href = 'account.html?token=' + encodeURIComponent(accessToken);
+        accountBtn.href = 'account.html';
         accountBtn.className = 'btn btn-navy';
         accountBtn.textContent = 'الذهاب إلى حسابي';
         actions.appendChild(accountBtn);
@@ -366,6 +430,7 @@
         text: 'شكراً لك. تم تأكيد عملية الدفع بنجاح.'
       });
       renderDetails(payment);
+      await maybeSendConfirmationEmail(payment);
 
       if (payment.receipt_url) {
         hideReceiptNote();
@@ -377,7 +442,7 @@
 
       if (accessToken) {
         setTimeout(() => {
-          window.location.href = 'account.html?token=' + encodeURIComponent(accessToken);
+          window.location.href = 'account.html';
         }, 5000);
         document.getElementById('resultText').textContent +=
           ' سيتم تحويلك تلقائياً إلى حسابك خلال لحظات.';

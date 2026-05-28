@@ -10,6 +10,8 @@ ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'p
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS admin_read BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS admin_hidden BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS course_id UUID;
+ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS trainee_profile_id UUID;
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS access_token TEXT UNIQUE;
 ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS country TEXT;
@@ -24,6 +26,7 @@ ALTER TABLE public.registrations DISABLE ROW LEVEL SECURITY;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON public.registrations TO anon, authenticated, service_role;
+GRANT DELETE ON public.registrations TO anon, authenticated, service_role;
 GRANT ALL ON SEQUENCE registrations_id_seq TO anon, authenticated, service_role;
 
 -- ─── 2) جدول الدورات (courses) ───
@@ -52,7 +55,8 @@ CREATE TABLE IF NOT EXISTS public.courses (
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS price NUMERIC DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'paid';
-ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS hours TEXT DEFAULT '20 ساعة';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS career_paths JSONB DEFAULT NULL;
+
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS level TEXT DEFAULT 'متوسط';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS cert TEXT DEFAULT 'شهادة INEXC';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS days INTEGER DEFAULT 20;
@@ -142,6 +146,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 
 ALTER TABLE public.payments DISABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.payments TO anon, authenticated, service_role;
+GRANT DELETE ON public.payments TO anon, authenticated, service_role;
 
 -- إصلاح جدول payments إن وُجد مسبقاً بأعمدة ناقصة
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS registration_id BIGINT;
