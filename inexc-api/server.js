@@ -6,6 +6,7 @@ import cors from 'cors';
 import multer from 'multer';
 import pg from 'pg';
 import mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
 
 const { Pool } = pg;
 const app = express();
@@ -115,8 +116,8 @@ const courseImportUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const permitted = ['.docx', '.txt', '.md'];
-    cb(permitted.includes(ext) ? null : new Error('ارفع ملف Word بصيغة DOCX أو ملف TXT أو MD.'), permitted.includes(ext));
+    const permitted = ['.pdf', '.docx', '.txt', '.md'];
+    cb(permitted.includes(ext) ? null : new Error('ارفع ملف PDF أو Word بصيغة DOCX أو ملف TXT أو MD.'), permitted.includes(ext));
   }
 });
 
@@ -352,12 +353,15 @@ app.post('/api/admin/course-import', auth, courseImportUpload.single('file'), as
   try {
     if (!req.file) return res.status(400).json({ error: 'اختر ملف Word أو TXT أولًا.' });
     const extension = path.extname(req.file.originalname).toLowerCase();
-    const extracted = extension === '.docx'
-      ? (await mammoth.extractRawText({ path: req.file.path })).value
-      : fs.readFileSync(req.file.path, 'utf8');
+    let extracted;
+    if (extension === '.docx') extracted = (await mammoth.extractRawText({ path: req.file.path })).value;
+    else if (extension === '.pdf') {
+      const parser = new PDFParse({ data: fs.readFileSync(req.file.path) });
+      try { extracted = (await parser.getText()).text; } finally { await parser.destroy(); }
+    } else extracted = fs.readFileSync(req.file.path, 'utf8');
     fs.unlink(req.file.path, () => {});
     const parsed = parseCourseDocument(extracted);
-    if (!parsed.name && !parsed.description && !parsed.axes) return res.status(400).json({ error: 'لم نتمكن من استخراج بيانات واضحة من الملف. استخدم عناوين: اسم الدورة، الوصف، محاور الدورة.' });
+    if (!parsed.name && !parsed.description && !parsed.axes) return res.status(400).json({ error: 'لم نتمكن من استخراج بيانات نصية واضحة من الملف. إذا كان PDF صورة ممسوحة ضوئيًا، أرسل نسخة نصية أو Word.' });
     res.json({ ok: true, ...parsed, axes: courseAxes(parsed.axes) });
   } catch (error) { if (req.file?.path) fs.unlink(req.file.path, () => {}); next(error); }
 });
