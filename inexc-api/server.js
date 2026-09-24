@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -17,6 +19,7 @@ const sessions = new Map();
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const emailFrom = String(process.env.EMAIL_FROM || 'INEXC Training <registrations@inexctraining.com>').trim();
 const adminNotificationEmail = String(process.env.ADMIN_NOTIFICATION_EMAIL || '').trim();
+const execFileAsync = promisify(execFile);
 
 if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.startsWith('CHANGE_')) {
   throw new Error('Set a real ADMIN_PASSWORD in .env before starting INEXC API.');
@@ -129,6 +132,31 @@ function courseSlug(id) { return `course-${String(id).replaceAll('-', '').slice(
 function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${value}`; }
 function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 20); }
 function courseOutcomes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 8); }
+function hasReadableCourseText(value) {
+  const lettersAndNumbers = String(value || '')
+    .replace(/(?:^|\n)\s*[-–—]*\s*(?:page\s*)?\d+\s*(?:of|من)\s*\d+\s*[-–—]*\s*(?=\n|$)/gi, ' ')
+    .match(/[\p{L}\p{N}]/gu) || [];
+  return lettersAndNumbers.length >= 40;
+}
+async function extractPdfWithOcr(filePath) {
+  const tempDir = await fs.promises.mkdtemp('/tmp/inexc-course-ocr-');
+  try {
+    const outputPrefix = path.join(tempDir, 'page');
+    await execFileAsync('pdftoppm', ['-png', '-r', '200', filePath, outputPrefix], { maxBuffer: 2 * 1024 * 1024 });
+    const pages = (await fs.promises.readdir(tempDir))
+      .filter(file => /^page-\d+\.png$/i.test(file))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .slice(0, 12);
+    const text = [];
+    for (const page of pages) {
+      const result = await execFileAsync('tesseract', [path.join(tempDir, page), 'stdout', '-l', 'ara+eng', '--psm', '6'], { maxBuffer: 5 * 1024 * 1024 });
+      if (result.stdout) text.push(result.stdout);
+    }
+    return text.join('\n');
+  } finally {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
+}
 function parseCourseDocument(raw) {
   const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/(?:^|\n)\s*[-–—]*\s*(?:page\s*)?\d+\s*(?:of|من)\s*\d+\s*[-–—]*\s*(?=\n|$)/gi, '\n').replace(/\n{3,}/g, '\n\n').trim();
   const isNoise = line => /^(?:[-–—\s]*\d+\s*(?:of|من)\s*\d+[-–—\s]*|page\s*\d+(?:\s*(?:of|من)\s*\d+)?)$/i.test(line) || /^[\-–—\s\d]+$/.test(line);
@@ -403,11 +431,12 @@ app.post('/api/admin/course-import', auth, courseImportUpload.single('file'), as
     if (extension === '.docx') extracted = (await mammoth.extractRawText({ path: req.file.path })).value;
     else if (extension === '.pdf') {
       const parser = new PDFParse({ data: fs.readFileSync(req.file.path) });
-      try { extracted = (await parser.getText()).text; } finally { await parser.destroy(); }
+      try { extracted = (await parser.getText()).text; } catch (error) { console.warn('PDF text extraction failed; attempting OCR:', error.message); extracted = ''; } finally { await parser.destroy(); }
+      if (!hasReadableCourseText(extracted)) extracted = await extractPdfWithOcr(req.file.path);
     } else extracted = fs.readFileSync(req.file.path, 'utf8');
     fs.unlink(req.file.path, () => {});
     const parsed = parseCourseDocument(extracted);
-    if (!parsed.name && !parsed.description && !parsed.axes) return res.status(400).json({ error: 'لم نتمكن من استخراج بيانات نصية واضحة من الملف. إذا كان PDF صورة ممسوحة ضوئيًا، أرسل نسخة نصية أو Word.' });
+    if (!parsed.name && !parsed.description && !parsed.axes) return res.status(400).json({ error: 'تعذر استخراج محتوى واضح من الملف، حتى عبر القراءة الضوئية. تأكد من أن صفحات PDF واضحة وغير محمية.' });
     res.json({ ok: true, ...parsed, axes: courseAxes(parsed.axes), outcomes: courseOutcomes(parsed.outcomes) });
   } catch (error) { if (req.file?.path) fs.unlink(req.file.path, () => {}); next(error); }
 });
