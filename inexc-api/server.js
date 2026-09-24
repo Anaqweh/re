@@ -130,8 +130,9 @@ function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${v
 function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 20); }
 function courseOutcomes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 8); }
 function parseCourseDocument(raw) {
-  const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/(?:^|\n)\s*[-–—]*\s*(?:page\s*)?\d+\s*(?:of|من)\s*\d+\s*[-–—]*\s*(?=\n|$)/gi, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const isNoise = line => /^(?:[-–—\s]*\d+\s*(?:of|من)\s*\d+[-–—\s]*|page\s*\d+(?:\s*(?:of|من)\s*\d+)?)$/i.test(line) || /^[\-–—\s\d]+$/.test(line);
+  const lines = text.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(line => line && !isNoise(line));
   const labelValue = labels => {
     const pattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
     const index = lines.findIndex(line => new RegExp(`^(?:${pattern})\\s*[:：-]?`, 'i').test(line));
@@ -139,28 +140,35 @@ function parseCourseDocument(raw) {
     const inline = lines[index].replace(new RegExp(`^(?:${pattern})\\s*[:：-]?\\s*`, 'i'), '').trim();
     return clean(inline || lines[index + 1] || '', 1000);
   };
-  const axesHeading = /^(?:محاور(?: الدورة)?|الأهداف(?: التعليمية)?|المحتوى(?: التدريبي)?|موضوعات الدورة)\s*[:：-]?$/i;
-  const outcomesHeading = /^(?:ماذا ستخرج به بعد الدورة|مخرجات الدورة|نواتج التعلم|النتائج المتوقعة)\s*[:：-]?$/i;
+  const axesHeading = /^(?:محاور(?: الدورة| البرنامج)?|الأهداف(?: التعليمية)?|المحتوى(?: التدريبي)?|موضوعات الدورة|المحور(?: الأول| الثاني| الثالث| الرابع| الخامس| السادس)?)\s*[:：-]?$/i;
+  const outcomesHeading = /^(?:ماذا ستخرج به بعد الدورة|مخرجات الدورة|نواتج التعلم|النتائج المتوقعة|المهارات المكتسبة)\s*[:：-]?$/i;
   const axesIndex = lines.findIndex(line => axesHeading.test(line));
   const outcomesIndex = lines.findIndex(line => outcomesHeading.test(line));
   const firstEnd = [axesIndex, outcomesIndex].filter(index => index >= 0).sort((a,b) => a-b)[0] ?? lines.length;
   const firstPart = lines.slice(0, firstEnd);
-  const axisPart = axesIndex >= 0 ? lines.slice(axesIndex + 1, outcomesIndex > axesIndex ? outcomesIndex : lines.length) : lines.filter(line => /^[•\-–—*\d]+[.)]?\s+/.test(line));
+  const inlineAxes = lines.filter(line => /^(?:المحور\s*(?:الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|\d+)|محور\s*\d+)\s*[:：-]\s*.+/i.test(line)).map(line => line.replace(/^(?:المحور\s*(?:الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|\d+)|محور\s*\d+)\s*[:：-]\s*/i, ''));
+  const axisPart = axesIndex >= 0 ? lines.slice(axesIndex + 1, outcomesIndex > axesIndex ? outcomesIndex : lines.length) : (inlineAxes.length ? inlineAxes : lines.filter(line => /^[•\-–—*\d]+[.)]?\s+/.test(line)));
   const outcomesPart = outcomesIndex >= 0 ? lines.slice(outcomesIndex + 1) : [];
   const nameLabels = ['اسم الدورة', 'عنوان الدورة', 'اسم البرنامج', 'عنوان البرنامج'];
-  const name = labelValue(nameLabels) || firstPart.find(line => !/^(الوصف|نبذة|مقدمة|تفاصيل الدورة|التاريخ|المكان|السعر|التصنيف)/i.test(line)) || '';
+  const name = labelValue(nameLabels) || firstPart.find(line => line.length > 4 && !/^(الوصف|نبذة|مقدمة|تفاصيل الدورة|التاريخ|المكان|السعر|التصنيف|البرنامج التدريبي)/i.test(line) && !isNoise(line)) || '';
   const metadata = {
     category: labelValue(['التصنيف', 'الفئة', 'مجال الدورة']),
     date: labelValue(['التاريخ', 'الموعد', 'المدة', 'تاريخ الدورة']),
     location: labelValue(['المكان', 'الموقع', 'طريقة الحضور', 'نمط التنفيذ']),
     price: labelValue(['السعر', 'الرسوم', 'تكلفة الدورة', 'الرسوم الدراسية'])
   };
-  let description = labelValue(['الوصف المختصر', 'وصف الدورة', 'الوصف', 'نبذة عن الدورة', 'النبذة', 'مقدمة الدورة']);
+  const descriptionLabels = ['الوصف المختصر', 'وصف الدورة', 'الوصف', 'نبذة عن الدورة', 'النبذة', 'مقدمة الدورة', 'عن الدورة'];
+  const descriptionIndex = lines.findIndex(line => new RegExp(`^(?:${descriptionLabels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*[:：-]?`, 'i').test(line));
+  let description = labelValue(descriptionLabels);
+  if (descriptionIndex >= 0) {
+    const afterHeading = lines.slice(descriptionIndex + 1, firstEnd).filter(line => !/^(?:التصنيف|الفئة|التاريخ|الموعد|المدة|المكان|الموقع|السعر|الرسوم)\s*[:：-]?/i.test(line) && !/^[•\-–—*\d]+[.)]?\s+/.test(line));
+    if (afterHeading.length) description = clean([description, ...afterHeading].filter(Boolean).join(' '), 1000);
+  }
   if (!description) {
     const ignored = new RegExp(`^(?:${[...nameLabels, 'الوصف', 'نبذة', 'مقدمة', 'التصنيف', 'الفئة', 'التاريخ', 'الموعد', 'المدة', 'المكان', 'الموقع', 'السعر', 'الرسوم'].map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*[:：-]?`, 'i');
     description = firstPart.filter(line => line !== name && !ignored.test(line) && !/^[•\-–—*\d]+[.)]?\s+/.test(line)).join(' ');
   }
-  const axes = courseAxes(axisPart.join('\n')).join('\n');
+  const axes = courseAxes(axisPart.filter(line => !isNoise(line)).join('\n')).join('\n');
   if (!description && axes) description = `تتناول الدورة ${courseAxes(axes).slice(0, 4).join('، ')}.`;
   return { name: clean(name, 180), description: clean(description, 1000), axes, outcomes: courseOutcomes(outcomesPart.join('\n')).join('\n'), ...metadata };
 }
