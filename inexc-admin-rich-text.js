@@ -17,12 +17,14 @@
       if (document.querySelector(`[data-rich-for="${id}"]`)) return;
       const toolbar = document.createElement('div');
       toolbar.className = 'rich-tools'; toolbar.dataset.richFor = id;
-      toolbar.innerHTML = `<span>${title}:</span><button type="button" data-action="bold">عريض B</button><button type="button" data-action="heading">عنوان بارز</button><small>حدد النص ثم اختر الأداة. يظهر العريض في صفحة الدورة فقط.</small>`;
+      const axisButton = id === 'courseAxes' ? '<button type="button" data-action="axis">+ محور رئيسي</button>' : '';
+      toolbar.innerHTML = `<span>${title}:</span><button type="button" data-action="bold">عريض B</button><button type="button" data-action="heading">عنوان بارز</button>${axisButton}<small>${id === 'courseAxes' ? 'المحور الرئيسي يظهر مغلقًا للزائر؛ أضف تحته النقاط التابعة له.' : 'حدد النص ثم اختر الأداة. يظهر العريض في صفحة الدورة فقط.'}</small>`;
+      if (id === 'courseAxes') field.placeholder = '## المحور الأول: عنوان المحور\n- النقطة الأولى\n- النقطة الثانية\n\n## المحور الثاني: عنوان المحور\n- النقطة الأولى';
       field.before(toolbar);
       toolbar.addEventListener('click', event => {
         const button = event.target.closest('button'); if (!button) return;
         event.preventDefault(); const start = field.selectionStart, end = field.selectionEnd, selected = field.value.slice(start, end) || 'نص بارز';
-        const insert = button.dataset.action === 'heading' ? `\n## ${selected}\n` : `**${selected}**`;
+        const insert = button.dataset.action === 'axis' ? '\n## المحور الرئيسي: عنوان المحور\n- نقطة فرعية أولى\n- نقطة فرعية ثانية\n' : button.dataset.action === 'heading' ? `\n## ${selected}\n` : `**${selected}**`;
         field.value = field.value.slice(0, start) + insert + field.value.slice(end);
         field.focus(); field.setSelectionRange(start, start + insert.length); field.dispatchEvent(new Event('input', { bubbles:true }));
       });
