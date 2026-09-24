@@ -219,6 +219,17 @@ async function sendEmail({ to, subject, html, attachmentPath = '' }) {
   if (!response.ok) throw new Error(`Resend: ${await response.text()}`);
   return response.json();
 }
+async function sendEmailWithRetry(message, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try { return await sendEmail(message); }
+    catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+  }
+  throw lastError;
+}
 function sendRegistrationEmails(registration) {
   if (!resendApiKey) return;
   const name = escapeHtml(registration.name);
@@ -229,10 +240,15 @@ function sendRegistrationEmails(registration) {
   const details = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dceafb;border-radius:12px;overflow:hidden;margin:22px 0;font-size:13px"><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;width:38%">رقم الطلب</td><td style="padding:11px 14px;font-weight:800;color:#0866c6;direction:ltr;text-align:right">${referenceNumber}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الدورة</td><td style="padding:11px 14px;font-weight:700;border-top:1px solid #dceafb">${course}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الحالة</td><td style="padding:11px 14px;border-top:1px solid #dceafb"><span style="display:inline-block;background:#fff4d9;color:#9b6500;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700">${status}</span></td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">المبلغ</td><td style="padding:11px 14px;font-weight:800;border-top:1px solid #dceafb">${amount} د.إ</td></tr></table>`;
   const userHtml = emailShell({ title: 'تم استلام طلب تسجيلك', preview: `تم استلام طلبك في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">تم استلام طلب تسجيلك ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.</p>${details}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
   const adminHtml = emailShell({ title: 'طلب تسجيل جديد', preview: `طلب جديد من ${name} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">طلب تسجيل جديد</div><p style="margin:10px 0 0;color:#526c84;font-size:14px">تم استلام طلب جديد عبر الموقع. هذه تفاصيله:</p>${details}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px"><tr><td style="padding:8px 0;color:#6a8096;width:30%">الاسم</td><td style="padding:8px 0;font-weight:700">${name}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">البريد</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.email)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموبايل</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.phone)}</td></tr></table><div style="margin-top:22px;text-align:center"><a href="https://www.inexctraining.com/admin-portal.html" style="display:inline-block;background:#0866c6;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700">فتح لوحة الإدارة</a></div>` });
-  void Promise.allSettled([
-    sendEmail({ to: registration.email, subject: `تم استلام طلبك – ${registration.reference}`, html: userHtml }),
-    adminNotificationEmail ? sendEmail({ to: adminNotificationEmail, subject: `طلب تسجيل جديد – ${registration.reference}`, html: adminHtml }) : Promise.resolve()
-  ]).then(results => results.forEach(result => { if (result.status === 'rejected') console.error('Email error:', result.reason); }));
+  void (async () => {
+    try { await sendEmailWithRetry({ to: registration.email, subject: `تم استلام طلبك – ${registration.reference}`, html: userHtml }); }
+    catch (error) { console.error('Registration confirmation email error:', error); }
+    if (!adminNotificationEmail) return console.error('ADMIN_NOTIFICATION_EMAIL غير مضبوط؛ لم يتم إرسال إشعار الإدارة.');
+    try {
+      await sendEmailWithRetry({ to: adminNotificationEmail, subject: `طلب تسجيل جديد – ${registration.reference}`, html: adminHtml });
+      console.log(`Admin registration notification sent: ${registration.reference}`);
+    } catch (error) { console.error('Admin registration notification email error:', error); }
+  })();
 }
 function sendInstitutionRequestEmails(request) {
   if (!resendApiKey) return;
