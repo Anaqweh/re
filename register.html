@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  <header class="top"><div class="wrap"><a class="brand" href="index.html"><img src="assets/inexc-icon.png" alt="INEXC">التميز الابتكاري <span style="font-size:10px;color:#6c8197;font-weight:500">INEXC TRAINING</span></a><a class="back" href="index.html">← العودة للدورات</a></div></header>
+  <header class="top"><div class="wrap"><a class="brand" href="index.html"><img data-brand-logo src="assets/inexc-icon.png" alt="INEXC">التميز الابتكاري <span style="font-size:10px;color:#6c8197;font-weight:500">INEXC TRAINING</span></a><a class="back" href="index.html">← العودة للدورات</a></div></header>
   <main class="wrap"><section class="intro"><span>تسجيل آمن ومنظّم</span><h1>سجّل في دورتك</h1><p>أكمل البيانات التالية، ثم اختر طريقة الدفع المناسبة لك.</p></section>
     <div class="layout"><section class="card" id="registrationCard"><form id="registrationForm"><h2 class="section-title">بيانات التسجيل<small>جميع الحقول المعلّمة مطلوبة.</small></h2><div class="grid"><div class="field"><label>الاسم الكامل <span class="req">*</span></label><input id="name" required placeholder="اكتب اسمك الكامل"></div><div class="field"><label>رقم الموبايل <span class="req">*</span></label><input id="phone" type="tel" required dir="ltr" placeholder="+971 5x xxx xxxx"></div><div class="field full"><label>البريد الإلكتروني <span class="req">*</span></label><input id="email" type="email" required dir="ltr" placeholder="name@example.com"></div><div class="field full"><label>الدورة <span class="req">*</span></label><select id="course" required></select></div></div>
       <div id="certificateArea" class="field" style="display:none"><label id="certificateTitle">الشهادة</label><div class="choice-grid" id="certificateChoices"></div></div>
@@ -20,6 +20,7 @@
       <aside class="card side"><h2>كل ما تحتاجه في مكان واحد</h2><p>تظهر لك التفاصيل الصحيحة بحسب الدورة التي اخترتها، من دون خطوات زائدة.</p><div class="feature"><i>١</i><div><b>سعر واضح</b><span>يتم حساب سعر الدورة والشهادة تلقائيًا.</span></div></div><div class="feature"><i>٢</i><div><b>شهادة مرنة</b><span>مشمولة، اختيارية، أو غير متاحة حسب كل دورة.</span></div></div><div class="feature"><i>٣</i><div><b>دفع يناسبك</b><span>رابط دفع أو تحويل بنكي مع رفع الوصل.</span></div></div></aside>
     </div></main>
   <script src="inexc-registration-config.js"></script>
+  <script src="inexc-branding.js"></script>
   <script>
     /* إعداد الدورات: يدار لاحقًا من لوحة الإدارة، وهذه البيانات نموذجية للمعاينة. */
     const COURSES = [
