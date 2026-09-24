@@ -15,7 +15,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       <h3>${esc(course.name)}</h3><p>${esc(course.description)}</p>
       <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
       <div class="course-bottom"><div class="price">${price(course.price)}</div>
-      <a class="course-link" href="register.html?course=${encodeURIComponent(course.name)}">تفاصيل وتسجيل</a></div>
+      <a class="course-link" href="course.html?id=${encodeURIComponent(course.id)}">تفاصيل وتسجيل</a></div>
     </article>`).join('');
   } catch (error) { console.warn('INEXC course cards unavailable', error); }
 });
