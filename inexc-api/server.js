@@ -128,22 +128,35 @@ function courseSlug(id) { return `course-${String(id).replaceAll('-', '').slice(
 function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${value}`; }
 function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 20); }
 function parseCourseDocument(raw) {
-  const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').trim();
-  const find = labels => {
+  const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const labelValue = labels => {
     const pattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    const match = text.match(new RegExp(`(?:^|\\n)\\s*(?:${pattern})\\s*[:：-]?\\s*([^\\n]+)`, 'im'));
-    return clean(match?.[1] || '', 1000);
+    const index = lines.findIndex(line => new RegExp(`^(?:${pattern})\\s*[:：-]?`, 'i').test(line));
+    if (index < 0) return '';
+    const inline = lines[index].replace(new RegExp(`^(?:${pattern})\\s*[:：-]?\\s*`, 'i'), '').trim();
+    return clean(inline || lines[index + 1] || '', 1000);
   };
-  const heading = /(?:^|\n)\s*(?:محاور(?: الدورة)?|الأهداف(?: التعليمية)?|المحتوى)\s*[:：-]?\s*/i;
-  const axisStart = text.search(heading);
-  const beforeAxes = axisStart >= 0 ? text.slice(0, axisStart).trim() : text;
-  const afterAxes = axisStart >= 0 ? text.slice(axisStart).replace(heading, '').trim() : '';
-  const lines = beforeAxes.split('\n').map(line => line.trim()).filter(Boolean);
-  const name = find(['اسم الدورة', 'عنوان الدورة', 'اسم البرنامج', 'عنوان البرنامج']) || lines.find(line => !/^(الوصف|نبذة|مقدمة)/i.test(line)) || '';
-  let description = find(['الوصف المختصر', 'وصف الدورة', 'الوصف', 'نبذة عن الدورة', 'النبذة']);
-  if (!description) description = lines.filter(line => line !== name && !/^(اسم الدورة|عنوان الدورة|الوصف|نبذة)/i.test(line)).join(' ').slice(0, 1000);
-  const axes = courseAxes(afterAxes).join('\n');
-  return { name: clean(name, 180), description: clean(description, 1000), axes };
+  const axesHeading = /^(?:محاور(?: الدورة)?|الأهداف(?: التعليمية)?|المحتوى(?: التدريبي)?|موضوعات الدورة)\s*[:：-]?$/i;
+  const axesIndex = lines.findIndex(line => axesHeading.test(line));
+  const firstPart = axesIndex >= 0 ? lines.slice(0, axesIndex) : lines;
+  const axisPart = axesIndex >= 0 ? lines.slice(axesIndex + 1) : lines.filter(line => /^[•\-–—*\d]+[.)]?\s+/.test(line));
+  const nameLabels = ['اسم الدورة', 'عنوان الدورة', 'اسم البرنامج', 'عنوان البرنامج'];
+  const name = labelValue(nameLabels) || firstPart.find(line => !/^(الوصف|نبذة|مقدمة|تفاصيل الدورة|التاريخ|المكان|السعر|التصنيف)/i.test(line)) || '';
+  const metadata = {
+    category: labelValue(['التصنيف', 'الفئة', 'مجال الدورة']),
+    date: labelValue(['التاريخ', 'الموعد', 'المدة', 'تاريخ الدورة']),
+    location: labelValue(['المكان', 'الموقع', 'طريقة الحضور', 'نمط التنفيذ']),
+    price: labelValue(['السعر', 'الرسوم', 'تكلفة الدورة', 'الرسوم الدراسية'])
+  };
+  let description = labelValue(['الوصف المختصر', 'وصف الدورة', 'الوصف', 'نبذة عن الدورة', 'النبذة', 'مقدمة الدورة']);
+  if (!description) {
+    const ignored = new RegExp(`^(?:${[...nameLabels, 'الوصف', 'نبذة', 'مقدمة', 'التصنيف', 'الفئة', 'التاريخ', 'الموعد', 'المدة', 'المكان', 'الموقع', 'السعر', 'الرسوم'].map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*[:：-]?`, 'i');
+    description = firstPart.filter(line => line !== name && !ignored.test(line) && !/^[•\-–—*\d]+[.)]?\s+/.test(line)).join(' ');
+  }
+  const axes = courseAxes(axisPart.join('\n')).join('\n');
+  if (!description && axes) description = `تتناول الدورة ${courseAxes(axes).slice(0, 4).join('، ')}.`;
+  return { name: clean(name, 180), description: clean(description, 1000), axes, ...metadata };
 }
 function emailShell({ title, preview, content }) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
