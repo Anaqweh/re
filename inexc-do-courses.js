@@ -1,0 +1,21 @@
+/* تحميل بطاقات الدورات المنشورة من خادم INEXC الخاص. */
+window.addEventListener('DOMContentLoaded', async () => {
+  const grid = document.querySelector('.course-grid');
+  const endpoint = window.INEXC_REGISTRATION_ENDPOINT || '';
+  if (!grid || !endpoint) return;
+  try {
+    const response = await fetch(`${endpoint}/courses`);
+    if (!response.ok) throw new Error('Courses are unavailable');
+    const courses = await response.json();
+    if (!courses.length) return;
+    const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    const price = value => Number(value) === 0 ? 'مجاني' : `${Number(value).toLocaleString('ar-AE')} <small>د.إ</small>`;
+    grid.innerHTML = courses.map(course => `<article class="course">
+      <span class="course-label">${esc(course.category || 'دورة تدريبية')}</span>
+      <h3>${esc(course.name)}</h3><p>${esc(course.description)}</p>
+      <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
+      <div class="course-bottom"><div class="price">${price(course.price)}</div>
+      <a class="course-link" href="register.html?course=${encodeURIComponent(course.name)}">تفاصيل وتسجيل</a></div>
+    </article>`).join('');
+  } catch (error) { console.warn('INEXC course cards unavailable', error); }
+});
