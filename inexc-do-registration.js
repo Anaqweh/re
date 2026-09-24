@@ -21,7 +21,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('institutionFields').style.display = institutional ? 'block' : 'none';
     if (courseField) courseField.style.display = institutional ? 'none' : '';
     if (courseSelect) courseSelect.disabled = institutional;
-    if (certificateArea) certificateArea.style.display = institutional ? 'none' : certificateArea.style.display;
+    if (certificateArea) certificateArea.style.display = institutional ? 'none' : '';
     if (summary) summary.style.display = institutional ? 'none' : '';
     if (paymentArea) paymentArea.style.display = institutional ? 'none' : '';
     document.getElementById('organization').required = institutional;
@@ -29,7 +29,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (regularTitle) regularTitle.innerHTML = institutional ? 'طلب برنامج تدريبي لمؤسسة<small>اترك تفاصيل احتياجكم وسيتواصل فريقنا معكم.</small>' : 'بيانات التسجيل<small>جميع الحقول المعلّمة مطلوبة.</small>';
     const button = document.getElementById('submitButton');
     if (institutional) button.textContent = 'إرسال طلب المؤسسة';
-    else if (typeof updateSummary === 'function') updateSummary();
+    else if (typeof renderCourse === 'function' && selectedCourse) renderCourse();
   };
   document.getElementById('requestType').value = requestType;
   document.getElementById('requestType').addEventListener('change', applyRequestType);
