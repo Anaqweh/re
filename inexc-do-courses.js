@@ -20,7 +20,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       <h3>${esc(course.name)}</h3><p>${esc(course.description)}</p>
       ${(course.axes || []).length ? `<div class="course-axes"><b>محاور الدورة</b><ul>${course.axes.slice(0,3).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
       <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
-      <div class="course-bottom"><div class="price">${price(course.price)}</div>
+      <div class="course-bottom"><div class="course-quick-info">${Number(course.hours) > 0 ? `<span class="course-hours">⏱ ${Number(course.hours).toLocaleString('ar-AE')} ساعة</span>` : ''}<div class="price">${price(course.price)}</div></div>
       <a class="course-link" href="/course/?id=${encodeURIComponent(course.id)}">تفاصيل وتسجيل</a></div>
     </article>`).join('');
   } catch (error) { console.warn('INEXC course cards unavailable', error); }
