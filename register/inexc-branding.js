@@ -61,7 +61,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     const response = await fetch(`${api}/settings`);
     const settings = await response.json();
     if (!response.ok || !settings.logoUrl) return;
-    const url = `${api.replace('/api', '')}${settings.logoUrl}`;
+    const url = new URL(settings.logoUrl, new URL(api).origin).href;
+    const favicon = document.querySelector('link[rel~="icon"]') || document.createElement('link');
+    favicon.rel = 'icon'; favicon.type = 'image/png'; favicon.href = url;
+    if (!favicon.parentNode) document.head.appendChild(favicon);
     if (preview) { preview.src = url; preview.style.visibility = 'visible'; }
     images.forEach(image => {
       image.src = url;
