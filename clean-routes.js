@@ -1,4 +1,9 @@
 /* روابط INEXC العامة بدون امتداد HTML. */
+(function canonicalAddress(){
+  const path = window.location.pathname;
+  if (path.endsWith('/register/index.html')) history.replaceState(null, '', '/register/' + window.location.search + window.location.hash);
+  if (path.endsWith('/course/index.html')) history.replaceState(null, '', '/course/' + window.location.search + window.location.hash);
+})();
 function normalizeLinks(root = document) {
   root.querySelectorAll('a[href]').forEach(link => {
     const href = link.getAttribute('href');
