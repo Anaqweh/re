@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import pg from 'pg';
+import mammoth from 'mammoth';
 
 const { Pool } = pg;
 const app = express();
@@ -106,6 +107,18 @@ const messageAttachmentUpload = multer({
     cb(blocked.includes(file.mimetype) ? new Error('لا يمكن إرسال ملفات تنفيذية أو غير آمنة بالبريد.') : null, !blocked.includes(file.mimetype));
   }
 });
+const courseImportUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => cb(null, `course-import-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const permitted = ['.docx', '.txt', '.md'];
+    cb(permitted.includes(ext) ? null : new Error('ارفع ملف Word بصيغة DOCX أو ملف TXT أو MD.'), permitted.includes(ext));
+  }
+});
 
 function clean(value, max = 400) { return String(value ?? '').trim().slice(0, max); }
 function asNumber(value) { const result = Number(value); return Number.isFinite(result) && result >= 0 ? result : 0; }
@@ -113,6 +126,25 @@ function reference() { return `IX-${Date.now().toString().slice(-8)}-${crypto.ra
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]); }
 function courseSlug(id) { return `course-${String(id).replaceAll('-', '').slice(0, 12)}`; }
 function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${value}`; }
+function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 20); }
+function parseCourseDocument(raw) {
+  const text = String(raw || '').replace(/\r/g, '').replace(/\u00a0/g, ' ').trim();
+  const find = labels => {
+    const pattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const match = text.match(new RegExp(`(?:^|\\n)\\s*(?:${pattern})\\s*[:：-]?\\s*([^\\n]+)`, 'im'));
+    return clean(match?.[1] || '', 1000);
+  };
+  const heading = /(?:^|\n)\s*(?:محاور(?: الدورة)?|الأهداف(?: التعليمية)?|المحتوى)\s*[:：-]?\s*/i;
+  const axisStart = text.search(heading);
+  const beforeAxes = axisStart >= 0 ? text.slice(0, axisStart).trim() : text;
+  const afterAxes = axisStart >= 0 ? text.slice(axisStart).replace(heading, '').trim() : '';
+  const lines = beforeAxes.split('\n').map(line => line.trim()).filter(Boolean);
+  const name = find(['اسم الدورة', 'عنوان الدورة', 'اسم البرنامج', 'عنوان البرنامج']) || lines.find(line => !/^(الوصف|نبذة|مقدمة)/i.test(line)) || '';
+  let description = find(['الوصف المختصر', 'وصف الدورة', 'الوصف', 'نبذة عن الدورة', 'النبذة']);
+  if (!description) description = lines.filter(line => line !== name && !/^(اسم الدورة|عنوان الدورة|الوصف|نبذة)/i.test(line)).join(' ').slice(0, 1000);
+  const axes = courseAxes(afterAxes).join('\n');
+  return { name: clean(name, 180), description: clean(description, 1000), axes };
+}
 function emailShell({ title, preview, content }) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
@@ -159,7 +191,7 @@ async function setupDatabase() {
   await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
   await pool.query(`CREATE TABLE IF NOT EXISTS courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', trainer TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', axes TEXT NOT NULL DEFAULT '', trainer TEXT NOT NULL DEFAULT '',
     course_date TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT 'دورة تدريبية',
     price NUMERIC(10,2) NOT NULL DEFAULT 0, certificate_mode TEXT NOT NULL DEFAULT 'included',
     certificate_name TEXT NOT NULL DEFAULT 'شهادة إتمام', certificate_price NUMERIC(10,2) NOT NULL DEFAULT 0,
@@ -179,6 +211,7 @@ async function setupDatabase() {
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS axes TEXT NOT NULL DEFAULT ''");
   await pool.query("UPDATE courses SET share_slug = 'course-' || replace(left(id::text, 12), '-', '') WHERE share_slug = ''");
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS courses_share_slug_unique ON courses(share_slug)');
   await pool.query(`CREATE TABLE IF NOT EXISTS email_campaigns (
@@ -206,7 +239,7 @@ function publicCourse(row) {
   const savedBankName = row.bank_name || '';
   const bankParts = savedBankName.match(/^اسم البنك:\s*(.*?)\s*\|\s*صاحب الحساب:\s*(.*)$/);
   return {
-    id: row.id, name: row.name, description: row.description, trainer: row.trainer, date: row.course_date,
+    id: row.id, name: row.name, description: row.description, axes: courseAxes(row.axes), trainer: row.trainer, date: row.course_date,
     location: row.location, category: row.category, price: Number(row.price),
     certificate: { mode: row.certificate_mode, name: row.certificate_name, price: Number(row.certificate_price) },
     payments: row.payment_methods, paymentLink: row.payment_link,
@@ -238,7 +271,8 @@ app.get('/:shareSlug', async (req, res, next) => {
     const url = publicUrl(req, req.originalUrl);
     const registrationUrl = `https://www.inexctraining.com/register/?course=${encodeURIComponent(course.name)}`;
     const sample = course.certificateSampleUrl ? `<a class="secondary" target="_blank" href="${escapeHtml(publicUrl(req, course.certificateSampleUrl))}">عرض نموذج الشهادة</a>` : '';
-    res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(course.name)} | INEXC Training</title><meta name="description" content="${escapeHtml(course.description.slice(0, 155))}"><meta property="og:type" content="website"><meta property="og:site_name" content="INEXC Training"><meta property="og:title" content="${escapeHtml(course.name)}"><meta property="og:description" content="${escapeHtml(course.description.slice(0, 180))}"><meta property="og:url" content="${escapeHtml(url)}"><meta property="og:image" content="${escapeHtml(image)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeHtml(course.name)}"><meta name="twitter:description" content="${escapeHtml(course.description.slice(0, 180))}"><meta name="twitter:image" content="${escapeHtml(image)}"><style>body{margin:0;background:#f1f7fd;color:#17324d;font-family:Arial,sans-serif;line-height:1.8}.wrap{width:min(880px,calc(100% - 32px));margin:42px auto}.card{overflow:hidden;background:#fff;border:1px solid #dceafb;border-radius:22px;box-shadow:0 16px 42px #0a55941c}.cover{display:block;width:100%;max-height:410px;object-fit:cover;background:#0a4d92}.content{padding:30px}.tag{display:inline-block;padding:5px 11px;color:#0866c6;background:#eaf4ff;border-radius:20px;font-size:13px;font-weight:bold}h1{color:#103b70;line-height:1.5}.meta{color:#5f778e;font-size:14px;margin:18px 0}.button{display:inline-block;text-decoration:none;background:#0866c6;color:#fff;padding:13px 20px;border-radius:10px;font-weight:bold;margin:8px 0 0}.secondary{display:inline-block;text-decoration:none;color:#0866c6;padding:13px 18px;font-weight:bold}</style></head><body><main class="wrap"><article class="card">${course.imageUrl ? `<img class="cover" src="${escapeHtml(publicUrl(req, course.imageUrl))}" alt="${escapeHtml(course.name)}">` : `<img class="cover" src="${fallback}" alt="INEXC Training">`}<div class="content"><span class="tag">${escapeHtml(course.category)}</span><h1>${escapeHtml(course.name)}</h1><p>${escapeHtml(course.description)}</p><div class="meta">📅 ${escapeHtml(course.date || 'سيُعلن قريبًا')} &nbsp; • &nbsp; 📍 ${escapeHtml(course.location || 'عن بُعد / حضوري')} &nbsp; • &nbsp; 💳 ${course.price === 0 ? 'مجاني' : `${course.price.toLocaleString('ar-AE')} د.إ`}</div><a class="button" href="${registrationUrl}">سجّل في الدورة</a>${sample}</div></article></main></body></html>`);
+    const axes = course.axes.length ? `<section class="axes"><h2>محاور الدورة</h2><ul>${course.axes.map(axis => `<li>${escapeHtml(axis)}</li>`).join('')}</ul></section>` : '';
+    res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(course.name)} | INEXC Training</title><meta name="description" content="${escapeHtml(course.description.slice(0, 155))}"><meta property="og:type" content="website"><meta property="og:site_name" content="INEXC Training"><meta property="og:title" content="${escapeHtml(course.name)}"><meta property="og:description" content="${escapeHtml(course.description.slice(0, 180))}"><meta property="og:url" content="${escapeHtml(url)}"><meta property="og:image" content="${escapeHtml(image)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeHtml(course.name)}"><meta name="twitter:description" content="${escapeHtml(course.description.slice(0, 180))}"><meta name="twitter:image" content="${escapeHtml(image)}"><style>body{margin:0;background:#f1f7fd;color:#17324d;font-family:Arial,sans-serif;line-height:1.8}.wrap{width:min(880px,calc(100% - 32px));margin:42px auto}.card{overflow:hidden;background:#fff;border:1px solid #dceafb;border-radius:22px;box-shadow:0 16px 42px #0a55941c}.cover{display:block;width:100%;max-height:410px;object-fit:cover;background:#0a4d92}.content{padding:30px}.tag{display:inline-block;padding:5px 11px;color:#0866c6;background:#eaf4ff;border-radius:20px;font-size:13px;font-weight:bold}h1{color:#103b70;line-height:1.5}.meta{color:#5f778e;font-size:14px;margin:18px 0}.axes{margin-top:22px;padding:18px;background:#f6fbff;border:1px solid #dceafb;border-radius:14px}.axes h2{margin:0 0 9px;color:#103b70;font-size:18px}.axes ul{margin:0;padding-right:20px}.axes li{margin:6px 0;font-size:14px}.button{display:inline-block;text-decoration:none;background:#0866c6;color:#fff;padding:13px 20px;border-radius:10px;font-weight:bold;margin:8px 0 0}.secondary{display:inline-block;text-decoration:none;color:#0866c6;padding:13px 18px;font-weight:bold}</style></head><body><main class="wrap"><article class="card">${course.imageUrl ? `<img class="cover" src="${escapeHtml(publicUrl(req, course.imageUrl))}" alt="${escapeHtml(course.name)}">` : `<img class="cover" src="${fallback}" alt="INEXC Training">`}<div class="content"><span class="tag">${escapeHtml(course.category)}</span><h1>${escapeHtml(course.name)}</h1><p>${escapeHtml(course.description)}</p>${axes}<div class="meta">📅 ${escapeHtml(course.date || 'سيُعلن قريبًا')} &nbsp; • &nbsp; 📍 ${escapeHtml(course.location || 'عن بُعد / حضوري')} &nbsp; • &nbsp; 💳 ${course.price === 0 ? 'مجاني' : `${course.price.toLocaleString('ar-AE')} د.إ`}</div><a class="button" href="${registrationUrl}">سجّل في الدورة</a>${sample}</div></article></main></body></html>`);
   } catch (error) { next(error); }
 });
 app.get('/api/sitemap.xml', async (_req, res, next) => {
@@ -301,6 +335,19 @@ app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req
   } catch (error) { next(error); }
 });
 app.get('/api/admin/courses', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM courses ORDER BY active DESC, created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); } });
+app.post('/api/admin/course-import', auth, courseImportUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'اختر ملف Word أو TXT أولًا.' });
+    const extension = path.extname(req.file.originalname).toLowerCase();
+    const extracted = extension === '.docx'
+      ? (await mammoth.extractRawText({ path: req.file.path })).value
+      : fs.readFileSync(req.file.path, 'utf8');
+    fs.unlink(req.file.path, () => {});
+    const parsed = parseCourseDocument(extracted);
+    if (!parsed.name && !parsed.description && !parsed.axes) return res.status(400).json({ error: 'لم نتمكن من استخراج بيانات واضحة من الملف. استخدم عناوين: اسم الدورة، الوصف، محاور الدورة.' });
+    res.json({ ok: true, ...parsed, axes: courseAxes(parsed.axes) });
+  } catch (error) { if (req.file?.path) fs.unlink(req.file.path, () => {}); next(error); }
+});
 app.post('/api/admin/courses/:id/image', auth, courseMediaUpload.single('file'), async (req, res, next) => {
   try {
     if (!req.file || !req.file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'ارفع صورة للدورة بصيغة PNG أو JPG أو WEBP.' });
@@ -327,9 +374,9 @@ app.post('/api/admin/courses', auth, async (req, res, next) => {
   try {
     const c = req.body || {}; const methods = Array.isArray(c.payments) ? c.payments.filter(v => ['link','bank'].includes(v)) : [];
     if (!clean(c.name, 180)) return res.status(400).json({ error: 'اسم الدورة مطلوب.' });
-    const values = [clean(c.name,180),clean(c.description,1000),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false];
-    const result = await pool.query(`INSERT INTO courses (name,description,trainer,course_date,location,category,price,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false];
+    const result = await pool.query(`INSERT INTO courses (name,description,axes,trainer,course_date,location,category,price,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
     res.status(201).json(publicCourse(saved));
@@ -338,8 +385,8 @@ app.post('/api/admin/courses', auth, async (req, res, next) => {
 app.put('/api/admin/courses/:id', auth, async (req, res, next) => {
   try {
     const c = req.body || {}; const methods = Array.isArray(c.payments) ? c.payments.filter(v => ['link','bank'].includes(v)) : [];
-    const values = [clean(c.name,180),clean(c.description,1000),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false, req.params.id];
-    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,trainer=$3,course_date=$4,location=$5,category=$6,price=$7,certificate_mode=$8,certificate_name=$9,certificate_price=$10,payment_methods=$11,payment_link=$12,bank_name=$13,bank_account=$14,bank_iban=$15,active=$16,updated_at=now() WHERE id=$17 RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false, req.params.id];
+    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,trainer=$4,course_date=$5,location=$6,category=$7,price=$8,certificate_mode=$9,certificate_name=$10,certificate_price=$11,payment_methods=$12,payment_link=$13,bank_name=$14,bank_account=$15,bank_iban=$16,active=$17,updated_at=now() WHERE id=$18 RETURNING *`, values);
     if (!result.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
