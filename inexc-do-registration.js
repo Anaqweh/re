@@ -54,3 +54,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   };
 });
+
+/* إظهار بيانات التحويل التي أدخلتها الإدارة، وإخفاء الحقول الفارغة. */
+function toggleBank() {
+  const bank = selectedPayment === 'bank';
+  document.getElementById('bankBox').classList.toggle('show', bank);
+  document.getElementById('receipt').required = bank;
+  if (!bank) return;
+  const data = selectedCourse.bank || {};
+  const box = document.getElementById('bankBox');
+  let bankTitle = document.getElementById('bankTitleLine');
+  if (!bankTitle) { bankTitle = document.createElement('p'); bankTitle.id = 'bankTitleLine'; box.querySelector('h3').after(bankTitle); }
+  const set = (id, label, value) => {
+    const element = document.getElementById(id);
+    element.textContent = value ? `${label}: ${value}` : '';
+    element.style.display = value ? 'block' : 'none';
+  };
+  set('bankTitleLine', 'اسم البنك', data.title);
+  set('bankName', 'اسم صاحب الحساب', data.name);
+  set('bankAccount', 'رقم الحساب', data.account);
+  set('bankIban', 'IBAN', data.iban);
+}
