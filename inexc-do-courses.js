@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     grid.innerHTML = courses.map(course => `<article class="course">
       <span class="course-label">${esc(course.category || 'دورة تدريبية')}</span>
       <h3>${esc(course.name)}</h3><p>${esc(course.description)}</p>
+      ${(course.axes || []).length ? `<div class="course-axes"><b>محاور الدورة</b><ul>${course.axes.slice(0,3).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
       <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
       <div class="course-bottom"><div class="price">${price(course.price)}</div>
       <a class="course-link" href="course.html?id=${encodeURIComponent(course.id)}">تفاصيل وتسجيل</a></div>
