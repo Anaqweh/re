@@ -198,6 +198,16 @@ function sendRegistrationEmails(registration) {
     adminNotificationEmail ? sendEmail({ to: adminNotificationEmail, subject: `طلب تسجيل جديد – ${registration.reference}`, html: adminHtml }) : Promise.resolve()
   ]).then(results => results.forEach(result => { if (result.status === 'rejected') console.error('Email error:', result.reason); }));
 }
+function sendInstitutionRequestEmails(request) {
+  if (!resendApiKey) return;
+  const name = escapeHtml(request.name);
+  const organization = escapeHtml(request.organization);
+  const details = escapeHtml(request.requestDetails).replace(/\n/g, '<br>');
+  const info = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dceafb;border-radius:12px;overflow:hidden;margin:22px 0;font-size:13px"><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;width:38%">رقم الطلب</td><td style="padding:11px 14px;font-weight:800;color:#0866c6;direction:ltr;text-align:right">${escapeHtml(request.reference)}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">المؤسسة</td><td style="padding:11px 14px;font-weight:700;border-top:1px solid #dceafb">${organization}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الاحتياج</td><td style="padding:11px 14px;border-top:1px solid #dceafb">${details}</td></tr></table>`;
+  const userHtml = emailShell({ title: 'تم استلام طلب مؤسستكم', preview: 'تم استلام طلب البرنامج التدريبي', content: `<div style="font-size:23px;font-weight:800;color:#103b70">تم استلام طلب مؤسستكم ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">شكرًا لثقتكم بـ INEXC Training. استلمنا تفاصيل احتياج مؤسستكم، وسيتواصل فريقنا معكم قريبًا لمناقشة البرنامج الأنسب.</p>${info}<p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
+  const adminHtml = emailShell({ title: 'طلب مؤسسة جديد', preview: `طلب جديد من ${organization}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">طلب برنامج مؤسسي جديد</div><p style="margin:10px 0 0;color:#526c84;font-size:14px">ورد طلب جديد عبر الموقع:</p>${info}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px"><tr><td style="padding:8px 0;color:#6a8096;width:30%">الاسم</td><td style="padding:8px 0;font-weight:700">${name}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">البريد</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(request.email)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموبايل</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(request.phone)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">عدد المشاركين</td><td style="padding:8px 0;border-top:1px solid #e5eef6">${escapeHtml(request.audienceSize || 'غير محدد')}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموعد المفضل</td><td style="padding:8px 0;border-top:1px solid #e5eef6">${escapeHtml(request.preferredTiming || 'غير محدد')}</td></tr></table><div style="margin-top:22px;text-align:center"><a href="https://www.inexctraining.com/admin-portal.html" style="display:inline-block;background:#0866c6;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700">فتح لوحة الإدارة</a></div>` });
+  void Promise.allSettled([sendEmail({ to: request.email, subject: `تم استلام طلب مؤسستكم – ${request.reference}`, html: userHtml }), adminNotificationEmail ? sendEmail({ to: adminNotificationEmail, subject: `طلب مؤسسة جديد – ${request.reference}`, html: adminHtml }) : Promise.resolve()]).then(results => results.forEach(result => { if (result.status === 'rejected') console.error('Institution email error:', result.reason); }));
+}
 function auth(req, res, next) {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const session = sessions.get(token);
@@ -232,6 +242,11 @@ async function setupDatabase() {
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS axes TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS outcomes TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS request_kind TEXT NOT NULL DEFAULT 'individual'");
+  await pool.query("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS organization TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS request_details TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS audience_size TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS preferred_timing TEXT NOT NULL DEFAULT ''");
   await pool.query("UPDATE courses SET share_slug = 'course-' || replace(left(id::text, 12), '-', '') WHERE share_slug = ''");
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS courses_share_slug_unique ON courses(share_slug)');
   await pool.query(`CREATE TABLE IF NOT EXISTS email_campaigns (
@@ -325,6 +340,21 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [registrationReference,name,email,phone,course.id,course.name,certificate,total,paymentMethod,status,receiptPath]);
     sendRegistrationEmails({ reference: registrationReference, name, email, phone, courseName: course.name, total, status });
     res.status(201).json({ ok: true, reference: registrationReference, paymentLink: paymentMethod === 'link' ? course.payment_link : '' });
+  } catch (error) { next(error); }
+});
+app.post('/api/institution-requests', async (req, res, next) => {
+  try {
+    const name = clean(req.body?.name, 150), email = clean(req.body?.email, 180), phone = clean(req.body?.phone, 50);
+    const organization = clean(req.body?.organization, 220), requestDetails = clean(req.body?.requestDetails, 3000);
+    const audienceSize = clean(req.body?.audienceSize, 100), preferredTiming = clean(req.body?.preferredTiming, 240);
+    if (!name || !email || !phone || !organization || !requestDetails) return res.status(400).json({ error: 'يرجى إدخال بيانات التواصل واسم المؤسسة وتفاصيل الاحتياج.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'يرجى إدخال بريد إلكتروني صحيح.' });
+    const registrationReference = reference();
+    const status = 'طلب مؤسسة جديد';
+    await pool.query(`INSERT INTO registrations (reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, [registrationReference,name,email,phone,'طلب برنامج مؤسسي','غير محدد',0,'institution_request',status,'institution',organization,requestDetails,audienceSize,preferredTiming]);
+    sendInstitutionRequestEmails({ reference: registrationReference, name, email, phone, organization, requestDetails, audienceSize, preferredTiming });
+    res.status(201).json({ ok: true, reference: registrationReference });
   } catch (error) { next(error); }
 });
 
@@ -425,7 +455,7 @@ app.delete('/api/admin/courses/:id', auth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 app.get('/api/admin/registrations', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC'); res.json(result.rows.map(r => ({...r,total:Number(r.total)}))); } catch (error) { next(error); } });
-app.put('/api/admin/registrations/:id/status', auth, async (req, res, next) => { try { const status = clean(req.body?.status,80); const allowed=['بانتظار الدفع','بانتظار مراجعة الوصل','مدفوع','مؤكد','ملغى','مسجل']; if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صالحة.'}); await pool.query('UPDATE registrations SET status=$1,updated_at=now() WHERE id=$2',[status,req.params.id]); res.json({ok:true}); } catch(error){next(error);} });
+app.put('/api/admin/registrations/:id/status', auth, async (req, res, next) => { try { const status = clean(req.body?.status,80); const allowed=['بانتظار الدفع','بانتظار مراجعة الوصل','مدفوع','مؤكد','ملغى','مسجل','طلب مؤسسة جديد','قيد التواصل']; if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صالحة.'}); await pool.query('UPDATE registrations SET status=$1,updated_at=now() WHERE id=$2',[status,req.params.id]); res.json({ok:true}); } catch(error){next(error);} });
 app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
   try {
     const result = await pool.query('DELETE FROM registrations WHERE id=$1 RETURNING receipt_path', [req.params.id]);
@@ -505,7 +535,7 @@ app.get('/api/admin/campaigns/:id', auth, async (req, res, next) => {
     res.json(result.rows);
   } catch (error) { next(error); }
 });
-app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
+app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 app.use((error, _req, res, _next) => { console.error(error); res.status(error instanceof multer.MulterError ? 400 : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
 setupDatabase().then(() => app.listen(port, () => console.log(`INEXC API listening on ${port}`))).catch(error => { console.error(error); process.exit(1); });
