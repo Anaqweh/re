@@ -3,6 +3,13 @@ const inexcFont = document.createElement('style');
 inexcFont.textContent = "@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');body,button,input,select,textarea{font-family:'Noto Sans Arabic',Arial,sans-serif!important}";
 document.head.appendChild(inexcFont);
 
+/* أيقونة INEXC الظاهرة في تبويب المتصفح. */
+const inexcFavicon = document.querySelector('link[rel~="icon"]') || document.createElement('link');
+inexcFavicon.rel = 'icon';
+inexcFavicon.type = 'image/png';
+inexcFavicon.href = '/assets/inexc-icon.png';
+if (!inexcFavicon.parentNode) document.head.appendChild(inexcFavicon);
+
 /* إضافة اسم البنك كحقل مستقل في لوحة الإدارة، مع حفظه وعرضه للمتدرب. */
 const inexcFetch = window.fetch.bind(window);
 window.fetch = (input, options = {}) => {
