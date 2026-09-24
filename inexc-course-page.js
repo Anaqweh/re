@@ -40,10 +40,18 @@
         ...(axes.length ? [{ label:'محاور الدورة', content:`<section class="panel"><h2>محاور الدورة</h2><p class="panel-lead">اضغط على أي محور رئيسي لعرض النقاط التي يتضمنها.</p>${axes.map((axis,index) => `<details class="axis-group"><summary><i class="axis-number">${arabicNumber(index)}</i><span>${inline(axis.title)}</span><b class="axis-arrow">⌄</b></summary>${axis.points.length ? `<ul class="axis-list">${axis.points.map(point => `<li>${inline(point)}</li>`).join('')}</ul>` : '<p class="axis-empty">تفاصيل هذا المحور ستُناقش ضمن جلسات الدورة.</p>'}</details>`).join('')}</section>` }] : []),
         ...(outcomes.length ? [{ label:'مخرجات الدورة', content:`<section class="panel"><h2>ماذا ستخرج به بعد الدورة؟</h2><p class="panel-lead">نتائج عملية تساعدك على الانتقال من المعرفة إلى التطبيق.</p>${outcomes.map(outcome => `<article class="outcome">${inline(outcome)}</article>`).join('')}</section>` }] : []),
         { label:'السعر', content:`<section class="panel"><h2>السعر وخيارات الشهادة</h2><div class="price-box"><div class="price-top"><span class="price-icon">💳</span><span>سعر الدورة</span></div><div class="price-amount">${Number(course.price) === 0 ? 'مجاني' : `${Number(course.price).toLocaleString('ar-AE')} د.إ`}</div><p class="price-note">${esc(certificateNote)}</p></div></section>` },
-        { label:'التسجيل', content:`<section class="panel"><div class="register-box"><h2>جاهز للبدء؟</h2><p>أرسل طلبك الآن، وسيتم التواصل معك لاستكمال خطوات التسجيل بالطريقة المناسبة.</p><a class="button" href="/register/?course=${encodeURIComponent(course.name)}">سجّل في هذه الدورة ←</a></div></section>` }
+        { label:'التسجيل', content:`<section class="panel"><div class="register-box"><h2>جاهز للبدء؟</h2><p>أرسل طلبك الآن، وسيتم التواصل معك لاستكمال خطوات التسجيل بالطريقة المناسبة.</p><a class="button" href="/register/?course=${encodeURIComponent(course.name)}">سجّل في هذه الدورة ←</a><button class="share-button" type="button">مشاركة الدورة</button></div></section>` }
       ];
       root.innerHTML = `<img class="cover" src="${esc(image)}" alt="${esc(course.name)}"><div class="content"><div class="journey"><div class="steps">${panels.map((panel,index) => `<button class="step" type="button">${index + 1}. ${panel.label}</button>`).join('')}</div>${panels.map(panel => panel.content).join('')}<div class="controls"><button class="previous" type="button">السابق</button><button class="next" type="button">التالي ←</button></div></div></div>`;
       setupJourney(root);
+      const shareButton = root.querySelector('.share-button');
+      shareButton?.addEventListener('click', async () => {
+        const shareUrl = course.shareUrl || location.href;
+        try {
+          if (navigator.share) await navigator.share({ title: course.name, text: `تفاصيل دورة ${course.name} من INEXC Training`, url: shareUrl });
+          else { await navigator.clipboard.writeText(shareUrl); shareButton.textContent = 'تم نسخ رابط المشاركة ✓'; }
+        } catch (_) { /* إلغاء نافذة المشاركة لا يحتاج إلى تنبيه. */ }
+      });
       const schema = { '@context':'https://schema.org', '@type':'Course', name:course.name, description:course.description, provider:{'@type':'Organization',name:'INEXC Training',url:'https://www.inexctraining.com'}, offers:{'@type':'Offer',price:course.price,priceCurrency:'AED',availability:'https://schema.org/InStock'} }; const node = document.createElement('script'); node.type = 'application/ld+json'; node.textContent = JSON.stringify(schema); document.head.appendChild(node);
     } catch (_) { root.innerHTML = '<p class="error" style="padding:25px">تعذر تحميل تفاصيل هذه الدورة حاليًا.</p>'; }
   });
