@@ -19,7 +19,8 @@ window.fetch = (input, options = {}) => {
 };
 window.addEventListener('DOMContentLoaded', () => {
   const owner = document.getElementById('bankName');
-  if (!owner || document.getElementById('bankTitle')) return;
+  // هذا الحقل مخصص للوحة الإدارة فقط؛ لا نضيفه إلى صفحة التسجيل العامة.
+  if (!document.getElementById('courseForm') || !owner || document.getElementById('bankTitle')) return;
   const title = document.createElement('input');
   title.id = 'bankTitle'; title.placeholder = 'اسم البنك';
   owner.before(title);
