@@ -12,7 +12,7 @@
 @media(max-width:560px){.course-main-info{grid-template-columns:1fr}}
 </style></head><body>
 <section id="login" class="login"><form id="loginForm" class="box"><div class="logo">INEXC</div><h1>إدارة الدورات والتسجيلات</h1><p style="font-size:12px;color:#64778c">لوحة خاصة لإدارة موقع التدريب.</p><label>كلمة المرور</label><input id="password" type="password" required><button class="primary" style="width:100%">تسجيل الدخول</button><div id="loginError" class="message"></div></form></section>
-<section id="app" class="app"><header class="bar"><b class="brand"><img data-brand-logo hidden alt="شعار INEXC">INEXC <span style="font-size:11px;color:#64778c">إدارة التدريب</span></b><button class="light" id="logout">تسجيل الخروج</button></header><main class="wrap"><div class="tabs"><button class="light active" data-view="registrations">طلبات التسجيل</button><button class="light" data-view="courses">إدارة الدورات</button><button class="light" data-view="branding">هوية الموقع</button></div>
+<section id="app" class="app"><header class="bar"><b class="brand"><img data-brand-logo hidden alt="شعار INEXC">INEXC <span style="font-size:11px;color:#64778c">إدارة التدريب</span></b><button class="light" id="logout">تسجيل الخروج</button></header><main class="wrap"><div class="tabs"><button class="light active" data-view="registrations">طلبات التسجيل</button><button class="light" data-view="courses">إدارة الدورات</button><button class="light" data-view="branding">هوية الموقع</button><button class="light" data-view="course-alerts">تنبيهات الدورات</button></div>
 <section id="registrations" class="view active"><div class="metrics"><div class="panel metric"><b id="total">0</b><span>إجمالي الطلبات</span></div><div class="panel metric"><b id="review">0</b><span>بانتظار مراجعة الوصل</span></div><div class="panel metric"><b id="paid">0</b><span>مدفوع / مؤكد</span></div><div class="panel metric"><b id="amount">0</b><span>إجمالي المبالغ د.إ</span></div></div><div class="layout"><div class="panel" style="padding:16px"><div class="tools"><input id="search" placeholder="ابحث بالاسم أو البريد أو الدورة"><button class="light" id="refresh">تحديث</button><button class="primary" id="export">تنزيل CSV</button></div><div id="table" class="table"></div></div>
 <aside class="panel dock"><h2>إرسال رسالة</h2><p>رسالة رسمية من INEXC إلى الشريحة التي تختارها.</p><label>شريحة المستلمين</label><select id="audience"><option value="selected">المسجلون المحددون من الجدول</option><option value="all">جميع المسجلين</option><option value="course">المسجلون في دورة محددة</option><option value="unpaid">من لم يكتمل دفعهم</option><option value="custom">عناوين بريد خارجية فقط</option></select><div id="courseWrap" hidden><label>اختر الدورة</label><select id="messageCourse"></select></div><div id="pickInfo" class="note">لم يتم تحديد أشخاص بعد.</div><label>إضافة عناوين بريد خارجية</label><textarea id="extraEmails" style="min-height:64px" placeholder="name@example.com&#10;name2@example.com أو افصل بينها بفاصلة"></textarea><div class="note">يمكن دمج هذه العناوين مع أي شريحة، أو اختيار عناوين خارجية فقط.</div><label>عنوان الرسالة</label><input id="subject" maxlength="160" placeholder="تحديث مهم بخصوص الدورة"><label>نص الرسالة</label><textarea id="message" maxlength="5000" placeholder="اكتب الرسالة التي تريد إرسالها..."></textarea><button class="primary" id="send" type="button" style="width:100%">إرسال الرسالة</button><div id="messageResult" class="message"></div></aside></div></section>
 <section id="courses" class="view"><div class="two"><form id="courseForm" class="panel" style="padding:20px"><h2 id="courseTitle" style="margin-top:0;color:#103b70;font-size:18px">إضافة دورة</h2><input id="courseId" type="hidden"><label>اسم الدورة</label><input id="courseName" required><label>الوصف المختصر</label><textarea id="courseDescription"></textarea><div class="course-main-info"><div><label>التصنيف</label><input id="courseCategory" value="دورة تدريبية"></div><div><label>السعر (د.إ)</label><input id="coursePrice" type="number" min="0" value="0"></div><div><label>عدد الساعات التدريبية</label><input id="courseHours" type="number" min="0" step="0.5" placeholder="مثال: 20"></div></div><div class="two"><div><label>التاريخ أو المدة</label><input id="courseDate"></div><div><label>المكان</label><input id="courseLocation" placeholder="حضوري / عن بُعد"></div></div><label>نظام الشهادة</label><select id="certificateMode"><option value="included">مشمولة في السعر</option><option value="optional">اختيارية بسعر منفصل</option><option value="none">لا توجد شهادة</option></select><div class="two"><div><label>اسم الشهادة</label><input id="certificateName" value="شهادة إتمام"></div><div><label>سعر الشهادة</label><input id="certificatePrice" type="number" min="0" value="0"></div></div><label class="check"><input id="payLink" type="checkbox"> إظهار رابط دفع إلكتروني (غير مفعّل حاليًا)</label><input id="paymentLink" placeholder="رابط الدفع لتفعيله لاحقًا"><label class="check"><input id="payBank" type="checkbox" checked> تحويل بنكي</label><input id="bankName" placeholder="اسم صاحب الحساب"><input id="bankAccount" placeholder="رقم الحساب"><input id="bankIban" placeholder="IBAN"><label class="check"><input id="courseActive" type="checkbox" checked> الدورة منشورة في الموقع</label><div style="display:flex;gap:8px"><button class="primary">حفظ الدورة</button><button class="light" id="newCourse" type="button">دورة جديدة</button></div><div id="courseError" class="message"></div></form><div><div class="tools"><h2 style="color:#103b70;font-size:19px;flex:1">الدورات الحالية</h2><button class="light" id="loadCourses">تحديث</button></div><div id="courseList" class="course-list"></div></div></div></section>
@@ -113,5 +113,44 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
     if (edit) { const item=items.find(entry=>entry.id===edit.dataset.editTestimonial); if(!item)return; q('#testimonialTitle').textContent='تعديل رأي المتدرب'; q('#testimonialId').value=item.id; q('#testimonialName').value=item.name; q('#testimonialContent').value=item.content; q('#testimonialRating').value=String(item.rating); q('#testimonialStatus').value=item.status; q('#testimonialVerified').checked=item.verified; window.scrollTo({top:q('#testimonials').offsetTop-20,behavior:'smooth'}); }
     if (remove) { if(!confirm('هل تريد حذف هذا الرأي نهائيًا؟')) return; try { await call('/admin/testimonials/'+remove.dataset.deleteTestimonial,{method:'DELETE'}); load(); } catch(error){ alert(error.message); } }
   };
+})();
+</script><style>
+#course-alerts .alerts-summary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+#course-alerts .alerts-count{font-size:13px;color:#52708f}#course-alerts .alerts-count b{font-size:24px;color:#0866c6;margin-left:5px}
+#course-alerts .alert-table{overflow:auto}.alert-table table{width:100%;border-collapse:collapse;min-width:620px}.alert-table th,.alert-table td{padding:12px 10px;text-align:right;border-bottom:1px solid #e8f1fb;font-size:11px}.alert-table th{background:#f8fbff;color:#52708f}.alert-state{font-weight:700;font-size:10px}.alert-state.active{color:#168865}.alert-state.off{color:#a16b16}
+</style>
+<script>
+(() => {
+  const tab = document.querySelector('[data-view="course-alerts"]');
+  const wrap = document.querySelector('.wrap');
+  if (!tab || !wrap || document.getElementById('course-alerts')) return;
+  const section = document.createElement('section');
+  section.id = 'course-alerts';
+  section.className = 'view';
+  section.innerHTML = '<div class="panel" style="padding:22px"><div class="alerts-summary"><div><h2 style="margin:0;color:#103b70;font-size:20px">تنبيهات الدورات الجديدة</h2><p class="note" style="margin:5px 0 0">هؤلاء الأشخاص طلبوا أن تصلهم رسالة تلقائية عند نشر دورة جديدة. لا تُرسل الرسائل عند تعديل دورة منشورة.</p></div><div class="alerts-count"><b id="alertsCount">0</b>مشترك</div></div><div id="alertsTable" class="alert-table"><p class="note">اضغط «تنبيهات الدورات» لعرض القائمة.</p></div></div>';
+  wrap.appendChild(section);
+  const escape = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const date = value => value ? new Date(value).toLocaleDateString('ar-AE') : '—';
+  async function loadAlerts() {
+    const host = document.getElementById('alertsTable');
+    host.innerHTML = '<p class="note">جارٍ تحميل المشتركين…</p>';
+    try {
+      const rows = await call('/admin/course-alerts');
+      document.getElementById('alertsCount').textContent = rows.length;
+      host.innerHTML = rows.length ? '<table><thead><tr><th>البريد الإلكتروني</th><th>الحالة</th><th>تاريخ الاشتراك</th><th>تنبيهات مرسلة</th><th>إجراء</th></tr></thead><tbody>' + rows.map(row => '<tr><td dir="ltr">' + escape(row.email) + '</td><td><span class="alert-state ' + (row.active ? 'active' : 'off') + '">' + (row.active ? 'مفعّل' : 'ملغي') + '</span></td><td>' + date(row.createdAt) + '</td><td>' + Number(row.deliveries || 0) + '</td><td><button class="danger" type="button" data-delete-alert="' + row.id + '">حذف</button></td></tr>').join('') + '</tbody></table>' : '<p class="note">لا يوجد مشتركون حتى الآن.</p>';
+    } catch (error) { host.innerHTML = '<p class="message">' + escape(error.message) + '</p>'; }
+  }
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button,.view').forEach(element => element.classList.remove('active'));
+    tab.classList.add('active'); section.classList.add('active'); loadAlerts();
+  });
+  section.addEventListener('click', async event => {
+    const button = event.target.closest('[data-delete-alert]');
+    if (!button) return;
+    if (!confirm('هل تريد حذف هذا البريد من تنبيهات الدورات؟')) return;
+    button.disabled = true;
+    try { await call('/admin/course-alerts/' + button.dataset.deleteAlert, { method:'DELETE' }); loadAlerts(); }
+    catch (error) { alert(error.message); button.disabled = false; }
+  });
 })();
 </script></body></html>
