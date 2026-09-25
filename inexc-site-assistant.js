@@ -2,10 +2,18 @@
 (() => {
   if (document.getElementById('inexcAssistant')) return;
   const endpoint = window.INEXC_REGISTRATION_ENDPOINT || '';
+  const FAQS = [
+    { question:'هل الدورة حضورية أم عن بُعد؟', keys:['حضوري','حضورية','أون لاين','اون لاين','عن بعد','عن بُعد','وجاهي','وجاهيا','مكان الدورة'], answer:'كل دورة مختلفة عن الأخرى، بعض الدورات أون لاين، وبعض الدورات وجاهيًا.' },
+    { question:'هل توجد شهادة؟', keys:['شهادة','الشهادات'], answer:'تظهر خيارات الشهادة وسعرها عند اختيار الدورة.' },
+    { question:'كيف أسجل؟', keys:['كيف أسجل','كيف اسجل','التسجيل','سجل'], answer:'اختر الدورة ثم املأ نموذج التسجيل، وسيصلك تأكيد عبر البريد.' },
+    { question:'ما نوع الشهادات؟', keys:['نوع الشهادات','أنواع الشهادات','انواع الشهادات','البورد الأمريكي','البورد الامريكي','cambridge','كامبردج','كامبرج','khda','adek'], answer:'تتوفر شهادات دولية مثل البورد الأمريكي وCambridge، وشهادات محلية مثل شركة التميز الابتكاري وKHDA وADEK، بالتعاون مع المؤسسات الدولية والمحلية.' },
+    { question:'هل لديكم شهادات ماجستير مهني أو دكتوراه مهني؟', keys:['ماجستير مهني','دكتوراه مهني','دكتوراة مهني','ماجستير','دكتوراه'], answer:'نعم، لدينا تعاون دولي يمكن من خلاله إصدار الشهادات المهنية المصدّقة حسب الأصول.' },
+    { question:'هل لديكم خدمات أخرى؟', keys:['خدمات أخرى','خدمات اخرى','خدماتكم','خدمات'], answer:'نعم، نقدم العديد من الخدمات التعليمية والتدريبية وغيرها. يمكن التواصل عبر واتساب لمعرفة الخدمة الأنسب لاحتياجك.' }
+  ];
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const root = document.createElement('div');
   root.id = 'inexcAssistant';
-  root.innerHTML = `<button id="assistantToggle" type="button" aria-expanded="false" aria-controls="assistantPanel"><span class="assistant-dot"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A3.5 3.5 0 0 1 7.5 1h9A3.5 3.5 0 0 1 20 4.5v7a3.5 3.5 0 0 1-3.5 3.5H10l-4.5 4v-4.42A3.5 3.5 0 0 1 4 11.5v-7ZM8 7h8M8 10h5"/></svg><span>مساعد INEXC</span></button><section id="assistantPanel" hidden aria-label="مساعد INEXC"><header><div><b>كيف يمكنني مساعدتك؟</b><small>مساعد سريع ومجاني</small></div><button id="assistantClose" type="button" aria-label="إغلاق">×</button></header><div id="assistantMessages" class="assistant-messages"></div><div id="assistantQuick" class="assistant-quick"><button type="button" data-assistant-action="courses">الدورات المتاحة</button><button type="button" data-assistant-action="register">أريد التسجيل</button><button type="button" data-assistant-action="institution">طلب مؤسسة</button><button type="button" data-assistant-action="contact">تواصل مع الفريق</button></div><form id="assistantForm"><input id="assistantInput" maxlength="300" autocomplete="off" placeholder="اكتب سؤالك عن الدورات"><button type="submit" aria-label="إرسال">←</button></form></section>`;
+  root.innerHTML = `<button id="assistantToggle" type="button" aria-expanded="false" aria-controls="assistantPanel"><span class="assistant-dot"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A3.5 3.5 0 0 1 7.5 1h9A3.5 3.5 0 0 1 20 4.5v7a3.5 3.5 0 0 1-3.5 3.5H10l-4.5 4v-4.42A3.5 3.5 0 0 1 4 11.5v-7ZM8 7h8M8 10h5"/></svg><span>مساعد INEXC</span></button><section id="assistantPanel" hidden aria-label="مساعد INEXC"><header><div><b>كيف يمكنني مساعدتك؟</b><small>مساعد سريع ومجاني</small></div><button id="assistantClose" type="button" aria-label="إغلاق">×</button></header><div id="assistantMessages" class="assistant-messages"></div><div id="assistantQuick" class="assistant-quick"><button type="button" data-assistant-action="courses">الدورات المتاحة</button><button type="button" data-assistant-action="register">أريد التسجيل</button><button type="button" data-assistant-action="institution">طلب مؤسسة</button><button type="button" data-assistant-action="faq">أسئلة شائعة</button><button type="button" data-assistant-action="contact">تواصل مع الفريق</button></div><form id="assistantForm"><input id="assistantInput" maxlength="300" autocomplete="off" placeholder="اكتب سؤالك عن الدورات"><button type="submit" aria-label="إرسال">←</button></form></section>`;
   const style = document.createElement('style');
   style.textContent = `
     #inexcAssistant{position:fixed;right:22px;bottom:22px;z-index:9998;font-family:Arial,sans-serif;color:#17324d}
@@ -41,6 +49,7 @@
     if(name==='courses') return courseList();
     if(name==='register') return say('يمكنك اختيار الدورة المناسبة ثم بدء التسجيل من هنا:<br><a href="/register/">ابدأ التسجيل ←</a>');
     if(name==='institution') return say('لديك برنامج مخصص للمؤسسات. اترك احتياجكم وسيتواصل الفريق معكم:<br><a href="/register/?type=institution">طلب برنامج لمؤسسة ←</a>');
+    if(name==='faq') return say(FAQS.map(item => '<b style="display:block;color:#103b70;margin-top:4px">'+esc(item.question)+'</b>'+esc(item.answer)).join('<br>'));
     if(name==='contact') return say('يمكنك التواصل السريع مع فريقنا عبر <a href="https://wa.me/971543475500?text='+encodeURIComponent('مرحبًا، لدي استفسار عن دورات INEXC Training.')+'" target="_blank" rel="noopener">واتساب ←</a>');
   };
   toggle.onclick = () => panel.hidden ? show() : hide();
@@ -51,6 +60,8 @@
     const input=document.getElementById('assistantInput'), question=input.value.trim(); if(!question) return;
     say(esc(question),'user'); input.value='';
     const normalized=question.toLowerCase();
+    const faq = FAQS.find(item => item.keys.some(key => normalized.includes(key.toLowerCase())));
+    if (faq) return say(esc(faq.answer));
     if(/دورة|دورات|برنامج|المتاح/.test(normalized)) return courseList();
     if(/سجل|تسجيل|التحاق/.test(normalized)) return action('register');
     if(/مؤسسة|مؤسسه|شركة|مدرسة|جامعة|جهة/.test(normalized)) return action('institution');
