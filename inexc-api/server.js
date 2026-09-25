@@ -748,6 +748,32 @@ app.post('/api/admin/course-alerts/release', auth, async (req, res, next) => {
     res.json({ ok: true, released: result.rowCount, requested: count });
   } catch (error) { next(error); }
 });
+app.post('/api/admin/course-alerts/:id/send', auth, async (req, res, next) => {
+  try {
+    const subscriberResult = await pool.query('SELECT * FROM course_alert_subscribers WHERE id=$1', [req.params.id]);
+    if (!subscriberResult.rowCount) return res.status(404).json({ error: 'لم نجد هذا البريد في قائمة التنبيهات.' });
+    const subscriber = subscriberResult.rows[0];
+    if (!subscriber.active || subscriber.suppressed) return res.status(400).json({ error: 'هذا البريد موقوف نهائيًا ولا يمكن الإرسال إليه.' });
+    const preference = await getEmailPreference(subscriber.email);
+    if (preference.marketing_opt_out) return res.status(400).json({ error: 'ألغى هذا البريد اشتراكه من الرسائل، لذلك لا يمكن الإرسال إليه.' });
+    const courseId = clean(req.body?.courseId, 80);
+    const courseResult = await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true', [courseId]);
+    if (!courseResult.rowCount) return res.status(400).json({ error: 'اختر دورة منشورة أولًا.' });
+    const course = publicCourse(courseResult.rows[0]);
+    const settings = await getCourseAlertSettings();
+    const sent = await sendEmail({
+      to: subscriber.email,
+      subject: mergeCourseAlertTemplate(settings.subject, course),
+      html: emailShell({
+        title: course.name,
+        preview: mergeCourseAlertTemplate(settings.subject, course),
+        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">' + escapeHtml(course.name) + '</h1><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</div></div><div style="text-align:center;margin:26px 0 20px"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div><p style="margin:0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي التنبيهات؟ <a href="' + unsubscribeUrl(subscriber.unsubscribe_token) + '" style="color:#0866c6">إلغاء الاشتراك</a></p>'
+      })
+    });
+    await pool.query("INSERT INTO course_alert_deliveries (subscriber_id,course_id,resend_email_id,status,send_after,released_at) VALUES ($1,$2,$3,'sent',now(),now()) ON CONFLICT (subscriber_id,course_id) DO UPDATE SET resend_email_id=EXCLUDED.resend_email_id,status='sent',error='',released_at=now()", [subscriber.id, course.id, sent?.id || '']);
+    res.json({ ok: true, email: subscriber.email, courseName: course.name });
+  } catch (error) { next(error); }
+});
 app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
   try {
     const email = clean(String(req.body?.email || '').toLowerCase(), 190);
