@@ -60,4 +60,58 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
   };
   load();
 })();
+</script>
+<script>
+(() => {
+  const shell = document.querySelector('.tabs');
+  const host = document.querySelector('main.wrap');
+  if (!shell || !host || document.querySelector('#testimonials')) return;
+  shell.insertAdjacentHTML('beforeend', '<button class="light" data-view="testimonials">تجارب المتدربين</button>');
+  host.insertAdjacentHTML('beforeend', `<section id="testimonials" class="view"><div class="two"><form id="testimonialForm" class="panel" style="padding:20px"><h2 id="testimonialTitle" style="margin-top:0;color:#103b70;font-size:18px">إضافة رأي متدرب</h2><input id="testimonialId" type="hidden"><label>اسم المتدرب <span style="color:#b02b3a">*</span></label><input id="testimonialName" maxlength="120" required placeholder="مثال: أحمد محمد"><label>محتوى الرأي <span style="color:#b02b3a">*</span></label><textarea id="testimonialContent" maxlength="2000" required placeholder="اكتب تجربة المتدرب أو رأيه هنا"></textarea><label>صورة المتدرب أو صورة الرأي</label><input id="testimonialImage" type="file" accept="image/png,image/jpeg,image/webp"><div class="two"><div><label>التقييم</label><select id="testimonialRating"><option value="5">★★★★★ — 5</option><option value="4">★★★★☆ — 4</option><option value="3">★★★☆☆ — 3</option><option value="2">★★☆☆☆ — 2</option><option value="1">★☆☆☆☆ — 1</option></select></div><div><label>حالة العرض</label><select id="testimonialStatus"><option value="draft">مسودة</option><option value="visible">ظاهر في الموقع</option><option value="hidden">مخفي</option><option value="featured">مميّز — يظهر أولًا</option></select></div></div><label class="check"><input id="testimonialVerified" type="checkbox"> رأي موثّق</label><div style="display:flex;gap:8px"><button class="primary">حفظ الرأي</button><button class="light" id="newTestimonial" type="button">رأي جديد</button></div><div id="testimonialResult" class="message"></div></form><div><div class="panel" style="padding:18px;margin-bottom:14px"><h2 style="margin:0 0 5px;color:#103b70;font-size:18px">إظهار آراء المتدربين في الموقع</h2><p class="note">يمكنك إخفاء القسم كاملًا مع الاحتفاظ بجميع الآراء في لوحة الإدارة.</p><label class="check"><input id="testimonialsVisible" type="checkbox" checked> إظهار القسم في الصفحة الرئيسية</label><button class="light" id="saveTestimonialsVisibility" type="button">حفظ الإعداد</button><div id="testimonialsVisibilityResult" class="message"></div></div><div class="tools"><h2 style="color:#103b70;font-size:19px;flex:1">الآراء المحفوظة</h2><button class="light" id="loadTestimonials" type="button">تحديث</button></div><div id="testimonialsList" class="course-list"></div></div></div></section>`);
+  const q = selector => document.querySelector(selector);
+  let items = [];
+  const escape = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[char]));
+  const statusLabel = value => ({ draft:'مسودة', visible:'ظاهر', hidden:'مخفي', featured:'مميّز' }[value] || 'مسودة');
+  const apiOrigin = () => (window.INEXC_REGISTRATION_ENDPOINT || '').replace(/\/api\/?$/, '');
+  const clear = () => { q('#testimonialForm').reset(); q('#testimonialId').value=''; q('#testimonialTitle').textContent='إضافة رأي متدرب'; q('#testimonialStatus').value='draft'; q('#testimonialRating').value='5'; q('#testimonialResult').textContent=''; };
+  const load = async () => {
+    try {
+      const [settings, data] = await Promise.all([call('/admin/settings'), call('/admin/testimonials')]);
+      q('#testimonialsVisible').checked = settings.testimonialsVisible !== false;
+      items = data;
+      q('#testimonialsList').innerHTML = items.length ? items.map(item => `<article class="panel course-card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:9px">${item.imageUrl ? `<img src="${escape(apiOrigin()+item.imageUrl)}" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover">` : '<span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#eaf4ff;color:#0866c6;font-weight:800">رأي</span>'}<div><h3 style="margin:0">${escape(item.name)} ${item.verified ? '<small style="color:#168865;font-size:10px">موثّق ✓</small>' : ''}</h3><small>${'★'.repeat(item.rating)}${'☆'.repeat(5-item.rating)} · ${statusLabel(item.status)}</small></div></div><p>${escape(item.content)}</p><div style="display:flex;gap:7px;margin-top:12px"><button class="light" data-edit-testimonial="${item.id}" type="button">تعديل</button><button class="danger" data-delete-testimonial="${item.id}" type="button">حذف</button></div></article>`).join('') : '<p class="note">لا توجد آراء محفوظة بعد.</p>';
+    } catch (error) { q('#testimonialsList').innerHTML = '<p class="message">'+escape(error.message)+'</p>'; }
+  };
+  q('[data-view="testimonials"]').onclick = () => { document.querySelectorAll('.tabs button,.view').forEach(element => element.classList.remove('active')); q('[data-view="testimonials"]').classList.add('active'); q('#testimonials').classList.add('active'); load(); };
+  q('#testimonialForm').onsubmit = async event => {
+    event.preventDefault();
+    const id = q('#testimonialId').value;
+    const output = q('#testimonialResult');
+    const button = q('#testimonialForm button.primary');
+    const data = { name:q('#testimonialName').value.trim(), content:q('#testimonialContent').value.trim(), rating:Number(q('#testimonialRating').value), verified:q('#testimonialVerified').checked, status:q('#testimonialStatus').value };
+    button.disabled=true; button.textContent='جارٍ الحفظ...';
+    try {
+      const saved = await call('/admin/testimonials'+(id ? '/'+id : ''), { method:id ? 'PUT' : 'POST', body:JSON.stringify(data) });
+      const image = q('#testimonialImage').files[0];
+      if (image) { const form = new FormData(); form.append('image', image); await call('/admin/testimonials/'+saved.id+'/image', { method:'POST', body:form }); }
+      output.style.color='#168865'; output.textContent='تم حفظ رأي المتدرب بنجاح.'; clear(); load();
+    } catch (error) { output.style.color='var(--bad)'; output.textContent=error.message; }
+    finally { button.disabled=false; button.textContent='حفظ الرأي'; }
+  };
+  q('#newTestimonial').onclick = clear;
+  q('#loadTestimonials').onclick = load;
+  q('#saveTestimonialsVisibility').onclick = async () => {
+    const output=q('#testimonialsVisibilityResult'), button=q('#saveTestimonialsVisibility');
+    button.disabled=true; button.textContent='جارٍ الحفظ...';
+    try { const result=await call('/admin/settings/testimonials',{method:'POST',body:JSON.stringify({visible:q('#testimonialsVisible').checked})}); q('#testimonialsVisible').checked=result.testimonialsVisible!==false; output.style.color='#168865'; output.textContent=result.testimonialsVisible!==false?'سيظهر قسم الآراء في الموقع.':'تم إخفاء قسم الآراء من الموقع.'; }
+    catch(error){ output.style.color='var(--bad)'; output.textContent=error.message; }
+    finally { button.disabled=false; button.textContent='حفظ الإعداد'; }
+  };
+  q('#testimonialsList').onclick = async event => {
+    const edit = event.target.closest('[data-edit-testimonial]');
+    const remove = event.target.closest('[data-delete-testimonial]');
+    if (edit) { const item=items.find(entry=>entry.id===edit.dataset.editTestimonial); if(!item)return; q('#testimonialTitle').textContent='تعديل رأي المتدرب'; q('#testimonialId').value=item.id; q('#testimonialName').value=item.name; q('#testimonialContent').value=item.content; q('#testimonialRating').value=String(item.rating); q('#testimonialStatus').value=item.status; q('#testimonialVerified').checked=item.verified; window.scrollTo({top:q('#testimonials').offsetTop-20,behavior:'smooth'}); }
+    if (remove) { if(!confirm('هل تريد حذف هذا الرأي نهائيًا؟')) return; try { await call('/admin/testimonials/'+remove.dataset.deleteTestimonial,{method:'DELETE'}); load(); } catch(error){ alert(error.message); } }
+  };
+})();
 </script></body></html>
