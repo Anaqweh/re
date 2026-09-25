@@ -723,13 +723,14 @@ app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
     if (!result.rowCount) return res.status(400).json({ error: 'لا توجد دورة منشورة لإرسال معاينة تجريبية.' });
     const course = publicCourse(result.rows[0]);
     const settings = await getCourseAlertSettings();
+    const preference = await getEmailPreference(email);
     await sendEmail({
       to: email,
       subject: '[تجريبي] ' + mergeCourseAlertTemplate(settings.subject, course),
       html: emailShell({
         title: 'رسالة تجريبية لتنبيه دورة',
         preview: 'هذه معاينة تجريبية فقط لرسالة الدورات الجديدة.',
-        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">هذه رسالة تجريبية</h1><p style="margin:0 0 18px;color:#58708a">هكذا سيصل المحتوى الذي حفظته إلى المشتركين.</p><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="font-size:19px;font-weight:800;color:#173d6b">' + escapeHtml(course.name) + '</div><p style="margin:10px 0;color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</p></div><div style="text-align:center;margin:26px 0 0"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>'
+        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">هذه رسالة تجريبية</h1><p style="margin:0 0 18px;color:#58708a">هكذا سيصل المحتوى الذي حفظته إلى المشتركين.</p><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="font-size:19px;font-weight:800;color:#173d6b">' + escapeHtml(course.name) + '</div><p style="margin:10px 0;color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</p></div><div style="text-align:center;margin:26px 0 0"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div><p style="margin:22px 0 0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي رسائل INEXC؟ <a href="' + emailPreferenceUnsubscribeUrl(preference.unsubscribe_token) + '" style="color:#0866c6">إلغاء الاشتراك</a></p>'
       })
     });
     res.json({ ok: true, courseName: course.name });
