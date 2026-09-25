@@ -463,19 +463,25 @@ async function queueCourseAlertEmails(course) {
   } catch (error) { console.error('Course alert queue failed:', error.message); }
 }
 
-async function processCourseAlertQueue() {
+async function processCourseAlertQueue(options = {}) {
   if (!resendApiKey) return;
   try {
     const settings = await getCourseAlertSettings();
-    if (!settings.enabled) return;
-    const manualReleaseFilter = settings.deliveryMode === 'manual' ? ' AND d.released_at IS NOT NULL' : '';
+    const force = options.force === true;
+    const courseId = clean(options.courseId, 80);
+    const requestedLimit = Number(options.limit);
+    const limit = [100,200,300,400,500].includes(requestedLimit) ? requestedLimit : settings.batchSize;
+    if (!settings.enabled && !force) return;
+    const manualReleaseFilter = !force && settings.deliveryMode === 'manual' ? ' AND d.released_at IS NOT NULL' : '';
+    const courseFilter = courseId ? ' AND d.course_id=$2' : '';
+    const values = courseId ? [limit, courseId] : [limit];
     const pending = await pool.query(`SELECT d.id,s.email,s.unsubscribe_token,c.*
       FROM course_alert_deliveries d
       JOIN course_alert_subscribers s ON s.id=d.subscriber_id AND s.active=true
       LEFT JOIN email_preferences p ON p.email=s.email
       JOIN courses c ON c.id=d.course_id AND c.active=true
-      WHERE d.status='queued' AND d.send_after <= now() AND COALESCE(p.marketing_opt_out,false)=false${manualReleaseFilter}
-      ORDER BY d.send_after ASC LIMIT $1`, [settings.batchSize]);
+      WHERE d.status='queued' AND d.send_after <= now() AND COALESCE(p.marketing_opt_out,false)=false${manualReleaseFilter}${courseFilter}
+      ORDER BY d.send_after ASC LIMIT $1`, values);
     for (const row of pending.rows) {
       const claimed = await pool.query(`UPDATE course_alert_deliveries SET status='sending'
         WHERE id=$1 AND status='queued' RETURNING id`, [row.id]);
@@ -767,7 +773,7 @@ app.post('/api/admin/course-alerts/send-now', auth, async (req, res, next) => {
       SELECT id,$1,'queued',now(),now() FROM recipients
       ON CONFLICT (subscriber_id,course_id) DO NOTHING
       RETURNING id`, [course.id, count]);
-    void processCourseAlertQueue();
+    void processCourseAlertQueue({ force: true, courseId: course.id, limit: count });
     res.json({ ok: true, courseName: course.name, queued: result.rowCount, requested: count });
   } catch (error) { next(error); }
 });
