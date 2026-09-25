@@ -8,7 +8,8 @@
     { question:'كيف أسجل؟', keys:['كيف أسجل','كيف اسجل','التسجيل','سجل'], answer:'اختر الدورة ثم املأ نموذج التسجيل، وسيصلك تأكيد عبر البريد.' },
     { question:'ما نوع الشهادات؟', keys:['نوع الشهادات','أنواع الشهادات','انواع الشهادات','البورد الأمريكي','البورد الامريكي','cambridge','كامبردج','كامبرج','khda','adek'], answer:'تتوفر شهادات دولية مثل البورد الأمريكي وCambridge، وشهادات محلية مثل شركة التميز الابتكاري وKHDA وADEK، بالتعاون مع المؤسسات الدولية والمحلية.' },
     { question:'هل لديكم شهادات ماجستير مهني أو دكتوراه مهني؟', keys:['ماجستير مهني','دكتوراه مهني','دكتوراة مهني','ماجستير','دكتوراه'], answer:'نعم، لدينا تعاون دولي يمكن من خلاله إصدار الشهادات المهنية المصدّقة حسب الأصول.' },
-    { question:'هل لديكم خدمات أخرى؟', keys:['خدمات أخرى','خدمات اخرى','خدماتكم','خدمات'], answer:'نعم، نقدم العديد من الخدمات التعليمية والتدريبية وغيرها. يمكن التواصل عبر واتساب لمعرفة الخدمة الأنسب لاحتياجك.' }
+    { question:'هل لديكم خدمات أخرى؟', keys:['خدمات أخرى','خدمات اخرى','خدماتكم','خدمات'], answer:'نعم، نقدم العديد من الخدمات التعليمية والتدريبية وغيرها. يمكن التواصل عبر واتساب لمعرفة الخدمة الأنسب لاحتياجك.' },
+    { question:'هل تنصحون بدورات IELTS أو TOEFL أو اللغة الإنجليزية؟', keys:['ielts','ايلتس','آيلتس','toefl','توفل','لغة انجليزية','اللغة الإنجليزية','اللغة الانجليزية','انجليزي'], answer:'نعم، نرشّح معهد سبارك لتعليم اللغات لبرامج IELTS وTOEFL ودورات اللغة الإنجليزية. يمكن التواصل معهم مباشرة عبر واتساب.', url:'https://wa.me/971506226156', urlLabel:'التواصل مع معهد سبارك عبر واتساب ←', listed:false }
   ];
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const root = document.createElement('div');
@@ -49,7 +50,7 @@
     if(name==='courses') return courseList();
     if(name==='register') return say('يمكنك اختيار الدورة المناسبة ثم بدء التسجيل من هنا:<br><a href="/register/">ابدأ التسجيل ←</a>');
     if(name==='institution') return say('لديك برنامج مخصص للمؤسسات. اترك احتياجكم وسيتواصل الفريق معكم:<br><a href="/register/?type=institution">طلب برنامج لمؤسسة ←</a>');
-    if(name==='faq') return say(FAQS.map(item => '<b style="display:block;color:#103b70;margin-top:4px">'+esc(item.question)+'</b>'+esc(item.answer)).join('<br>'));
+    if(name==='faq') return say(FAQS.filter(item => item.listed !== false).map(item => '<b style="display:block;color:#103b70;margin-top:4px">'+esc(item.question)+'</b>'+esc(item.answer)).join('<br>'));
     if(name==='contact') return say('يمكنك التواصل السريع مع فريقنا عبر <a href="https://wa.me/971543475500?text='+encodeURIComponent('مرحبًا، لدي استفسار عن دورات INEXC Training.')+'" target="_blank" rel="noopener">واتساب ←</a>');
   };
   toggle.onclick = () => panel.hidden ? show() : hide();
@@ -61,7 +62,7 @@
     say(esc(question),'user'); input.value='';
     const normalized=question.toLowerCase();
     const faq = FAQS.find(item => item.keys.some(key => normalized.includes(key.toLowerCase())));
-    if (faq) return say(esc(faq.answer));
+    if (faq) return say(esc(faq.answer)+(faq.url ? '<br><a href="'+faq.url+'" target="_blank" rel="noopener">'+esc(faq.urlLabel)+'</a>' : ''));
     if(/دورة|دورات|برنامج|المتاح/.test(normalized)) return courseList();
     if(/سجل|تسجيل|التحاق/.test(normalized)) return action('register');
     if(/مؤسسة|مؤسسه|شركة|مدرسة|جامعة|جهة/.test(normalized)) return action('institution');
