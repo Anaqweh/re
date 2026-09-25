@@ -67,7 +67,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     const response = await fetch(`${api}/settings`);
     const settings = await response.json();
-    if (!response.ok || !settings.logoUrl) return;
+    if (!response.ok) return;
+    const heroPreview = document.querySelector('[data-hero-preview]');
+    if (heroPreview && settings.heroPreviewVisible === false) heroPreview.hidden = true;
+    if (!settings.logoUrl) return;
     const url = new URL(settings.logoUrl, new URL(api).origin).href;
     const favicon = document.querySelector('link[rel~="icon"]') || document.createElement('link');
     favicon.rel = 'icon'; favicon.type = 'image/png'; favicon.href = url;
