@@ -225,7 +225,7 @@ function parseCourseDocument(raw) {
   return { name: clean(name, 180), description: clean(description, 1000), axes, outcomes: courseOutcomes(outcomesPart.join('\n')).join('\n'), ...metadata };
 }
 function emailShell({ title, preview, content }) {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">تواصل معنا عبر واتساب ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
 async function sendEmail({ to, subject, html, attachmentPath = '' }) {
   if (!resendApiKey || !to) return;
@@ -321,7 +321,7 @@ async function setupDatabase() {
   )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_subscribers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT UNIQUE NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE, unsubscribe_token TEXT UNIQUE NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE, suppressed BOOLEAN NOT NULL DEFAULT FALSE, unsubscribe_token TEXT UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_deliveries (
@@ -334,6 +334,8 @@ async function setupDatabase() {
   )`);
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS course_alert_unique_delivery ON course_alert_deliveries (subscriber_id, course_id)');
   await pool.query('ALTER TABLE course_alert_deliveries ADD COLUMN IF NOT EXISTS send_after TIMESTAMPTZ NOT NULL DEFAULT now()');
+  await pool.query('ALTER TABLE course_alert_subscribers ADD COLUMN IF NOT EXISTS suppressed BOOLEAN NOT NULL DEFAULT FALSE');
+  await pool.query('UPDATE course_alert_subscribers SET suppressed=true WHERE active=false AND suppressed=false');
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
@@ -495,7 +497,8 @@ app.post('/api/course-alerts', async (req, res, next) => {
   try {
     const email = clean(String(req.body?.email || '').toLowerCase(), 190);
     if (!alertEmailPattern.test(email)) return res.status(400).json({ error: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
-    const existing = await pool.query('SELECT id,active FROM course_alert_subscribers WHERE email=$1', [email]);
+    const existing = await pool.query('SELECT id,active,suppressed FROM course_alert_subscribers WHERE email=$1', [email]);
+    if (existing.rowCount && existing.rows[0].suppressed) return res.json({ ok: true, alreadyUnsubscribed: true });
     if (existing.rowCount && existing.rows[0].active) return res.json({ ok: true, alreadySubscribed: true });
     const token = crypto.randomBytes(24).toString('hex');
     if (existing.rowCount) {
@@ -510,7 +513,7 @@ app.post('/api/course-alerts', async (req, res, next) => {
 app.get('/api/course-alerts/unsubscribe', async (req, res, next) => {
   try {
     const token = clean(req.query.token, 100);
-    const result = await pool.query('UPDATE course_alert_subscribers SET active=false,updated_at=now() WHERE unsubscribe_token=$1 RETURNING email', [token]);
+    const result = await pool.query('UPDATE course_alert_subscribers SET active=false,suppressed=true,updated_at=now() WHERE unsubscribe_token=$1 RETURNING email', [token]);
     const message = result.rowCount ? 'تم إلغاء اشتراكك بنجاح. لن تصلك تنبيهات الدورات الجديدة بعد الآن.' : 'هذا الرابط غير صالح أو تم استخدامه مسبقًا.';
     res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تنبيهات INEXC</title><body style="margin:0;background:#eef5fc;font-family:Tahoma,Arial,sans-serif;color:#17324d"><main style="max-width:520px;margin:12vh auto;background:#fff;padding:36px;border-radius:18px;text-align:center;box-shadow:0 10px 32px rgba(15,70,120,.12)"><h1 style="color:#0b4b91">تنبيهات الدورات</h1><p style="line-height:1.9">${message}</p><a href="https://www.inexctraining.com" style="color:#0866c6">العودة إلى الموقع</a></main></body></html>`);
   } catch (error) { next(error); }
@@ -715,7 +718,7 @@ app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single
     if (!emails.length) return res.status(400).json({ error: 'لم نجد عناوين بريد إلكتروني صالحة داخل الملف.' });
     let added = 0, existing = 0, unsubscribed = 0;
     for (const email of emails) {
-      const current = await pool.query('SELECT active FROM course_alert_subscribers WHERE email=$1', [email]);
+      const current = await pool.query('SELECT active,suppressed FROM course_alert_subscribers WHERE email=$1', [email]);
       if (current.rowCount) {
         if (current.rows[0].active) existing += 1; else unsubscribed += 1;
         continue;
@@ -728,7 +731,7 @@ app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single
 });
 app.get('/api/admin/course-alerts', auth, async (_req, res, next) => {
   try {
-    const result = await pool.query(`SELECT s.id,s.email,s.active,s.created_at,
+    const result = await pool.query(`SELECT s.id,s.email,s.active,s.suppressed,s.created_at,
       COUNT(d.id)::int AS deliveries,
       COUNT(d.id) FILTER (WHERE d.status='queued')::int AS queued,
       COUNT(d.id) FILTER (WHERE d.status='sent')::int AS sent,
@@ -736,12 +739,12 @@ app.get('/api/admin/course-alerts', auth, async (_req, res, next) => {
       MAX(d.created_at) AS last_delivery
       FROM course_alert_subscribers s LEFT JOIN course_alert_deliveries d ON d.subscriber_id=s.id
       GROUP BY s.id ORDER BY s.created_at DESC`);
-    res.json(result.rows.map(row => ({ id: row.id, email: row.email, active: row.active, createdAt: row.created_at, deliveries: row.deliveries, queued: row.queued, sent: row.sent, failed: row.failed, lastDelivery: row.last_delivery })));
+    res.json(result.rows.map(row => ({ id: row.id, email: row.email, active: row.active, suppressed: row.suppressed === true, createdAt: row.created_at, deliveries: row.deliveries, queued: row.queued, sent: row.sent, failed: row.failed, lastDelivery: row.last_delivery })));
   } catch (error) { next(error); }
 });
 app.delete('/api/admin/course-alerts/:id', auth, async (req, res, next) => {
   try {
-    const result = await pool.query('DELETE FROM course_alert_subscribers WHERE id=$1 RETURNING id', [req.params.id]);
+    const result = await pool.query('UPDATE course_alert_subscribers SET active=false,suppressed=true,updated_at=now() WHERE id=$1 RETURNING id', [req.params.id]);
     if (!result.rowCount) return res.status(404).json({ error: 'المشترك غير موجود.' });
     res.json({ ok: true });
   } catch (error) { next(error); }
