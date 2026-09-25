@@ -27,9 +27,14 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'تعذر حفظ البريد الآن. حاول مرة أخرى.');
-        message.textContent = data.alreadySubscribed ? 'هذا البريد مشترك بالفعل في تنبيهات الدورات.' : 'تم الاشتراك بنجاح. ستصلك رسالة عند نشر أي دورة جديدة.';
-        message.className = 'course-alert-message';
-        if (!data.alreadySubscribed) form.reset();
+        if (data.alreadyUnsubscribed) {
+          message.textContent = 'تم إلغاء اشتراك هذا البريد سابقًا، لذلك لن يُضاف إلى التنبيهات.';
+          message.className = 'course-alert-message error';
+        } else {
+          message.textContent = data.alreadySubscribed ? 'هذا البريد مشترك بالفعل في تنبيهات الدورات.' : 'تم الاشتراك بنجاح. ستصلك رسالة عند نشر أي دورة جديدة.';
+          message.className = 'course-alert-message';
+          if (!data.alreadySubscribed) form.reset();
+        }
       } catch (error) {
         message.textContent = error.message || 'تعذر حفظ البريد الآن. حاول مرة أخرى.';
         message.className = 'course-alert-message error';
