@@ -146,7 +146,7 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
     try {
       const rows = await call('/admin/course-alerts');
       document.getElementById('alertsCount').textContent = rows.length;
-      host.innerHTML = rows.length ? '<table><thead><tr><th>البريد الإلكتروني</th><th>الحالة</th><th>تاريخ الاشتراك</th><th>تم الإرسال</th><th>بانتظار الإرسال</th><th>فشل</th><th>إجراء</th></tr></thead><tbody>' + rows.map(row => '<tr><td dir="ltr">' + escape(row.email) + '</td><td><span class="alert-state ' + (row.active ? 'active' : 'off') + '">' + (row.active ? 'مفعّل' : 'ملغي') + '</span></td><td>' + date(row.createdAt) + '</td><td>' + Number(row.sent || 0) + '</td><td>' + Number(row.queued || 0) + '</td><td>' + Number(row.failed || 0) + '</td><td><button class="danger" type="button" data-delete-alert="' + row.id + '">حذف</button></td></tr>').join('') + '</tbody></table>' : '<p class="note">لا يوجد مشتركون حتى الآن.</p>';
+      host.innerHTML = rows.length ? '<table><thead><tr><th>البريد الإلكتروني</th><th>الحالة</th><th>تاريخ الاشتراك</th><th>تم الإرسال</th><th>بانتظار الإرسال</th><th>فشل</th><th>إجراء</th></tr></thead><tbody>' + rows.map(row => '<tr><td dir="ltr">' + escape(row.email) + '</td><td><span class="alert-state ' + (row.active ? 'active' : 'off') + '">' + (row.active ? 'مفعّل' : (row.suppressed ? 'إلغاء نهائي' : 'موقوف')) + '</span></td><td>' + date(row.createdAt) + '</td><td>' + Number(row.sent || 0) + '</td><td>' + Number(row.queued || 0) + '</td><td>' + Number(row.failed || 0) + '</td><td><button class="danger" type="button" data-delete-alert="' + row.id + '">إيقاف نهائي</button></td></tr>').join('') + '</tbody></table>' : '<p class="note">لا يوجد مشتركون حتى الآن.</p>';
     } catch (error) { host.innerHTML = '<p class="message">' + escape(error.message) + '</p>'; }
   }
   tab.addEventListener('click', () => {
@@ -196,7 +196,7 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
   section.addEventListener('click', async event => {
     const button = event.target.closest('[data-delete-alert]');
     if (!button) return;
-    if (!confirm('هل تريد حذف هذا البريد من تنبيهات الدورات؟')) return;
+    if (!confirm('سيتم إيقاف هذا البريد نهائيًا من تنبيهات الدورات، ولن يعاد تفعيله حتى لو ظهر في ملف استيراد لاحق. هل تريد المتابعة؟')) return;
     button.disabled = true;
     try { await call('/admin/course-alerts/' + button.dataset.deleteAlert, { method:'DELETE' }); loadAlerts(); }
     catch (error) { alert(error.message); button.disabled = false; }
