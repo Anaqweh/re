@@ -342,8 +342,9 @@ function publicCourse(row) {
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API' }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
-    const result = await pool.query("SELECT value FROM app_settings WHERE key='brand_logo'");
-    res.json({ logoUrl: result.rows[0]?.value || '' });
+    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible')");
+    const settings = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
+    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false' });
   } catch (error) { next(error); }
 });
 app.get('/api/courses', async (_req, res, next) => {
@@ -466,8 +467,16 @@ app.post('/api/admin/login', (req, res) => {
 app.post('/api/admin/logout', auth, (req, res) => { sessions.delete(String(req.headers.authorization).replace(/^Bearer\s+/i, '')); res.json({ ok: true }); });
 app.get('/api/admin/settings', auth, async (_req, res, next) => {
   try {
-    const result = await pool.query("SELECT value FROM app_settings WHERE key='brand_logo'");
-    res.json({ logoUrl: result.rows[0]?.value || '' });
+    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible')");
+    const settings = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
+    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false' });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/settings/hero-preview', auth, async (req, res, next) => {
+  try {
+    const visible = req.body?.visible !== false;
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('hero_preview_visible',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [visible ? 'true' : 'false']);
+    res.json({ ok: true, heroPreviewVisible: visible });
   } catch (error) { next(error); }
 });
 app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req, res, next) => {
