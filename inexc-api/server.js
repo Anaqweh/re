@@ -401,11 +401,28 @@ const alertEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const unsubscribeUrl = token => `https://api.inexctraining.com/api/course-alerts/unsubscribe?token=${encodeURIComponent(token)}`;
 const coursePublicUrl = course => `https://www.inexctraining.com/course/?id=${encodeURIComponent(course.id)}`;
 
+const defaultCourseAlertSubject = 'دورة جديدة: {course_name} | INEXC Training';
+const defaultCourseAlertMessage = 'أهلًا بك، تم نشر دورة جديدة بعنوان {course_name}.\n\n{course_description}\n\nالتاريخ أو المدة: {course_date}\nطريقة التنفيذ: {course_location}\nعدد الساعات: {course_hours}';
+function mergeCourseAlertTemplate(template, course) {
+  const values = {
+    course_name: course.name || '',
+    course_description: course.description || '',
+    course_date: course.date || 'يُعلن لاحقًا',
+    course_location: course.location || 'يُعلن لاحقًا',
+    course_hours: course.hours ? String(course.hours) + ' ساعة تدريبية' : 'يُعلن لاحقًا'
+  };
+  return String(template || '').replace(/\{(course_name|course_description|course_date|course_location|course_hours)\}/g, (_match, key) => values[key] || '');
+}
 async function getCourseAlertSettings() {
-  const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('course_alerts_enabled','course_alert_delay_minutes')");
+  const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('course_alerts_enabled','course_alert_delay_minutes','course_alert_subject','course_alert_message')");
   const values = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
   const delay = Number(values.course_alert_delay_minutes || 60);
-  return { enabled: values.course_alerts_enabled !== 'false', delayMinutes: Math.max(0, Math.min(10080, Number.isFinite(delay) ? delay : 60)) };
+  return {
+    enabled: values.course_alerts_enabled !== 'false',
+    delayMinutes: Math.max(0, Math.min(10080, Number.isFinite(delay) ? delay : 60)),
+    subject: clean(values.course_alert_subject || defaultCourseAlertSubject, 220),
+    message: clean(values.course_alert_message || defaultCourseAlertMessage, 4000)
+  };
 }
 
 async function queueCourseAlertEmails(course) {
@@ -447,19 +464,11 @@ async function processCourseAlertQueue() {
         ].filter(Boolean).join(' · ');
         const result = await sendEmail({
           to: row.email,
-          subject: `دورة جديدة: ${course.name} | INEXC Training`,
+          subject: mergeCourseAlertTemplate(settings.subject, course),
           html: emailShell({
-            title: `دورة جديدة: ${course.name}`,
-            preview: `تم نشر دورة جديدة بعنوان ${course.name}`,
-            content: `<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">دورة جديدة بانتظارك</h1>
-              <p style="margin:0 0 18px;color:#58708a">أهلًا بك، تم نشر دورة تدريبية جديدة من INEXC Training.</p>
-              <div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff">
-                <div style="font-size:19px;font-weight:800;color:#173d6b">${escapeHtml(course.name)}</div>
-                ${course.description ? `<p style="margin:10px 0;color:#58708a">${escapeHtml(course.description)}</p>` : ''}
-                ${details ? `<div style="font-size:13px;color:#30689d;margin-top:12px">${details}</div>` : ''}
-              </div>
-              <div style="text-align:center;margin:26px 0 20px"><a href="${coursePublicUrl(course)}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>
-              <p style="margin:0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي التنبيهات؟ <a href="${unsubscribeUrl(row.unsubscribe_token)}" style="color:#0866c6">إلغاء الاشتراك</a></p>`
+            title: course.name,
+            preview: mergeCourseAlertTemplate(settings.subject, course),
+            content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">' + escapeHtml(course.name) + '</h1><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</div></div><div style="text-align:center;margin:26px 0 20px"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div><p style="margin:0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي التنبيهات؟ <a href="' + unsubscribeUrl(row.unsubscribe_token) + '" style="color:#0866c6">إلغاء الاشتراك</a></p>'
           })
         });
         await pool.query("UPDATE course_alert_deliveries SET status='sent',resend_email_id=$1 WHERE id=$2", [result?.id || '', row.id]);
@@ -670,8 +679,12 @@ app.post('/api/admin/course-alerts/settings', auth, async (req, res, next) => {
     const rawDelay = Number(req.body?.delayMinutes);
     const delayMinutes = Math.max(0, Math.min(10080, Number.isFinite(rawDelay) ? Math.round(rawDelay) : 60));
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alerts_enabled',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [enabled ? 'true' : 'false']);
+    const subject = clean(req.body?.subject || defaultCourseAlertSubject, 220);
+    const message = clean(req.body?.message || defaultCourseAlertMessage, 4000);
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_delay_minutes',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [String(delayMinutes)]);
-    res.json({ enabled, delayMinutes });
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_subject',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [subject]);
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_message',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [message]);
+    res.json({ enabled, delayMinutes, subject, message });
   } catch (error) { next(error); }
 });
 app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
@@ -681,13 +694,14 @@ app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
     const result = await pool.query('SELECT * FROM courses WHERE active=true ORDER BY created_at DESC LIMIT 1');
     if (!result.rowCount) return res.status(400).json({ error: 'لا توجد دورة منشورة لإرسال معاينة تجريبية.' });
     const course = publicCourse(result.rows[0]);
+    const settings = await getCourseAlertSettings();
     await sendEmail({
       to: email,
-      subject: '[تجريبي] دورة جديدة: ' + course.name + ' | INEXC Training',
+      subject: '[تجريبي] ' + mergeCourseAlertTemplate(settings.subject, course),
       html: emailShell({
         title: 'رسالة تجريبية لتنبيه دورة',
         preview: 'هذه معاينة تجريبية فقط لرسالة الدورات الجديدة.',
-        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">هذه رسالة تجريبية</h1><p style="margin:0 0 18px;color:#58708a">هكذا ستصل رسالة الدورة الجديدة إلى المشتركين بعد الوقت الذي حددته.</p><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="font-size:19px;font-weight:800;color:#173d6b">' + escapeHtml(course.name) + '</div><p style="margin:10px 0;color:#58708a">' + escapeHtml(course.description || 'وصف الدورة سيظهر هنا.') + '</p></div><div style="text-align:center;margin:26px 0 0"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>'
+        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">هذه رسالة تجريبية</h1><p style="margin:0 0 18px;color:#58708a">هكذا سيصل المحتوى الذي حفظته إلى المشتركين.</p><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="font-size:19px;font-weight:800;color:#173d6b">' + escapeHtml(course.name) + '</div><p style="margin:10px 0;color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</p></div><div style="text-align:center;margin:26px 0 0"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>'
       })
     });
     res.json({ ok: true, courseName: course.name });
