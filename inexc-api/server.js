@@ -475,7 +475,7 @@ async function processCourseAlertQueue(options = {}) {
     const manualReleaseFilter = !force && settings.deliveryMode === 'manual' ? ' AND d.released_at IS NOT NULL' : '';
     const courseFilter = courseId ? ' AND d.course_id=$2' : '';
     const values = courseId ? [limit, courseId] : [limit];
-    const pending = await pool.query(`SELECT d.id,s.email,s.unsubscribe_token,c.*
+    const pending = await pool.query(`SELECT d.id AS delivery_id,s.email,s.unsubscribe_token,c.*
       FROM course_alert_deliveries d
       JOIN course_alert_subscribers s ON s.id=d.subscriber_id AND s.active=true
       LEFT JOIN email_preferences p ON p.email=s.email
@@ -484,7 +484,7 @@ async function processCourseAlertQueue(options = {}) {
       ORDER BY d.send_after ASC LIMIT $1`, values);
     for (const row of pending.rows) {
       const claimed = await pool.query(`UPDATE course_alert_deliveries SET status='sending'
-        WHERE id=$1 AND status='queued' RETURNING id`, [row.id]);
+        WHERE id=$1 AND status='queued' RETURNING id`, [row.delivery_id]);
       if (!claimed.rowCount) continue;
       const course = publicCourse(row);
       try {
@@ -502,9 +502,9 @@ async function processCourseAlertQueue(options = {}) {
             content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">' + escapeHtml(course.name) + '</h1><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="color:#58708a;line-height:2">' + escapeHtml(mergeCourseAlertTemplate(settings.message, course)).replace(/\n/g, '<br>') + '</div></div><div style="text-align:center;margin:26px 0 20px"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div><p style="margin:0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي التنبيهات؟ <a href="' + unsubscribeUrl(row.unsubscribe_token) + '" style="color:#0866c6">إلغاء الاشتراك</a></p>'
           })
         });
-        await pool.query("UPDATE course_alert_deliveries SET status='sent',resend_email_id=$1 WHERE id=$2", [result?.id || '', row.id]);
+        await pool.query("UPDATE course_alert_deliveries SET status='sent',resend_email_id=$1 WHERE id=$2", [result?.id || '', row.delivery_id]);
       } catch (error) {
-        await pool.query("UPDATE course_alert_deliveries SET status='failed',error=$1 WHERE id=$2", [clean(error.message, 800), row.id]);
+        await pool.query("UPDATE course_alert_deliveries SET status='failed',error=$1 WHERE id=$2", [clean(error.message, 800), row.delivery_id]);
         console.error('Course alert email failed:', error.message);
       }
     }
