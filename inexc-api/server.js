@@ -100,6 +100,17 @@ const courseMediaUpload = multer({
     cb(permitted.includes(file.mimetype) ? null : new Error('ارفع صورة PNG أو JPG أو WEBP، أو نموذج شهادة PDF أو DOCX.'), permitted.includes(file.mimetype));
   }
 });
+const testimonialImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => cb(null, `testimonial-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const permitted = ['image/png', 'image/jpeg', 'image/webp'];
+    cb(permitted.includes(file.mimetype) ? null : new Error('ارفع صورة PNG أو JPG أو WEBP.'), permitted.includes(file.mimetype));
+  }
+});
 const messageAttachmentUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
@@ -289,6 +300,12 @@ async function setupDatabase() {
   await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS testimonials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, content TEXT NOT NULL,
+    image_path TEXT NOT NULL DEFAULT '', rating SMALLINT NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+    verified BOOLEAN NOT NULL DEFAULT FALSE, status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','visible','hidden','featured')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
@@ -342,13 +359,21 @@ function publicCourse(row) {
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API' }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
-    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible')");
+    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
     const settings = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
-    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false' });
+    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false', testimonialsVisible: settings.testimonials_visible !== 'false' });
   } catch (error) { next(error); }
 });
 app.get('/api/courses', async (_req, res, next) => {
   try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); }
+});
+app.get('/api/testimonials', async (_req, res, next) => {
+  try {
+    const setting = await pool.query("SELECT value FROM app_settings WHERE key='testimonials_visible'");
+    if (setting.rows[0]?.value === 'false') return res.json({ visible: false, testimonials: [] });
+    const result = await pool.query("SELECT id,name,content,image_path,rating,verified,status FROM testimonials WHERE status IN ('visible','featured') ORDER BY (status='featured') DESC, created_at DESC");
+    res.json({ visible: true, testimonials: result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true })) });
+  } catch (error) { next(error); }
 });
 function publicRichText(value) {
   return String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
@@ -467,9 +492,9 @@ app.post('/api/admin/login', (req, res) => {
 app.post('/api/admin/logout', auth, (req, res) => { sessions.delete(String(req.headers.authorization).replace(/^Bearer\s+/i, '')); res.json({ ok: true }); });
 app.get('/api/admin/settings', auth, async (_req, res, next) => {
   try {
-    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible')");
+    const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
     const settings = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
-    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false' });
+    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false', testimonialsVisible: settings.testimonials_visible !== 'false' });
   } catch (error) { next(error); }
 });
 app.post('/api/admin/settings/hero-preview', auth, async (req, res, next) => {
@@ -477,6 +502,13 @@ app.post('/api/admin/settings/hero-preview', auth, async (req, res, next) => {
     const visible = req.body?.visible !== false;
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('hero_preview_visible',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [visible ? 'true' : 'false']);
     res.json({ ok: true, heroPreviewVisible: visible });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/settings/testimonials', auth, async (req, res, next) => {
+  try {
+    const visible = req.body?.visible !== false;
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('testimonials_visible',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [visible ? 'true' : 'false']);
+    res.json({ ok: true, testimonialsVisible: visible });
   } catch (error) { next(error); }
 });
 app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req, res, next) => {
@@ -488,6 +520,50 @@ app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req
     const old = previous.rows[0]?.value || '';
     if (old.startsWith('/uploads/')) fs.unlink(path.join(uploadDir, path.basename(old)), () => {});
     res.status(201).json({ ok: true, logoUrl });
+  } catch (error) { next(error); }
+});
+app.get('/api/admin/testimonials', auth, async (_req, res, next) => {
+  try {
+    const result = await pool.query('SELECT * FROM testimonials ORDER BY (status=\'featured\') DESC, created_at DESC');
+    res.json(result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true, status: row.status })));
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/testimonials', auth, async (req, res, next) => {
+  try {
+    const data = req.body || {}; const status = ['draft','visible','hidden','featured'].includes(data.status) ? data.status : 'draft';
+    if (!clean(data.name, 120) || !clean(data.content, 2000)) return res.status(400).json({ error: 'الاسم ومحتوى الرأي مطلوبان.' });
+    const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 5)));
+    const result = await pool.query('INSERT INTO testimonials (name,content,rating,verified,status) VALUES ($1,$2,$3,$4,$5) RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status]);
+    const row = result.rows[0]; res.status(201).json({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating), verified: row.verified, status: row.status });
+  } catch (error) { next(error); }
+});
+app.put('/api/admin/testimonials/:id', auth, async (req, res, next) => {
+  try {
+    const data = req.body || {}; const status = ['draft','visible','hidden','featured'].includes(data.status) ? data.status : 'draft';
+    if (!clean(data.name, 120) || !clean(data.content, 2000)) return res.status(400).json({ error: 'الاسم ومحتوى الرأي مطلوبان.' });
+    const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 5)));
+    const result = await pool.query('UPDATE testimonials SET name=$1,content=$2,rating=$3,verified=$4,status=$5,updated_at=now() WHERE id=$6 RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status, req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'الرأي غير موجود.' });
+    const row = result.rows[0]; res.json({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating), verified: row.verified, status: row.status });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/testimonials/:id/image', auth, testimonialImageUpload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'اختر صورة أولًا.' });
+    const current = await pool.query('SELECT image_path FROM testimonials WHERE id=$1', [req.params.id]);
+    if (!current.rowCount) return res.status(404).json({ error: 'الرأي غير موجود.' });
+    const imagePath = `/uploads/${req.file.filename}`;
+    await pool.query('UPDATE testimonials SET image_path=$1,updated_at=now() WHERE id=$2', [imagePath, req.params.id]);
+    if (current.rows[0].image_path) fs.unlink(path.join(uploadDir, path.basename(current.rows[0].image_path)), () => {});
+    res.status(201).json({ ok: true, imageUrl: imagePath });
+  } catch (error) { next(error); }
+});
+app.delete('/api/admin/testimonials/:id', auth, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM testimonials WHERE id=$1 RETURNING image_path', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'الرأي غير موجود.' });
+    if (result.rows[0].image_path) fs.unlink(path.join(uploadDir, path.basename(result.rows[0].image_path)), () => {});
+    res.json({ ok: true });
   } catch (error) { next(error); }
 });
 app.get('/api/admin/courses', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM courses ORDER BY active DESC, created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); } });
