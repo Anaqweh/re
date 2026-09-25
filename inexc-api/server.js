@@ -330,10 +330,11 @@ async function setupDatabase() {
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     resend_email_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued',
     error TEXT NOT NULL DEFAULT '', send_after TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    released_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS course_alert_unique_delivery ON course_alert_deliveries (subscriber_id, course_id)');
   await pool.query('ALTER TABLE course_alert_deliveries ADD COLUMN IF NOT EXISTS send_after TIMESTAMPTZ NOT NULL DEFAULT now()');
+  await pool.query('ALTER TABLE course_alert_deliveries ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE course_alert_subscribers ADD COLUMN IF NOT EXISTS suppressed BOOLEAN NOT NULL DEFAULT FALSE');
   await pool.query('UPDATE course_alert_subscribers SET suppressed=true WHERE active=false AND suppressed=false');
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
@@ -429,12 +430,14 @@ function mergeCourseAlertTemplate(template, course) {
   return String(template || '').replace(/\{(course_name|course_description|course_date|course_location|course_hours)\}/g, (_match, key) => values[key] || '');
 }
 async function getCourseAlertSettings() {
-  const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('course_alerts_enabled','course_alert_delay_minutes','course_alert_subject','course_alert_message')");
+  const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('course_alerts_enabled','course_alert_delay_minutes','course_alert_subject','course_alert_message','course_alert_delivery_mode','course_alert_batch_size')");
   const values = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
   const delay = Number(values.course_alert_delay_minutes || 60);
   return {
     enabled: values.course_alerts_enabled !== 'false',
     delayMinutes: Math.max(0, Math.min(10080, Number.isFinite(delay) ? delay : 60)),
+    deliveryMode: values.course_alert_delivery_mode === 'manual' ? 'manual' : 'auto',
+    batchSize: [100,200,300,400,500].includes(Number(values.course_alert_batch_size)) ? Number(values.course_alert_batch_size) : 100,
     subject: clean(values.course_alert_subject || defaultCourseAlertSubject, 220),
     message: clean(values.course_alert_message || defaultCourseAlertMessage, 4000)
   };
@@ -460,13 +463,14 @@ async function processCourseAlertQueue() {
   try {
     const settings = await getCourseAlertSettings();
     if (!settings.enabled) return;
+    const manualReleaseFilter = settings.deliveryMode === 'manual' ? ' AND d.released_at IS NOT NULL' : '';
     const pending = await pool.query(`SELECT d.id,s.email,s.unsubscribe_token,c.*
       FROM course_alert_deliveries d
       JOIN course_alert_subscribers s ON s.id=d.subscriber_id AND s.active=true
       LEFT JOIN email_preferences p ON p.email=s.email
       JOIN courses c ON c.id=d.course_id AND c.active=true
-      WHERE d.status='queued' AND d.send_after <= now() AND COALESCE(p.marketing_opt_out,false)=false
-      ORDER BY d.send_after ASC LIMIT 40`);
+      WHERE d.status='queued' AND d.send_after <= now() AND COALESCE(p.marketing_opt_out,false)=false${manualReleaseFilter}
+      ORDER BY d.send_after ASC LIMIT $1`, [settings.batchSize]);
     for (const row of pending.rows) {
       const claimed = await pool.query(`UPDATE course_alert_deliveries SET status='sending'
         WHERE id=$1 AND status='queued' RETURNING id`, [row.id]);
@@ -706,13 +710,37 @@ app.post('/api/admin/course-alerts/settings', auth, async (req, res, next) => {
     const enabled = req.body?.enabled !== false;
     const rawDelay = Number(req.body?.delayMinutes);
     const delayMinutes = Math.max(0, Math.min(10080, Number.isFinite(rawDelay) ? Math.round(rawDelay) : 60));
+    const deliveryMode = req.body?.deliveryMode === 'manual' ? 'manual' : 'auto';
+    const requestedBatchSize = Number(req.body?.batchSize);
+    const batchSize = [100,200,300,400,500].includes(requestedBatchSize) ? requestedBatchSize : 100;
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alerts_enabled',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [enabled ? 'true' : 'false']);
     const subject = clean(req.body?.subject || defaultCourseAlertSubject, 220);
     const message = clean(req.body?.message || defaultCourseAlertMessage, 4000);
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_delay_minutes',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [String(delayMinutes)]);
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_subject',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [subject]);
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_message',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [message]);
-    res.json({ enabled, delayMinutes, subject, message });
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_delivery_mode',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [deliveryMode]);
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_batch_size',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [String(batchSize)]);
+    res.json({ enabled, delayMinutes, deliveryMode, batchSize, subject, message });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/course-alerts/release', auth, async (req, res, next) => {
+  try {
+    const settings = await getCourseAlertSettings();
+    if (!settings.enabled) return res.status(400).json({ error: 'فعّل تنبيهات الدورات أولًا.' });
+    if (settings.deliveryMode !== 'manual') return res.status(400).json({ error: 'اختر وضع الإرسال اليدوي على دفعات أولًا.' });
+    const requestedCount = Number(req.body?.count);
+    const count = [100,200,300,400,500].includes(requestedCount) ? requestedCount : settings.batchSize;
+    const result = await pool.query(`WITH next_batch AS (
+      SELECT d.id FROM course_alert_deliveries d
+      JOIN course_alert_subscribers s ON s.id=d.subscriber_id AND s.active=true
+      LEFT JOIN email_preferences p ON p.email=s.email
+      WHERE d.status='queued' AND d.send_after <= now() AND d.released_at IS NULL
+        AND COALESCE(p.marketing_opt_out,false)=false
+      ORDER BY d.send_after ASC LIMIT $1
+    ) UPDATE course_alert_deliveries d SET released_at=now() FROM next_batch n WHERE d.id=n.id RETURNING d.id`, [count]);
+    void processCourseAlertQueue();
+    res.json({ ok: true, released: result.rowCount, requested: count });
   } catch (error) { next(error); }
 });
 app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
