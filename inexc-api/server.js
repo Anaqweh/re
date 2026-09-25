@@ -130,7 +130,7 @@ function reference() { return `IX-${Date.now().toString().slice(-8)}-${crypto.ra
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]); }
 function courseSlug(id) { return `course-${String(id).replaceAll('-', '').slice(0, 12)}`; }
 function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${value}`; }
-function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 20); }
+function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean); }
 function courseOutcomes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 8); }
 function hasReadableCourseText(value) {
   const lettersAndNumbers = String(value || '')
