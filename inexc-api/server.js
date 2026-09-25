@@ -401,14 +401,24 @@ const alertEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const unsubscribeUrl = token => `https://api.inexctraining.com/api/course-alerts/unsubscribe?token=${encodeURIComponent(token)}`;
 const coursePublicUrl = course => `https://www.inexctraining.com/course/?id=${encodeURIComponent(course.id)}`;
 
+async function getCourseAlertSettings() {
+  const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('course_alerts_enabled','course_alert_delay_minutes')");
+  const values = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
+  const delay = Number(values.course_alert_delay_minutes || 60);
+  return { enabled: values.course_alerts_enabled !== 'false', delayMinutes: Math.max(0, Math.min(10080, Number.isFinite(delay) ? delay : 60)) };
+}
+
 async function queueCourseAlertEmails(course) {
   if (!course?.active) return;
   try {
+    const settings = await getCourseAlertSettings();
+    if (!settings.enabled) return;
     const subscribers = await pool.query('SELECT id FROM course_alert_subscribers WHERE active=true ORDER BY created_at ASC');
+    const sendAfter = new Date(Date.now() + settings.delayMinutes * 60 * 1000);
     for (const subscriber of subscribers.rows) {
       await pool.query(`INSERT INTO course_alert_deliveries (subscriber_id,course_id,status,send_after)
-        VALUES ($1,$2,'queued',now() + interval '1 hour')
-        ON CONFLICT (subscriber_id,course_id) DO NOTHING`, [subscriber.id, course.id]);
+        VALUES ($1,$2,'queued',$3)
+        ON CONFLICT (subscriber_id,course_id) DO NOTHING`, [subscriber.id, course.id, sendAfter]);
     }
   } catch (error) { console.error('Course alert queue failed:', error.message); }
 }
@@ -416,6 +426,8 @@ async function queueCourseAlertEmails(course) {
 async function processCourseAlertQueue() {
   if (!resendApiKey) return;
   try {
+    const settings = await getCourseAlertSettings();
+    if (!settings.enabled) return;
     const pending = await pool.query(`SELECT d.id,s.email,s.unsubscribe_token,c.*
       FROM course_alert_deliveries d
       JOIN course_alert_subscribers s ON s.id=d.subscriber_id AND s.active=true
@@ -649,6 +661,38 @@ app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req
     res.status(201).json({ ok: true, logoUrl });
   } catch (error) { next(error); }
 });
+app.get('/api/admin/course-alerts/settings', auth, async (_req, res, next) => {
+  try { res.json(await getCourseAlertSettings()); } catch (error) { next(error); }
+});
+app.post('/api/admin/course-alerts/settings', auth, async (req, res, next) => {
+  try {
+    const enabled = req.body?.enabled !== false;
+    const rawDelay = Number(req.body?.delayMinutes);
+    const delayMinutes = Math.max(0, Math.min(10080, Number.isFinite(rawDelay) ? Math.round(rawDelay) : 60));
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alerts_enabled',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [enabled ? 'true' : 'false']);
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('course_alert_delay_minutes',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [String(delayMinutes)]);
+    res.json({ enabled, delayMinutes });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
+  try {
+    const email = clean(String(req.body?.email || '').toLowerCase(), 190);
+    if (!alertEmailPattern.test(email)) return res.status(400).json({ error: 'أدخل بريدًا إلكترونيًا صحيحًا للإرسال التجريبي.' });
+    const result = await pool.query('SELECT * FROM courses WHERE active=true ORDER BY created_at DESC LIMIT 1');
+    if (!result.rowCount) return res.status(400).json({ error: 'لا توجد دورة منشورة لإرسال معاينة تجريبية.' });
+    const course = publicCourse(result.rows[0]);
+    await sendEmail({
+      to: email,
+      subject: '[تجريبي] دورة جديدة: ' + course.name + ' | INEXC Training',
+      html: emailShell({
+        title: 'رسالة تجريبية لتنبيه دورة',
+        preview: 'هذه معاينة تجريبية فقط لرسالة الدورات الجديدة.',
+        content: '<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">هذه رسالة تجريبية</h1><p style="margin:0 0 18px;color:#58708a">هكذا ستصل رسالة الدورة الجديدة إلى المشتركين بعد الوقت الذي حددته.</p><div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff"><div style="font-size:19px;font-weight:800;color:#173d6b">' + escapeHtml(course.name) + '</div><p style="margin:10px 0;color:#58708a">' + escapeHtml(course.description || 'وصف الدورة سيظهر هنا.') + '</p></div><div style="text-align:center;margin:26px 0 0"><a href="' + coursePublicUrl(course) + '" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>'
+      })
+    });
+    res.json({ ok: true, courseName: course.name });
+  } catch (error) { next(error); }
+});
 app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'اختر ملف الإيميلات أولًا.' });
@@ -671,10 +715,14 @@ app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single
 app.get('/api/admin/course-alerts', auth, async (_req, res, next) => {
   try {
     const result = await pool.query(`SELECT s.id,s.email,s.active,s.created_at,
-      COUNT(d.id)::int AS deliveries, MAX(d.created_at) AS last_delivery
+      COUNT(d.id)::int AS deliveries,
+      COUNT(d.id) FILTER (WHERE d.status='queued')::int AS queued,
+      COUNT(d.id) FILTER (WHERE d.status='sent')::int AS sent,
+      COUNT(d.id) FILTER (WHERE d.status='failed')::int AS failed,
+      MAX(d.created_at) AS last_delivery
       FROM course_alert_subscribers s LEFT JOIN course_alert_deliveries d ON d.subscriber_id=s.id
       GROUP BY s.id ORDER BY s.created_at DESC`);
-    res.json(result.rows.map(row => ({ id: row.id, email: row.email, active: row.active, createdAt: row.created_at, deliveries: row.deliveries, lastDelivery: row.last_delivery })));
+    res.json(result.rows.map(row => ({ id: row.id, email: row.email, active: row.active, createdAt: row.created_at, deliveries: row.deliveries, queued: row.queued, sent: row.sent, failed: row.failed, lastDelivery: row.last_delivery })));
   } catch (error) { next(error); }
 });
 app.delete('/api/admin/course-alerts/:id', auth, async (req, res, next) => {
