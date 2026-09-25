@@ -306,6 +306,19 @@ async function setupDatabase() {
     verified BOOLEAN NOT NULL DEFAULT FALSE, status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','visible','hidden','featured')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_subscribers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT UNIQUE NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE, unsubscribe_token TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscriber_id UUID NOT NULL REFERENCES course_alert_subscribers(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    resend_email_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued',
+    error TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS course_alert_unique_delivery ON course_alert_deliveries (subscriber_id, course_id)');
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
@@ -356,6 +369,50 @@ function publicCourse(row) {
   };
 }
 
+const alertEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const unsubscribeUrl = token => `https://api.inexctraining.com/api/course-alerts/unsubscribe?token=${encodeURIComponent(token)}`;
+const coursePublicUrl = course => `https://www.inexctraining.com/course/?id=${encodeURIComponent(course.id)}`;
+
+async function sendCourseAlertEmails(course) {
+  if (!resendApiKey || !course?.active) return;
+  try {
+    const subscribers = await pool.query('SELECT id,email,unsubscribe_token FROM course_alert_subscribers WHERE active=true ORDER BY created_at ASC');
+    for (const subscriber of subscribers.rows) {
+      const delivery = await pool.query(`INSERT INTO course_alert_deliveries (subscriber_id,course_id,status)
+        VALUES ($1,$2,'queued') ON CONFLICT (subscriber_id,course_id) DO NOTHING RETURNING id`, [subscriber.id, course.id]);
+      if (!delivery.rowCount) continue;
+      try {
+        const details = [
+          course.date ? `<span style="margin:0 5px">📅 ${escapeHtml(course.date)}</span>` : '',
+          course.location ? `<span style="margin:0 5px">📍 ${escapeHtml(course.location)}</span>` : '',
+          course.hours ? `<span style="margin:0 5px">⏱ ${course.hours} ساعة تدريبية</span>` : ''
+        ].filter(Boolean).join(' · ');
+        const result = await sendEmail({
+          to: subscriber.email,
+          subject: `دورة جديدة: ${course.name} | INEXC Training`,
+          html: emailShell({
+            title: `دورة جديدة: ${course.name}`,
+            preview: `تم نشر دورة جديدة بعنوان ${course.name}`,
+            content: `<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">دورة جديدة بانتظارك</h1>
+              <p style="margin:0 0 18px;color:#58708a">أهلًا بك، تم نشر دورة تدريبية جديدة من INEXC Training.</p>
+              <div style="border:1px solid #d9e8f7;border-radius:14px;padding:20px;background:#fbfdff">
+                <div style="font-size:19px;font-weight:800;color:#173d6b">${escapeHtml(course.name)}</div>
+                ${course.description ? `<p style="margin:10px 0;color:#58708a">${escapeHtml(course.description)}</p>` : ''}
+                ${details ? `<div style="font-size:13px;color:#30689d;margin-top:12px">${details}</div>` : ''}
+              </div>
+              <div style="text-align:center;margin:26px 0 20px"><a href="${coursePublicUrl(course)}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 25px;border-radius:10px;font-weight:800">استعرض الدورة وسجّل</a></div>
+              <p style="margin:0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي التنبيهات؟ <a href="${unsubscribeUrl(subscriber.unsubscribe_token)}" style="color:#0866c6">إلغاء الاشتراك</a></p>`
+          })
+        });
+        await pool.query("UPDATE course_alert_deliveries SET status='sent',resend_email_id=$1 WHERE id=$2", [result?.id || '', delivery.rows[0].id]);
+      } catch (error) {
+        await pool.query("UPDATE course_alert_deliveries SET status='failed',error=$1 WHERE id=$2", [clean(error.message, 800), delivery.rows[0].id]);
+        console.error('Course alert email failed:', error.message);
+      }
+    }
+  } catch (error) { console.error('Course alert delivery failed:', error.message); }
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API' }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
@@ -366,6 +423,34 @@ app.get('/api/settings', async (_req, res, next) => {
 });
 app.get('/api/courses', async (_req, res, next) => {
   try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); }
+});
+app.post('/api/course-alerts', async (req, res, next) => {
+  try {
+    const email = clean(String(req.body?.email || '').toLowerCase(), 190);
+    if (!alertEmailPattern.test(email)) return res.status(400).json({ error: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
+    const existing = await pool.query('SELECT id,active FROM course_alert_subscribers WHERE email=$1', [email]);
+    if (existing.rowCount && existing.rows[0].active) return res.json({ ok: true, alreadySubscribed: true });
+    const token = crypto.randomBytes(24).toString('hex');
+    if (existing.rowCount) {
+      await pool.query('UPDATE course_alert_subscribers SET active=true,unsubscribe_token=$1,updated_at=now() WHERE id=$2', [token, existing.rows[0].id]);
+    } else {
+      await pool.query('INSERT INTO course_alert_subscribers (email,unsubscribe_token) VALUES ($1,$2)', [email, token]);
+    }
+    void sendEmail({
+      to: email, subject: 'تم تفعيل تنبيهات الدورات | INEXC Training',
+      html: emailShell({ title: 'تم تفعيل تنبيهات الدورات', preview: 'ستصلك رسالة عند نشر أي دورة جديدة.',
+        content: `<h1 style="margin:0 0 12px;font-size:24px;color:#0b4b91">تم تفعيل تنبيهاتك</h1><p style="margin:0;color:#58708a">شكرًا لانضمامك. سنرسل لك رابطًا مباشرًا عند نشر أي دورة تدريبية جديدة.</p><p style="margin:24px 0 0;text-align:center;font-size:11px;color:#7890a8">يمكنك <a href="${unsubscribeUrl(token)}" style="color:#0866c6">إلغاء الاشتراك</a> في أي وقت.</p>` })
+    }).catch(error => console.error('Course alert confirmation failed:', error.message));
+    res.status(201).json({ ok: true, alreadySubscribed: false });
+  } catch (error) { next(error); }
+});
+app.get('/api/course-alerts/unsubscribe', async (req, res, next) => {
+  try {
+    const token = clean(req.query.token, 100);
+    const result = await pool.query('UPDATE course_alert_subscribers SET active=false,updated_at=now() WHERE unsubscribe_token=$1 RETURNING email', [token]);
+    const message = result.rowCount ? 'تم إلغاء اشتراكك بنجاح. لن تصلك تنبيهات الدورات الجديدة بعد الآن.' : 'هذا الرابط غير صالح أو تم استخدامه مسبقًا.';
+    res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تنبيهات INEXC</title><body style="margin:0;background:#eef5fc;font-family:Tahoma,Arial,sans-serif;color:#17324d"><main style="max-width:520px;margin:12vh auto;background:#fff;padding:36px;border-radius:18px;text-align:center;box-shadow:0 10px 32px rgba(15,70,120,.12)"><h1 style="color:#0b4b91">تنبيهات الدورات</h1><p style="line-height:1.9">${message}</p><a href="https://www.inexctraining.com" style="color:#0866c6">العودة إلى الموقع</a></main></body></html>`);
+  } catch (error) { next(error); }
 });
 app.get('/api/testimonials', async (_req, res, next) => {
   try {
@@ -522,6 +607,22 @@ app.post('/api/admin/settings/logo', auth, logoUpload.single('logo'), async (req
     res.status(201).json({ ok: true, logoUrl });
   } catch (error) { next(error); }
 });
+app.get('/api/admin/course-alerts', auth, async (_req, res, next) => {
+  try {
+    const result = await pool.query(`SELECT s.id,s.email,s.active,s.created_at,
+      COUNT(d.id)::int AS deliveries, MAX(d.created_at) AS last_delivery
+      FROM course_alert_subscribers s LEFT JOIN course_alert_deliveries d ON d.subscriber_id=s.id
+      GROUP BY s.id ORDER BY s.created_at DESC`);
+    res.json(result.rows.map(row => ({ id: row.id, email: row.email, active: row.active, createdAt: row.created_at, deliveries: row.deliveries, lastDelivery: row.last_delivery })));
+  } catch (error) { next(error); }
+});
+app.delete('/api/admin/course-alerts/:id', auth, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM course_alert_subscribers WHERE id=$1 RETURNING id', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'المشترك غير موجود.' });
+    res.json({ ok: true });
+  } catch (error) { next(error); }
+});
 app.get('/api/admin/testimonials', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT * FROM testimonials ORDER BY (status=\'featured\') DESC, created_at DESC');
@@ -615,18 +716,23 @@ app.post('/api/admin/courses', auth, async (req, res, next) => {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
-    res.status(201).json(publicCourse(saved));
+    const published = publicCourse(saved);
+    res.status(201).json(published);
+    if (published.active) void sendCourseAlertEmails(published);
   } catch (error) { next(error); }
 });
 app.put('/api/admin/courses/:id', auth, async (req, res, next) => {
   try {
+    const before = await pool.query('SELECT active FROM courses WHERE id=$1', [req.params.id]);
+    if (!before.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
     const c = req.body || {}; const methods = Array.isArray(c.payments) ? c.payments.filter(v => ['link','bank'].includes(v)) : [];
     const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false, req.params.id];
     const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,updated_at=now() WHERE id=$20 RETURNING *`, values);
-    if (!result.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
-    res.json(publicCourse(saved));
+    const published = publicCourse(saved);
+    res.json(published);
+    if (before.rows[0].active === false && published.active) void sendCourseAlertEmails(published);
   } catch (error) { next(error); }
 });
 app.delete('/api/admin/courses/:id', auth, async (req, res, next) => {
