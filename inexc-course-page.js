@@ -47,10 +47,10 @@
       setupJourney(root);
       const shareButton = root.querySelector('.share-button');
       shareButton?.addEventListener('click', async () => {
-        const shareUrl = course.shareUrl || location.href;
+        const shareUrl = course.shareUrl || `https://courses.inexctraining.com/course-${String(course.id || '').replace(/-/g, '').slice(0, 12)}` || location.href;
         try {
           if (navigator.share) await navigator.share({ title: course.name, text: `تفاصيل دورة ${course.name} من INEXC Training`, url: shareUrl });
-          else { await navigator.clipboard.writeText(shareUrl); shareButton.textContent = 'تم نسخ رابط المشاركة ✓'; }
+          else { await navigator.clipboard.writeText(shareUrl); shareButton.textContent = 'تم نسخ رابط المشاركة بالصورة ✓'; }
         } catch (_) { /* إلغاء نافذة المشاركة لا يحتاج إلى تنبيه. */ }
       });
       const fitCheck = root.querySelector('[data-fit-check]');
