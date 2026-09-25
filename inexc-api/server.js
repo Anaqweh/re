@@ -153,7 +153,12 @@ function asNumber(value) { const result = Number(value); return Number.isFinite(
 function reference() { return `IX-${Date.now().toString().slice(-8)}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`; }
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]); }
 function courseSlug(id) { return `course-${String(id).replaceAll('-', '').slice(0, 12)}`; }
-function publicUrl(req, value) { return `${req.protocol}://${req.get('host')}${value}`; }
+function publicUrl(req, value) {
+  if (/^https?:\/\//i.test(String(value || ''))) return value;
+  const host = req.get('host') || '';
+  const protocol = /(^|\.)inexctraining\.com(?::\d+)?$/i.test(host) ? 'https' : req.protocol;
+  return `${protocol}://${host}${value}`;
+}
 function courseAxes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean); }
 function courseOutcomes(value) { return String(value || '').split(/\r?\n/).map(item => item.replace(/^[\s•\-–—*\d.)]+/, '').trim()).filter(Boolean).slice(0, 8); }
 function hasReadableCourseText(value) {
