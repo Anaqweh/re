@@ -127,7 +127,7 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
   const section = document.createElement('section');
   section.id = 'course-alerts';
   section.className = 'view';
-  section.innerHTML = '<div class="panel" style="padding:22px"><div class="alerts-summary"><div><h2 style="margin:0;color:#103b70;font-size:20px">تنبيهات الدورات الجديدة</h2><p class="note" style="margin:5px 0 0">هؤلاء الأشخاص طلبوا أن تصلهم رسالة تلقائية عند نشر دورة جديدة. لا تُرسل الرسائل عند تعديل دورة منشورة.</p></div><div class="alerts-count"><b id="alertsCount">0</b>مشترك</div></div><div id="alertsTable" class="alert-table"><p class="note">اضغط «تنبيهات الدورات» لعرض القائمة.</p></div></div>';
+  section.innerHTML = '<div class="panel" style="padding:22px"><div class="alerts-summary"><div><h2 style="margin:0;color:#103b70;font-size:20px">تنبيهات الدورات الجديدة</h2><p class="note" style="margin:5px 0 0">هؤلاء الأشخاص طلبوا أن تصلهم رسالة تلقائية عند نشر دورة جديدة. لا تُرسل الرسائل عند تعديل دورة منشورة.</p></div><div class="alerts-count"><b id="alertsCount">0</b>مشترك</div></div><form id="alertImportForm" class="note" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px"><b style="color:#103b70">إضافة إيميلات من ملف</b><input id="alertImportFile" type="file" accept=".csv,.txt,.xlsx" required style="width:auto;max-width:100%;margin:0"><button class="primary" type="submit">رفع وإضافة</button><span id="alertImportResult" style="font-size:10px"></span><small style="width:100%">الصيغ المدعومة: CSV أو TXT أو Excel بصيغة XLSX. تُضاف العناوين الجديدة فقط، ويحترم النظام من ألغى اشتراكه.</small></form><div id="alertsTable" class="alert-table"><p class="note">اضغط «تنبيهات الدورات» لعرض القائمة.</p></div></div>';
   wrap.appendChild(section);
   const escape = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const date = value => value ? new Date(value).toLocaleDateString('ar-AE') : '—';
@@ -143,6 +143,22 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tabs button,.view').forEach(element => element.classList.remove('active'));
     tab.classList.add('active'); section.classList.add('active'); loadAlerts();
+  });
+  section.querySelector('#alertImportForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const file = section.querySelector('#alertImportFile').files[0];
+    const output = section.querySelector('#alertImportResult');
+    const button = section.querySelector('#alertImportForm button');
+    if (!file) return;
+    button.disabled = true; button.textContent = 'جارٍ الإضافة…'; output.textContent = '';
+    try {
+      const data = new FormData(); data.append('file', file);
+      const result = await call('/admin/course-alerts/import', { method:'POST', body:data });
+      output.style.color = '#168865';
+      output.textContent = 'تمت إضافة ' + result.added + ' بريد جديد' + (result.existing ? '، و' + result.existing + ' موجود مسبقًا.' : '.');
+      event.target.reset(); loadAlerts();
+    } catch (error) { output.style.color = 'var(--bad)'; output.textContent = error.message; }
+    finally { button.disabled = false; button.textContent = 'رفع وإضافة'; }
   });
   section.addEventListener('click', async event => {
     const button = event.target.closest('[data-delete-alert]');
