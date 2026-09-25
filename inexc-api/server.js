@@ -748,6 +748,29 @@ app.post('/api/admin/course-alerts/release', auth, async (req, res, next) => {
     res.json({ ok: true, released: result.rowCount, requested: count });
   } catch (error) { next(error); }
 });
+app.post('/api/admin/course-alerts/send-now', auth, async (req, res, next) => {
+  try {
+    const courseId = clean(req.body?.courseId, 80);
+    const requestedCount = Number(req.body?.count);
+    const count = [100,200,300,400,500].includes(requestedCount) ? requestedCount : 100;
+    const courseResult = await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true', [courseId]);
+    if (!courseResult.rowCount) return res.status(400).json({ error: 'اختر دورة منشورة أولًا.' });
+    const course = publicCourse(courseResult.rows[0]);
+    const result = await pool.query(`WITH recipients AS (
+      SELECT s.id FROM course_alert_subscribers s
+      LEFT JOIN email_preferences p ON p.email=s.email
+      WHERE s.active=true AND s.suppressed=false AND COALESCE(p.marketing_opt_out,false)=false
+        AND NOT EXISTS (SELECT 1 FROM course_alert_deliveries d WHERE d.subscriber_id=s.id AND d.course_id=$1)
+      ORDER BY s.created_at ASC
+      LIMIT $2
+    ) INSERT INTO course_alert_deliveries (subscriber_id,course_id,status,send_after,released_at)
+      SELECT id,$1,'queued',now(),now() FROM recipients
+      ON CONFLICT (subscriber_id,course_id) DO NOTHING
+      RETURNING id`, [course.id, count]);
+    void processCourseAlertQueue();
+    res.json({ ok: true, courseName: course.name, queued: result.rowCount, requested: count });
+  } catch (error) { next(error); }
+});
 app.post('/api/admin/course-alerts/:id/send', auth, async (req, res, next) => {
   try {
     const subscriberResult = await pool.query('SELECT * FROM course_alert_subscribers WHERE id=$1', [req.params.id]);
