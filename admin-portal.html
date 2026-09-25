@@ -127,22 +127,53 @@ $('#uploadLogo').onclick=async()=>{let f=$('#logoFile').files[0];if(!f)return $(
   const section = document.createElement('section');
   section.id = 'course-alerts';
   section.className = 'view';
-  section.innerHTML = '<div class="panel" style="padding:22px"><div class="alerts-summary"><div><h2 style="margin:0;color:#103b70;font-size:20px">تنبيهات الدورات الجديدة</h2><p class="note" style="margin:5px 0 0">هؤلاء الأشخاص طلبوا أن تصلهم رسالة تلقائية عند نشر دورة جديدة. لا تُرسل الرسائل عند تعديل دورة منشورة.</p></div><div class="alerts-count"><b id="alertsCount">0</b>مشترك</div></div><form id="alertImportForm" class="note" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px"><b style="color:#103b70">إضافة إيميلات من ملف</b><input id="alertImportFile" type="file" accept=".csv,.txt,.xlsx" required style="width:auto;max-width:100%;margin:0"><button class="primary" type="submit">رفع وإضافة</button><span id="alertImportResult" style="font-size:10px"></span><small style="width:100%">الصيغ المدعومة: CSV أو TXT أو Excel بصيغة XLSX. تُضاف العناوين الجديدة فقط، ويحترم النظام من ألغى اشتراكه.</small></form><div id="alertsTable" class="alert-table"><p class="note">اضغط «تنبيهات الدورات» لعرض القائمة.</p></div></div>';
+  section.innerHTML = '<div class="panel" style="padding:22px"><div class="alerts-summary"><div><h2 style="margin:0;color:#103b70;font-size:20px">تنبيهات الدورات الجديدة</h2><p class="note" style="margin:5px 0 0">تحكم كامل في الإرسال الآلي للدورات الجديدة، دون التأثير في التسجيلات أو الدورات الحالية.</p></div><div class="alerts-count"><b id="alertsCount">0</b>مشترك</div></div><form id="alertSettingsForm" class="note" style="display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin:0 0 12px"><label class="check" style="margin:0"><input id="alertsEnabled" type="checkbox"> تفعيل الإرسال التلقائي</label><label style="margin:0">وقت الإرسال<select id="alertDelay" style="width:auto;margin:4px 0 0"><option value="0">فور النشر</option><option value="60">بعد ساعة</option><option value="180">بعد 3 ساعات</option><option value="1440">بعد 24 ساعة</option></select></label><button class="primary" type="submit">حفظ الإعداد</button><span id="alertSettingsResult" style="font-size:10px"></span><small style="width:100%">عند التعطيل، تتوقف الرسائل المؤجلة ولا يتم إنشاء تنبيهات جديدة حتى تعيد التفعيل.</small></form><form id="alertTestForm" class="note" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px"><b style="color:#103b70">إرسال تجريبي</b><input id="alertTestEmail" type="email" required placeholder="ضع بريدك لمعاينة الرسالة" style="width:min(300px,100%);margin:0"><button class="light" type="submit">أرسل معاينة</button><span id="alertTestResult" style="font-size:10px"></span><details style="width:100%"><summary style="cursor:pointer;color:#0866c6;font-weight:700">معاينة محتوى الرسالة</summary><div style="margin-top:8px;background:#fff;border:1px solid #dcecff;border-radius:10px;padding:12px"><b style="color:#103b70">دورة جديدة بانتظارك</b><p style="margin:5px 0;color:#64778c">عنوان الدورة ووصفها المختصر وزر مباشر لاستعراض الدورة والتسجيل فيها.</p></div></details></form><form id="alertImportForm" class="note" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px"><b style="color:#103b70">إضافة إيميلات من ملف</b><input id="alertImportFile" type="file" accept=".csv,.txt,.xlsx" required style="width:auto;max-width:100%;margin:0"><button class="primary" type="submit">رفع وإضافة</button><span id="alertImportResult" style="font-size:10px"></span><small style="width:100%">الصيغ المدعومة: CSV أو TXT أو Excel بصيغة XLSX. تُضاف العناوين الجديدة فقط، ويحترم النظام من ألغى اشتراكه.</small></form><div id="alertsTable" class="alert-table"><p class="note">اضغط «تنبيهات الدورات» لعرض القائمة.</p></div></div>';
   wrap.appendChild(section);
   const escape = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const date = value => value ? new Date(value).toLocaleDateString('ar-AE') : '—';
+  async function loadAlertSettings() {
+    try {
+      const settings = await call('/admin/course-alerts/settings');
+      section.querySelector('#alertsEnabled').checked = settings.enabled !== false;
+      section.querySelector('#alertDelay').value = String(settings.delayMinutes || 60);
+    } catch (error) { section.querySelector('#alertSettingsResult').textContent = error.message; }
+  }
   async function loadAlerts() {
     const host = document.getElementById('alertsTable');
     host.innerHTML = '<p class="note">جارٍ تحميل المشتركين…</p>';
     try {
       const rows = await call('/admin/course-alerts');
       document.getElementById('alertsCount').textContent = rows.length;
-      host.innerHTML = rows.length ? '<table><thead><tr><th>البريد الإلكتروني</th><th>الحالة</th><th>تاريخ الاشتراك</th><th>تنبيهات مرسلة</th><th>إجراء</th></tr></thead><tbody>' + rows.map(row => '<tr><td dir="ltr">' + escape(row.email) + '</td><td><span class="alert-state ' + (row.active ? 'active' : 'off') + '">' + (row.active ? 'مفعّل' : 'ملغي') + '</span></td><td>' + date(row.createdAt) + '</td><td>' + Number(row.deliveries || 0) + '</td><td><button class="danger" type="button" data-delete-alert="' + row.id + '">حذف</button></td></tr>').join('') + '</tbody></table>' : '<p class="note">لا يوجد مشتركون حتى الآن.</p>';
+      host.innerHTML = rows.length ? '<table><thead><tr><th>البريد الإلكتروني</th><th>الحالة</th><th>تاريخ الاشتراك</th><th>تم الإرسال</th><th>بانتظار الإرسال</th><th>فشل</th><th>إجراء</th></tr></thead><tbody>' + rows.map(row => '<tr><td dir="ltr">' + escape(row.email) + '</td><td><span class="alert-state ' + (row.active ? 'active' : 'off') + '">' + (row.active ? 'مفعّل' : 'ملغي') + '</span></td><td>' + date(row.createdAt) + '</td><td>' + Number(row.sent || 0) + '</td><td>' + Number(row.queued || 0) + '</td><td>' + Number(row.failed || 0) + '</td><td><button class="danger" type="button" data-delete-alert="' + row.id + '">حذف</button></td></tr>').join('') + '</tbody></table>' : '<p class="note">لا يوجد مشتركون حتى الآن.</p>';
     } catch (error) { host.innerHTML = '<p class="message">' + escape(error.message) + '</p>'; }
   }
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tabs button,.view').forEach(element => element.classList.remove('active'));
-    tab.classList.add('active'); section.classList.add('active'); loadAlerts();
+    tab.classList.add('active'); section.classList.add('active'); loadAlerts(); loadAlertSettings();
+  });
+  section.querySelector('#alertSettingsForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = event.target.querySelector('button');
+    const output = section.querySelector('#alertSettingsResult');
+    button.disabled = true; button.textContent = 'جارٍ الحفظ…'; output.textContent = '';
+    try {
+      const saved = await call('/admin/course-alerts/settings', { method:'POST', body:JSON.stringify({ enabled:section.querySelector('#alertsEnabled').checked, delayMinutes:Number(section.querySelector('#alertDelay').value) }) });
+      section.querySelector('#alertsEnabled').checked = saved.enabled !== false;
+      section.querySelector('#alertDelay').value = String(saved.delayMinutes);
+      output.style.color='#168865'; output.textContent = saved.enabled ? 'تم تفعيل الإرسال التلقائي وحفظ وقت الإرسال.' : 'تم تعطيل الإرسال التلقائي مؤقتًا.';
+    } catch (error) { output.style.color='var(--bad)'; output.textContent=error.message; }
+    finally { button.disabled=false; button.textContent='حفظ الإعداد'; }
+  });
+  section.querySelector('#alertTestForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = event.target.querySelector('button');
+    const output = section.querySelector('#alertTestResult');
+    button.disabled=true; button.textContent='جارٍ الإرسال…'; output.textContent='';
+    try {
+      const result = await call('/admin/course-alerts/test', { method:'POST', body:JSON.stringify({ email:section.querySelector('#alertTestEmail').value.trim() }) });
+      output.style.color='#168865'; output.textContent='تم إرسال المعاينة التجريبية لدورة: '+result.courseName;
+    } catch (error) { output.style.color='var(--bad)'; output.textContent=error.message; }
+    finally { button.disabled=false; button.textContent='أرسل معاينة'; }
   });
   section.querySelector('#alertImportForm').addEventListener('submit', async event => {
     event.preventDefault();
