@@ -610,6 +610,7 @@ async function redeemMembershipCard({code,email,course,registrationId}) {
   const card=result.rows[0];
   if(card.status!=='active'||new Date(card.expires_at)<=new Date()) throw new Error('هذه البطاقة غير فعّالة أو انتهت صلاحيتها.');
   if(!course.membership_enabled) throw new Error('هذه الدورة غير متاحة حاليًا للحجز بالبطاقات.');
+  if(course.member_booking_opens_at && new Date(course.member_booking_opens_at) > new Date()) throw new Error('الحجز المبكر لحاملي البطاقات لم يبدأ بعد.');
   const kind=course.membership_kind==='diploma'?'diploma':'course';
   const cost=kind==='diploma'?Number(card.diploma_unit_cost):Number(card.course_unit_cost);
   if(Number(card.units_remaining)<cost) throw new Error('الرصيد المتبقي في البطاقة لا يكفي لحجز هذه الدورة.');
@@ -786,6 +787,7 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     const requestedPaymentMethod = clean(req.body.payment_method, 20);
     const membershipCode = clean(req.body.membership_code, 80);
     const paymentMethod = membershipCode ? 'membership' : (standardTotal === 0 ? 'free' : requestedPaymentMethod);
+    if (paymentMethod !== 'membership' && course.public_booking_opens_at && new Date(course.public_booking_opens_at) > new Date()) return res.status(400).json({ error: 'التسجيل العام لهذه الدورة لم يبدأ بعد.' });
     if (paymentMethod === 'link') return res.status(400).json({ error: 'الدفع عبر الرابط غير مفعّل حاليًا. يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
     if (paymentMethod !== 'membership' && standardTotal > 0 && paymentMethod !== 'bank') return res.status(400).json({ error: 'يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
     if (paymentMethod === 'bank' && !req.file) return res.status(400).json({ error: 'يرجى إرفاق وصل التحويل البنكي.' });
