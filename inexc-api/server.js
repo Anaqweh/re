@@ -315,6 +315,48 @@ async function setupDatabase() {
     certificate TEXT NOT NULL DEFAULT 'لا', total NUMERIC(10,2) NOT NULL DEFAULT 0, payment_method TEXT NOT NULL DEFAULT 'free',
     status TEXT NOT NULL DEFAULT 'مسجل', receipt_path TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS membership_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, price_usd NUMERIC(10,2) NOT NULL,
+    max_cards INTEGER NOT NULL CHECK (max_cards > 0), valid_months INTEGER NOT NULL CHECK (valid_months > 0),
+    booking_units INTEGER NOT NULL CHECK (booking_units > 0), course_unit_cost INTEGER NOT NULL DEFAULT 1,
+    diploma_unit_cost INTEGER NOT NULL DEFAULT 1, certificate_discount NUMERIC(5,2) NOT NULL DEFAULT 0,
+    early_access_hours INTEGER NOT NULL DEFAULT 0, perks TEXT NOT NULL DEFAULT '', payment_link TEXT NOT NULL DEFAULT '',
+    active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS membership_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), reference TEXT UNIQUE NOT NULL,
+    plan_id UUID NOT NULL REFERENCES membership_plans(id), name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL,
+    total NUMERIC(10,2) NOT NULL, payment_method TEXT NOT NULL CHECK (payment_method IN ('bank','link')),
+    status TEXT NOT NULL DEFAULT 'بانتظار مراجعة الدفع', receipt_path TEXT NOT NULL DEFAULT '',
+    card_id UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS membership_cards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), card_number TEXT UNIQUE NOT NULL, access_token TEXT UNIQUE NOT NULL,
+    plan_id UUID NOT NULL REFERENCES membership_plans(id), order_id UUID UNIQUE REFERENCES membership_orders(id) ON DELETE SET NULL,
+    holder_name TEXT NOT NULL, holder_email TEXT NOT NULL, holder_phone TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','expired')),
+    units_total INTEGER NOT NULL, units_remaining INTEGER NOT NULL, activated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS membership_redemptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), card_id UUID NOT NULL REFERENCES membership_cards(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE RESTRICT, registration_id UUID,
+    units_used INTEGER NOT NULL, course_kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'used',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS membership_card_id UUID');
+  await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS membership_redemption_id UUID');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS membership_enabled BOOLEAN NOT NULL DEFAULT TRUE');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS membership_kind TEXT NOT NULL DEFAULT \'course\'');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS member_booking_opens_at TIMESTAMPTZ');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS public_booking_opens_at TIMESTAMPTZ');
+  await pool.query(`INSERT INTO membership_plans (slug,name,price_usd,max_cards,valid_months,booking_units,course_unit_cost,diploma_unit_cost,certificate_discount,early_access_hours,perks)
+    VALUES
+    ('launch','بطاقة الانطلاقة',39,100,4,2,1,1,0,0,'حجز دورتين أو دبلومين مباشرين أونلاين خلال مدة البطاقة.'),
+    ('mastery','بطاقة التمكّن',79,100,6,3,1,1,10,24,'3 حجوزات تدريبية مباشرة أونلاين + خصم 10% على رسوم الشهادات.'),
+    ('leadership','بطاقة الريادة',179,100,12,30,5,6,10,72,'6 دورات أو حتى 5 دبلومات + أولوية الحجز + جلسة إرشادية جماعية أو ورشة حصرية.')
+    ON CONFLICT (slug) DO NOTHING`);
   await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
@@ -519,6 +561,103 @@ app.get('/api/settings', async (_req, res, next) => {
     res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false', testimonialsVisible: settings.testimonials_visible !== 'false' });
   } catch (error) { next(error); }
 });
+
+function membershipPlanPublic(row, sold = 0) {
+  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',active:row.active===true };
+}
+async function membershipPlans(includeInactive=false) {
+  const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold
+    FROM membership_plans p LEFT JOIN membership_orders o ON o.plan_id=p.id
+    ${includeInactive?'':'WHERE p.active=true'} GROUP BY p.id ORDER BY p.price_usd ASC`);
+  return result.rows.map(row=>membershipPlanPublic(row,row.sold));
+}
+function membershipCardNumber(plan) {
+  const prefix = plan.slug === 'leadership' ? 'RD' : plan.slug === 'mastery' ? 'TM' : 'IN';
+  return `INX-${prefix}-${crypto.randomBytes(3).toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+}
+function cardSnapshot(row, redemptions = []) {
+  const plan = membershipPlanPublic(row, row.sold||0);
+  return { cardNumber:row.card_number, accessToken:row.access_token, holderName:row.holder_name, holderEmail:row.holder_email,
+    status:row.status, activatedAt:row.activated_at, expiresAt:row.expires_at, unitsTotal:Number(row.units_total),unitsRemaining:Number(row.units_remaining),
+    plan, redemptions };
+}
+async function createMembershipCard(orderId) {
+  const existing = await pool.query('SELECT card_id FROM membership_orders WHERE id=$1',[orderId]);
+  if(!existing.rowCount) throw new Error('طلب البطاقة غير موجود.');
+  if(existing.rows[0].card_id) return existing.rows[0].card_id;
+  const result=await pool.query(`SELECT o.*,p.* FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id WHERE o.id=$1 FOR UPDATE`,[orderId]);
+  const order=result.rows[0]; if(!order) throw new Error('طلب البطاقة غير موجود.');
+  let cardNumber; for(let i=0;i<5;i++){ cardNumber=membershipCardNumber(order); const check=await pool.query('SELECT 1 FROM membership_cards WHERE card_number=$1',[cardNumber]); if(!check.rowCount)break; }
+  const accessToken=crypto.randomBytes(24).toString('hex');
+  const card=await pool.query(`INSERT INTO membership_cards (card_number,access_token,plan_id,order_id,holder_name,holder_email,holder_phone,units_total,units_remaining,expires_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,now() + ($9::text || ' months')::interval) RETURNING id`,
+    [cardNumber,accessToken,order.plan_id,order.id,order.name,order.email,order.phone,order.booking_units,order.valid_months]);
+  await pool.query(`UPDATE membership_orders SET card_id=$1,status='مفعلة',updated_at=now() WHERE id=$2`,[card.rows[0].id,orderId]);
+  return card.rows[0].id;
+}
+async function getMembershipCard(code,email) {
+  const result=await pool.query(`SELECT c.*,p.*,0 AS sold FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id
+    WHERE upper(c.card_number)=upper($1) AND lower(c.holder_email)=lower($2)`,[code,email]);
+  if(!result.rowCount) return null;
+  const row=result.rows[0]; const red=await pool.query(`SELECT r.*,co.name AS course_name FROM membership_redemptions r JOIN courses co ON co.id=r.course_id WHERE r.card_id=$1 ORDER BY r.created_at DESC`,[row.id]);
+  return { row, snapshot:cardSnapshot(row,red.rows.map(x=>({courseName:x.course_name,unitsUsed:Number(x.units_used),kind:x.course_kind,status:x.status,createdAt:x.created_at}))) };
+}
+async function redeemMembershipCard({code,email,course,registrationId}) {
+  const result=await pool.query(`SELECT c.*,p.* FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE upper(c.card_number)=upper($1) AND lower(c.holder_email)=lower($2) FOR UPDATE`,[code,email]);
+  if(!result.rowCount) throw new Error('رقم البطاقة أو البريد الإلكتروني غير صحيح.');
+  const card=result.rows[0];
+  if(card.status!=='active'||new Date(card.expires_at)<=new Date()) throw new Error('هذه البطاقة غير فعّالة أو انتهت صلاحيتها.');
+  if(!course.membership_enabled) throw new Error('هذه الدورة غير متاحة حاليًا للحجز بالبطاقات.');
+  const kind=course.membership_kind==='diploma'?'diploma':'course';
+  const cost=kind==='diploma'?Number(card.diploma_unit_cost):Number(card.course_unit_cost);
+  if(Number(card.units_remaining)<cost) throw new Error('الرصيد المتبقي في البطاقة لا يكفي لحجز هذه الدورة.');
+  const redemption=await pool.query(`INSERT INTO membership_redemptions (card_id,course_id,registration_id,units_used,course_kind) VALUES ($1,$2,$3,$4,$5) RETURNING id`,[card.id,course.id,registrationId,cost,kind]);
+  await pool.query('UPDATE membership_cards SET units_remaining=units_remaining-$1,updated_at=now() WHERE id=$2',[cost,card.id]);
+  return {cardId:card.id,redemptionId:redemption.rows[0].id,remaining:Number(card.units_remaining)-cost};
+}
+app.get('/api/memberships/plans', async (_req,res,next)=>{try{res.json(await membershipPlans(false));}catch(error){next(error);}});
+app.post('/api/memberships/orders', upload.single('receipt'), async (req,res,next)=>{
+  try {
+    const planId=clean(req.body?.plan_id,80),name=clean(req.body?.name,150),email=clean(String(req.body?.email||'').toLowerCase(),190),phone=clean(req.body?.phone,50),method=clean(req.body?.payment_method,20);
+    if(!name||!email||!phone) return res.status(400).json({error:'يرجى إدخال الاسم والبريد الإلكتروني ورقم الهاتف.'});
+    if(!['bank','link'].includes(method)) return res.status(400).json({error:'اختر طريقة دفع صالحة.'});
+    const planResult=await pool.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true',[planId]);
+    if(!planResult.rowCount) return res.status(400).json({error:'هذه البطاقة غير متاحة حاليًا.'});
+    const plan=planResult.rows[0]; const sold=await pool.query(`SELECT COUNT(*) FROM membership_orders WHERE plan_id=$1 AND status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')`,[plan.id]);
+    if(Number(sold.rows[0].count)>=Number(plan.max_cards)) return res.status(400).json({error:'نفدت هذه الفئة من البطاقات.'});
+    if(method==='bank'&&!req.file) return res.status(400).json({error:'يرجى رفع وصل التحويل البنكي.'});
+    const ref='CARD-'+Date.now().toString().slice(-8)+'-'+crypto.randomBytes(2).toString('hex').toUpperCase();
+    const status=method==='bank'?'بانتظار مراجعة الدفع':'بانتظار الدفع';
+    const order=await pool.query(`INSERT INTO membership_orders (reference,plan_id,name,email,phone,total,payment_method,status,receipt_path) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[ref,plan.id,name,email,phone,plan.price_usd,method,status,req.file?`/uploads/${req.file.filename}`:'']);
+    res.status(201).json({ok:true,reference:ref,status,paymentLink:method==='link'?clean(plan.payment_link,500):'',orderId:order.rows[0].id});
+  } catch(error){next(error);}
+});
+app.get('/api/memberships/card',async(req,res,next)=>{try{
+  const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190));
+  if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
+  res.json(found.snapshot);
+}catch(error){next(error);}});
+app.post('/api/memberships/verify',async(req,res,next)=>{try{
+  const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
+  const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح.'});
+  const course=await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true',[courseId]);if(!course.rowCount)return res.status(400).json({error:'الدورة غير متاحة.'});
+  const card=found.row; const kind=course.rows[0].membership_kind==='diploma'?'diploma':'course',cost=kind==='diploma'?Number(card.diploma_unit_cost):Number(card.course_unit_cost);
+  if(card.status!=='active'||new Date(card.expires_at)<=new Date())return res.status(400).json({error:'هذه البطاقة غير فعّالة أو انتهت صلاحيتها.'});
+  if(!course.rows[0].membership_enabled)return res.status(400).json({error:'هذه الدورة غير متاحة للحجز بالبطاقة.'});
+  if(Number(card.units_remaining)<cost)return res.status(400).json({error:'الرصيد المتبقي لا يكفي لهذه الدورة.'});
+  res.json({ok:true,card:found.snapshot,cost,kind,remainingAfter:Number(card.units_remaining)-cost});
+}catch(error){next(error);}});
+app.get('/api/admin/memberships/plans',auth,async(_req,res,next)=>{try{res.json(await membershipPlans(true));}catch(error){next(error);}});
+app.put('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
+  const body=req.body||{};const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,updated_at=now() WHERE id=$13 RETURNING *`,
+  [clean(body.name,100),asNumber(body.priceUsd),Math.max(1,Math.floor(asNumber(body.maxCards))),Math.max(1,Math.floor(asNumber(body.validMonths))),Math.max(1,Math.floor(asNumber(body.bookingUnits))),Math.max(1,Math.floor(asNumber(body.courseUnitCost))),Math.max(1,Math.floor(asNumber(body.diplomaUnitCost))),asNumber(body.certificateDiscount),Math.max(0,Math.floor(asNumber(body.earlyAccessHours))),clean(body.perks,1000),clean(body.paymentLink,500),body.active!==false,req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json(membershipPlanPublic(result.rows[0]));
+}catch(error){next(error);}});
+app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,total:Number(r.total)})));}catch(error){next(error);}});
+app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res,next)=>{const client=await pool.connect();try{await client.query('BEGIN');const order=await client.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[req.params.id]);if(!order.rowCount)return res.status(404).json({error:'الطلب غير موجود.'});if(order.rows[0].card_id){await client.query('COMMIT');return res.json({ok:true,alreadyActive:true});}await client.query('COMMIT');const cardId=await createMembershipCard(req.params.id);const card=await pool.query('SELECT card_number,holder_email FROM membership_cards WHERE id=$1',[cardId]);res.json({ok:true,cardNumber:card.rows[0].card_number,email:card.rows[0].holder_email});}catch(error){try{await client.query('ROLLBACK');}catch{}next(error);}finally{client.release();}});
+app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل بطاقته.'});res.json({ok:true});}catch(error){next(error);}});
+app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
+app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/courses', async (_req, res, next) => {
   try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); }
 });
