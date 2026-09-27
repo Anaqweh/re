@@ -780,16 +780,22 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     if (!name || !email || !phone) return res.status(400).json({ error: 'يرجى إدخال الاسم والبريد الإلكتروني ورقم الموبايل.' });
     const certificateRequested = clean(req.body.certificate) === 'yes';
     const certificate = course.certificate_mode === 'none' ? 'لا' : (course.certificate_mode === 'included' || certificateRequested ? course.certificate_name : 'لا');
-    const total = Number(course.price) + (course.certificate_mode === 'optional' && certificateRequested ? Number(course.certificate_price) : 0);
-    const paymentMethod = total === 0 ? 'free' : clean(req.body.payment_method, 20);
+    const standardTotal = Number(course.price) + (course.certificate_mode === 'optional' && certificateRequested ? Number(course.certificate_price) : 0);
+    const requestedPaymentMethod = clean(req.body.payment_method, 20);
+    const membershipCode = clean(req.body.membership_code, 80);
+    const paymentMethod = membershipCode ? 'membership' : (standardTotal === 0 ? 'free' : requestedPaymentMethod);
     if (paymentMethod === 'link') return res.status(400).json({ error: 'الدفع عبر الرابط غير مفعّل حاليًا. يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
-    if (total > 0 && paymentMethod !== 'bank') return res.status(400).json({ error: 'يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
+    if (paymentMethod !== 'membership' && standardTotal > 0 && paymentMethod !== 'bank') return res.status(400).json({ error: 'يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
     if (paymentMethod === 'bank' && !req.file) return res.status(400).json({ error: 'يرجى إرفاق وصل التحويل البنكي.' });
-    const status = paymentMethod === 'bank' ? 'بانتظار مراجعة الوصل' : total > 0 ? 'بانتظار الدفع' : 'مسجل';
     const registrationReference = reference();
+    let membership = null;
+    if (paymentMethod === 'membership') membership = await redeemMembershipCard({ code: membershipCode, email, course, registrationId: null });
+    const total = paymentMethod === 'membership' ? 0 : standardTotal;
+    const status = paymentMethod === 'membership' ? 'مسجل بالبطاقة' : (paymentMethod === 'bank' ? 'بانتظار مراجعة الوصل' : total > 0 ? 'بانتظار الدفع' : 'مسجل');
     const receiptPath = req.file ? `/uploads/${req.file.filename}` : '';
-    await pool.query(`INSERT INTO registrations (reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [registrationReference,name,email,phone,course.id,course.name,certificate,total,paymentMethod,status,receiptPath]);
+    const inserted = await pool.query(`INSERT INTO registrations (reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,membership_redemption_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, [registrationReference,name,email,phone,course.id,course.name,certificate,total,paymentMethod,status,receiptPath,membership?.cardId||null,membership?.redemptionId||null]);
+    if (membership?.redemptionId) await pool.query('UPDATE membership_redemptions SET registration_id=$1 WHERE id=$2',[inserted.rows[0].id,membership.redemptionId]);
     sendRegistrationEmails({ reference: registrationReference, name, email, phone, courseName: course.name, total, status });
     res.status(201).json({ ok: true, reference: registrationReference, paymentLink: paymentMethod === 'link' ? course.payment_link : '' });
   } catch (error) { next(error); }
