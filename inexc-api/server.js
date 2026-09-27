@@ -434,6 +434,8 @@ function publicCourse(row) {
     bank: { title: bankParts?.[1] || '', name: bankParts?.[2] === '—' ? '' : (bankParts?.[2] || savedBankName), account: row.bank_account, iban: row.bank_iban },
     imageUrl: row.image_path || '', certificateSampleUrl: row.certificate_sample_path || '',
     shareSlug: row.share_slug || courseSlug(row.id), shareUrl: `https://courses.inexctraining.com/${row.share_slug || courseSlug(row.id)}`,
+    membershipEnabled: row.membership_enabled !== false, membershipKind: row.membership_kind || 'course',
+    memberBookingOpensAt: row.member_booking_opens_at || null, publicBookingOpensAt: row.public_booking_opens_at || null,
     active: row.active
   };
 }
