@@ -587,13 +587,13 @@ async function createMembershipCard(orderId) {
   const existing = await pool.query('SELECT card_id FROM membership_orders WHERE id=$1',[orderId]);
   if(!existing.rowCount) throw new Error('طلب البطاقة غير موجود.');
   if(existing.rows[0].card_id) return existing.rows[0].card_id;
-  const result=await pool.query(`SELECT o.*,p.* FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id WHERE o.id=$1 FOR UPDATE`,[orderId]);
+  const result=await pool.query(`SELECT o.id AS order_id,o.plan_id,o.name AS holder_name,o.email AS holder_email,o.phone AS holder_phone,p.slug,p.booking_units,p.valid_months FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id WHERE o.id=$1 FOR UPDATE`,[orderId]);
   const order=result.rows[0]; if(!order) throw new Error('طلب البطاقة غير موجود.');
   let cardNumber; for(let i=0;i<5;i++){ cardNumber=membershipCardNumber(order); const check=await pool.query('SELECT 1 FROM membership_cards WHERE card_number=$1',[cardNumber]); if(!check.rowCount)break; }
   const accessToken=crypto.randomBytes(24).toString('hex');
   const card=await pool.query(`INSERT INTO membership_cards (card_number,access_token,plan_id,order_id,holder_name,holder_email,holder_phone,units_total,units_remaining,expires_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,now() + ($9::text || ' months')::interval) RETURNING id`,
-    [cardNumber,accessToken,order.plan_id,order.id,order.name,order.email,order.phone,order.booking_units,order.valid_months]);
+    [cardNumber,accessToken,order.plan_id,order.order_id,order.holder_name,order.holder_email,order.holder_phone,order.booking_units,order.valid_months]);
   await pool.query(`UPDATE membership_orders SET card_id=$1,status='مفعلة',updated_at=now() WHERE id=$2`,[card.rows[0].id,orderId]);
   return card.rows[0].id;
 }
