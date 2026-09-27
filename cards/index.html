@@ -20,20 +20,90 @@
 <dialog id="dialog"><div class="modal" id="formView"><button class="close" id="close">×</button><h2 id="modalTitle">طلب بطاقة</h2><p id="modalInfo"></p><form class="form" id="orderForm"><input type="hidden" id="planId"><div><label>الاسم الكامل<input id="name" required></label></div><div><label>البريد الإلكتروني<input id="email" type="email" required></label></div><div><label>رقم الموبايل<input id="phone" required placeholder="+971 …"></label></div><div><label>طريقة الدفع</label><div class="pay"><label><input type="radio" name="method" value="bank" checked>تحويل بنكي</label><label><input type="radio" name="method" value="link">رابط دفع</label></div></div><div class="receipt" id="receiptWrap"><label>وصل التحويل<input id="receipt" type="file" accept=".pdf,image/png,image/jpeg,image/webp"></label></div><button class="buy" id="submit">إرسال طلب البطاقة</button><div class="message" id="message"></div></form></div><div class="success" id="success"><div class="tick">✓</div><h2>تم استلام طلبك</h2><p id="successText"></p><p><a class="link" href="/">العودة إلى الموقع</a></p></div></dialog>
 <script src="../inexc-registration-config.js"></script>
 <script>
-const API=window.INEXC_REGISTRATION_ENDPOINT;let plans=[];
-const esc=v=>String(v||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function description(p){const list=[];if(p.slug==='launch')list.push('حجز دورتين أو دبلومين مباشرين أونلاين');if(p.slug==='mastery')list.push('3 حجوزات تدريبية مباشرة أونلاين');if(p.slug==='leadership')list.push('6 دورات أو حتى 5 دبلومات مباشرة أونلاين');list.push('صلاحية '+p.validMonths+' '+(p.validMonths===12?'شهرًا':'أشهر'));if(p.certificateDiscount)list.push('خصم '+p.certificateDiscount+'% على رسوم الشهادات');if(p.earlyAccessHours)list.push('حجز مبكر قبل العامة بـ'+p.earlyAccessHours+' ساعة');if(p.perks)list.push(p.perks);return [...new Set(list)]}
-function render(){document.getElementById('plans').innerHTML=plans.map(p=>{const soldOut=p.remaining<=0;return '<article class="plan '+(p.slug==='mastery'?'featured':'')+'">'+(p.slug==='mastery'?'<span class="ribbon">الأكثر توازنًا</span>':'')+'<h2>'+esc(p.name)+'</h2><div class="price">$ '+p.priceUsd.toLocaleString('en-US')+'</div><div class="stock">متبقي <b>'+p.remaining+'</b> من أصل '+p.maxCards+' بطاقة</div><ul class="features">'+description(p).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><button class="buy" '+(soldOut?'disabled':'')+' onclick="openPlan(\''+p.id+'\')">'+(soldOut?'نفدت البطاقات':'احصل على البطاقة')+'</button></article>'}).join('')}
-function openPlan(id){const p=plans.find(x=>x.id===id);document.getElementById('planId').value=id;document.getElementById('modalTitle').textContent=p.name;document.getElementById('modalInfo').textContent='قيمة البطاقة: 
-document.getElementById('close').onclick=()=>document.getElementById('dialog').close();
-document.querySelectorAll('[name=method]').forEach(x=>x.onchange=()=>document.getElementById('receiptWrap').style.display=document.querySelector('[name=method]:checked').value==='bank'?'block':'none');document.querySelector('[name=method]').dispatchEvent(new Event('change'));
-document.getElementById('orderForm').onsubmit=async e=>{e.preventDefault();const b=document.getElementById('submit'),msg=document.getElementById('message'),method=document.querySelector('[name=method]:checked').value,file=document.getElementById('receipt').files[0];if(method==='bank'&&!file)return msg.textContent='يرجى إرفاق وصل التحويل البنكي.';b.disabled=true;b.textContent='جارٍ الإرسال…';msg.textContent='';try{const f=new FormData();f.append('plan_id',document.getElementById('planId').value);f.append('name',document.getElementById('name').value.trim());f.append('email',document.getElementById('email').value.trim());f.append('phone',document.getElementById('phone').value.trim());f.append('payment_method',method);if(file)f.append('receipt',file);const r=await fetch(API+'/memberships/orders',{method:'POST',body:f}),d=await r.json();if(!r.ok)throw Error(d.error||'تعذر إرسال الطلب.');if(method==='link'&&d.paymentLink){location.href=d.paymentLink;return}document.getElementById('formView').style.display='none';document.getElementById('success').classList.add('show');document.getElementById('successText').textContent=method==='bank'?'تم استلام وصل التحويل. بعد اعتماده ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+d.reference:'تم إنشاء طلب الدفع. بعد تأكيد العملية ستصدر بطاقتك الرقمية. رقم الطلب: '+d.reference;}catch(err){msg.textContent=err.message}finally{b.disabled=false;b.textContent='إرسال طلب البطاقة'}};
-fetch(API+'/memberships/plans').then(r=>r.json()).then(d=>{plans=d;render()}).catch(()=>document.getElementById('plans').innerHTML='<p>تعذر تحميل البطاقات الآن. حاول لاحقًا.</p>');
-</script>
-</body></html>+p.priceUsd+' — بعد اعتماد الدفع تصدر بطاقتك الرقمية مباشرة.';const linkChoice=document.querySelector('[name=method][value=link]');linkChoice.disabled=!p.paymentLink;linkChoice.closest('label').style.opacity=p.paymentLink?'1':'.45';if(!p.paymentLink){document.querySelector('[name=method][value=bank]').checked=true;document.getElementById('receiptWrap').style.display='block';}document.getElementById('message').textContent='';document.getElementById('formView').style.display='block';document.getElementById('success').classList.remove('show');document.getElementById('dialog').showModal()}
-document.getElementById('close').onclick=()=>document.getElementById('dialog').close();
-document.querySelectorAll('[name=method]').forEach(x=>x.onchange=()=>document.getElementById('receiptWrap').style.display=document.querySelector('[name=method]:checked').value==='bank'?'block':'none');document.querySelector('[name=method]').dispatchEvent(new Event('change'));
-document.getElementById('orderForm').onsubmit=async e=>{e.preventDefault();const b=document.getElementById('submit'),msg=document.getElementById('message'),method=document.querySelector('[name=method]:checked').value,file=document.getElementById('receipt').files[0];if(method==='bank'&&!file)return msg.textContent='يرجى إرفاق وصل التحويل البنكي.';b.disabled=true;b.textContent='جارٍ الإرسال…';msg.textContent='';try{const f=new FormData();f.append('plan_id',document.getElementById('planId').value);f.append('name',document.getElementById('name').value.trim());f.append('email',document.getElementById('email').value.trim());f.append('phone',document.getElementById('phone').value.trim());f.append('payment_method',method);if(file)f.append('receipt',file);const r=await fetch(API+'/memberships/orders',{method:'POST',body:f}),d=await r.json();if(!r.ok)throw Error(d.error||'تعذر إرسال الطلب.');if(method==='link'&&d.paymentLink){location.href=d.paymentLink;return}document.getElementById('formView').style.display='none';document.getElementById('success').classList.add('show');document.getElementById('successText').textContent=method==='bank'?'تم استلام وصل التحويل. بعد اعتماده ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+d.reference:'تم إنشاء طلب الدفع. بعد تأكيد العملية ستصدر بطاقتك الرقمية. رقم الطلب: '+d.reference;}catch(err){msg.textContent=err.message}finally{b.disabled=false;b.textContent='إرسال طلب البطاقة'}};
-fetch(API+'/memberships/plans').then(r=>r.json()).then(d=>{plans=d;render()}).catch(()=>document.getElementById('plans').innerHTML='<p>تعذر تحميل البطاقات الآن. حاول لاحقًا.</p>');
+const API = window.INEXC_REGISTRATION_ENDPOINT;
+let plans = [];
+const esc = v => String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function description(p) {
+  const list = [];
+  if (p.slug === 'launch') list.push('حجز دورتين أو دبلومين مباشرين أونلاين');
+  if (p.slug === 'mastery') list.push('3 حجوزات تدريبية مباشرة أونلاين');
+  if (p.slug === 'leadership') list.push('6 دورات أو حتى 5 دبلومات مباشرة أونلاين');
+  list.push('صلاحية ' + p.validMonths + (p.validMonths === 12 ? ' شهرًا' : ' أشهر'));
+  if (p.certificateDiscount) list.push('خصم ' + p.certificateDiscount + '% على رسوم الشهادات');
+  if (p.earlyAccessHours) list.push('حجز مبكر قبل العامة بـ' + p.earlyAccessHours + ' ساعة');
+  if (p.perks) list.push(p.perks);
+  return [...new Set(list)];
+}
+function render() {
+  const host = document.getElementById('plans');
+  host.innerHTML = plans.map(p => {
+    const soldOut = p.remaining <= 0;
+    const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
+    return '<article class="plan ' + (p.slug === 'mastery' ? 'featured' : '') + '">' +
+      (p.slug === 'mastery' ? '<span class="ribbon">الأكثر توازنًا</span>' : '') +
+      '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
+      '<div class="stock">متبقي <b>' + p.remaining + '</b> من أصل ' + p.maxCards + ' بطاقة</div>' +
+      '<ul class="features">' + items + '</ul>' +
+      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت البطاقات' : 'احصل على البطاقة') + '</button></article>';
+  }).join('');
+  host.querySelectorAll('[data-plan]').forEach(button => button.onclick = () => openPlan(button.dataset.plan));
+}
+function openPlan(id) {
+  const p = plans.find(x => x.id === id);
+  document.getElementById('planId').value = id;
+  document.getElementById('modalTitle').textContent = p.name;
+  document.getElementById('modalInfo').textContent = 'قيمة البطاقة: $' + p.priceUsd + ' — بعد اعتماد الدفع تصدر بطاقتك الرقمية مباشرة.';
+  const linkChoice = document.querySelector('[name=method][value=link]');
+  linkChoice.disabled = !p.paymentLink;
+  linkChoice.closest('label').style.opacity = p.paymentLink ? '1' : '.45';
+  if (!p.paymentLink) {
+    document.querySelector('[name=method][value=bank]').checked = true;
+    document.getElementById('receiptWrap').style.display = 'block';
+  }
+  document.getElementById('message').textContent = '';
+  document.getElementById('formView').style.display = 'block';
+  document.getElementById('success').classList.remove('show');
+  document.getElementById('dialog').showModal();
+}
+document.getElementById('close').onclick = () => document.getElementById('dialog').close();
+document.querySelectorAll('[name=method]').forEach(x => x.onchange = () => {
+  document.getElementById('receiptWrap').style.display = document.querySelector('[name=method]:checked').value === 'bank' ? 'block' : 'none';
+});
+document.querySelector('[name=method]').dispatchEvent(new Event('change'));
+document.getElementById('orderForm').onsubmit = async event => {
+  event.preventDefault();
+  const button = document.getElementById('submit');
+  const message = document.getElementById('message');
+  const method = document.querySelector('[name=method]:checked').value;
+  const file = document.getElementById('receipt').files[0];
+  if (method === 'bank' && !file) { message.textContent = 'يرجى إرفاق وصل التحويل البنكي.'; return; }
+  button.disabled = true; button.textContent = 'جارٍ الإرسال…'; message.textContent = '';
+  try {
+    const data = new FormData();
+    data.append('plan_id', document.getElementById('planId').value);
+    data.append('name', document.getElementById('name').value.trim());
+    data.append('email', document.getElementById('email').value.trim());
+    data.append('phone', document.getElementById('phone').value.trim());
+    data.append('payment_method', method);
+    if (file) data.append('receipt', file);
+    const response = await fetch(API + '/memberships/orders', { method:'POST', body:data });
+    const result = await response.json();
+    if (!response.ok) throw Error(result.error || 'تعذر إرسال الطلب.');
+    if (method === 'link' && result.paymentLink) { location.href = result.paymentLink; return; }
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('success').classList.add('show');
+    document.getElementById('successText').textContent = method === 'bank'
+      ? 'تم استلام وصل التحويل. بعد اعتماده ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: ' + result.reference
+      : 'تم إنشاء طلب الدفع. بعد تأكيد العملية ستصدر بطاقتك الرقمية. رقم الطلب: ' + result.reference;
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false; button.textContent = 'إرسال طلب البطاقة';
+  }
+};
+fetch(API + '/memberships/plans')
+  .then(response => response.ok ? response.json() : Promise.reject())
+  .then(data => { plans = data; render(); })
+  .catch(() => document.getElementById('plans').innerHTML = '<p>تعذر تحميل البطاقات الآن. حاول لاحقًا.</p>');
 </script>
 </body></html>
