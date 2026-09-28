@@ -324,6 +324,13 @@ async function setupDatabase() {
     early_access_hours INTEGER NOT NULL DEFAULT 0, perks TEXT NOT NULL DEFAULT '', payment_link TEXT NOT NULL DEFAULT '',
     active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  // Existing installations already have this table; additive columns preserve their plans and orders.
+  for (const column of [
+    "feature_lines TEXT NOT NULL DEFAULT ''", "badge_text TEXT",
+    "featured BOOLEAN NOT NULL DEFAULT FALSE", "stock_mode TEXT NOT NULL DEFAULT 'count'",
+    "stock_label TEXT NOT NULL DEFAULT 'فرصتك ما زالت متاحة'",
+    "low_stock_threshold INTEGER NOT NULL DEFAULT 15", "low_stock_label TEXT NOT NULL DEFAULT 'اقترب اكتمال الإصدار'", "sort_order INTEGER NOT NULL DEFAULT 0"
+  ]) await pool.query(`ALTER TABLE membership_plans ADD COLUMN IF NOT EXISTS ${column}`);
   await pool.query(`CREATE TABLE IF NOT EXISTS membership_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), reference TEXT UNIQUE NOT NULL,
     plan_id UUID NOT NULL REFERENCES membership_plans(id), name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL,
@@ -357,6 +364,9 @@ async function setupDatabase() {
     ('mastery','بطاقة التمكّن',79,100,6,3,1,1,10,24,'3 حجوزات تدريبية مباشرة أونلاين + خصم 10% على رسوم الشهادات.'),
     ('leadership','بطاقة الريادة',179,100,12,30,5,6,10,72,'6 دورات أو حتى 5 دبلومات + أولوية الحجز + جلسة إرشادية جماعية أو ورشة حصرية.')
     ON CONFLICT (slug) DO NOTHING`);
+  await pool.query(`UPDATE membership_plans SET badge_text=CASE WHEN slug='mastery' THEN 'الأكثر توازنًا' ELSE '' END,
+    featured=(slug='mastery'), sort_order=CASE slug WHEN 'launch' THEN 1 WHEN 'mastery' THEN 2 WHEN 'leadership' THEN 3 ELSE sort_order END
+    WHERE badge_text IS NULL`);
   await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
@@ -565,12 +575,12 @@ app.get('/api/settings', async (_req, res, next) => {
 });
 
 function membershipPlanPublic(row, sold = 0) {
-  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',active:row.active===true };
+  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
 }
 async function membershipPlans(includeInactive=false) {
   const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold
     FROM membership_plans p LEFT JOIN membership_orders o ON o.plan_id=p.id
-    ${includeInactive?'':'WHERE p.active=true'} GROUP BY p.id ORDER BY p.price_usd ASC`);
+    ${includeInactive?'':'WHERE p.active=true'} GROUP BY p.id ORDER BY p.sort_order ASC, p.price_usd ASC`);
   return result.rows.map(row=>membershipPlanPublic(row,row.sold));
 }
 function membershipCardNumber(plan) {
@@ -654,10 +664,31 @@ app.post('/api/memberships/verify',async(req,res,next)=>{try{
   res.json({ok:true,card:found.snapshot,cost,kind,remainingAfter:Number(card.units_remaining)-cost});
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/plans',auth,async(_req,res,next)=>{try{res.json(await membershipPlans(true));}catch(error){next(error);}});
+function membershipPlanInput(body) {
+  const integer=(value,min,max)=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max?Number(value):null;
+  const price=Number(body.priceUsd),discount=Number(body.certificateDiscount);
+  const numbers={maxCards:integer(body.maxCards,1,100000),validMonths:integer(body.validMonths,1,120),bookingUnits:integer(body.bookingUnits,1,10000),courseUnitCost:integer(body.courseUnitCost,1,10000),diplomaUnitCost:integer(body.diplomaUnitCost,1,10000),earlyAccessHours:integer(body.earlyAccessHours,0,8760),lowStockThreshold:integer(body.lowStockThreshold,0,100000),sortOrder:integer(body.sortOrder,0,100000)};
+  if(!clean(body.name,100)||Object.values(numbers).some(v=>v===null)||!Number.isFinite(price)||price<0||price>100000||!Number.isFinite(discount)||discount<0||discount>100) throw Object.assign(new Error('تحقق من الاسم والسعر والأعداد ونسبة الخصم.'),{status:400});
+  const link=clean(body.paymentLink,500);
+  if(link && (!/^https:\/\//i.test(link)||!URL.canParse(link))) throw Object.assign(new Error('رابط الدفع يجب أن يبدأ بـ https://'),{status:400});
+  const mode=['count','limited','hidden'].includes(body.stockMode)?body.stockMode:'count';
+  return [clean(body.name,100),price,numbers.maxCards,numbers.validMonths,numbers.bookingUnits,numbers.courseUnitCost,numbers.diplomaUnitCost,discount,numbers.earlyAccessHours,clean(body.perks,1000),link,body.active!==false,clean(body.featureLines,2000),clean(body.badgeText,80),body.featured===true,mode,clean(body.stockLabel,100),numbers.lowStockThreshold,numbers.sortOrder,clean(body.lowStockLabel,100)];
+}
+app.post('/api/admin/memberships/plans',auth,async(req,res,next)=>{try{
+  const values=membershipPlanInput(req.body||{}),slug='custom-'+crypto.randomBytes(8).toString('hex');
+  const result=await pool.query(`INSERT INTO membership_plans (name,price_usd,max_cards,valid_months,booking_units,course_unit_cost,diploma_unit_cost,certificate_discount,early_access_hours,perks,payment_link,active,feature_lines,badge_text,featured,stock_mode,stock_label,low_stock_threshold,sort_order,low_stock_label,slug)
+    VALUES (${Array.from({length:21},(_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,[...values,slug]);
+  res.status(201).json(membershipPlanPublic(result.rows[0]));
+}catch(error){next(error);}});
 app.put('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
-  const body=req.body||{};const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,updated_at=now() WHERE id=$13 RETURNING *`,
-  [clean(body.name,100),asNumber(body.priceUsd),Math.max(1,Math.floor(asNumber(body.maxCards))),Math.max(1,Math.floor(asNumber(body.validMonths))),Math.max(1,Math.floor(asNumber(body.bookingUnits))),Math.max(1,Math.floor(asNumber(body.courseUnitCost))),Math.max(1,Math.floor(asNumber(body.diplomaUnitCost))),asNumber(body.certificateDiscount),Math.max(0,Math.floor(asNumber(body.earlyAccessHours))),clean(body.perks,1000),clean(body.paymentLink,500),body.active!==false,req.params.id]);
+  const values=membershipPlanInput(req.body||{});const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,feature_lines=$13,badge_text=$14,featured=$15,stock_mode=$16,stock_label=$17,low_stock_threshold=$18,sort_order=$19,low_stock_label=$20,updated_at=now() WHERE id=$21 RETURNING *`,[...values,req.params.id]);
   if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json(membershipPlanPublic(result.rows[0]));
+}catch(error){next(error);}});
+app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
+  const used=await pool.query('SELECT 1 FROM membership_orders WHERE plan_id=$1 LIMIT 1',[req.params.id]);
+  if(used.rowCount)return res.status(409).json({error:'توجد طلبات لهذه البطاقة. أوقف عرضها بدل حذفها للحفاظ على سجلات المشترين.'});
+  const result=await pool.query('DELETE FROM membership_plans WHERE id=$1 RETURNING id',[req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json({ok:true});
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,total:Number(r.total)})));}catch(error){next(error);}});
 app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res,next)=>{const client=await pool.connect();try{await client.query('BEGIN');const order=await client.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[req.params.id]);if(!order.rowCount)return res.status(404).json({error:'الطلب غير موجود.'});if(order.rows[0].card_id){await client.query('COMMIT');return res.json({ok:true,alreadyActive:true});}await client.query('COMMIT');const cardId=await createMembershipCard(req.params.id);const card=await pool.query('SELECT card_number,holder_name,holder_email,access_token FROM membership_cards WHERE id=$1',[cardId]);const issued=card.rows[0];void sendEmail({to:issued.holder_email,subject:'تم تفعيل بطاقتك التدريبية | INEXC',html:`<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:600px;margin:auto;text-align:center;color:#17324d"><div style="background:#0755a5;color:#fff;padding:28px;border-radius:18px 18px 0 0"><b style="font-size:18px">INEXC TRAINING</b><h1 style="font-size:22px;margin:14px 0 0">تم تفعيل بطاقتك التدريبية</h1></div><div style="border:1px solid #dcecff;border-top:0;padding:30px;border-radius:0 0 18px 18px"><p>مرحبًا ${escapeHtml(issued.holder_name)}،</p><p>أصبحت بطاقتك جاهزة للاستخدام في حجز الدورات المباشرة أونلاين.</p><p style="font-family:monospace;font-size:18px;font-weight:bold;color:#0866c6;direction:ltr">${issued.card_number}</p><a href="https://www.inexctraining.com/my-card/?token=${issued.access_token}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 20px;border-radius:9px;font-weight:bold">عرض بطاقتي</a><p style="font-size:11px;color:#60788f;margin-top:22px">استخدم رقم البطاقة مع البريد الإلكتروني المرتبط بها عند حجز الدورة.</p></div></div>`}).catch(error=>console.error('Membership activation email error:',error));res.json({ok:true,cardNumber:issued.card_number,email:issued.holder_email});}catch(error){try{await client.query('ROLLBACK');}catch{}next(error);}finally{client.release();}});
@@ -1221,6 +1252,6 @@ app.get('/api/admin/campaigns/:id', auth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
-app.use((error, _req, res, _next) => { console.error(error); res.status(error instanceof multer.MulterError ? 400 : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
+app.use((error, _req, res, _next) => { console.error(error); res.status(error.status === 400 || error instanceof multer.MulterError ? 400 : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
 setupDatabase().then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); setInterval(() => void processCourseAlertQueue(), 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });

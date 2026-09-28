@@ -8,6 +8,9 @@
 <style>
 :root{--blue:#0866c6;--dark:#103b70;--pale:#f2f8ff;--line:#dcecff;--muted:#60788f;--gold:#d99a21}*{box-sizing:border-box}body{margin:0;background:var(--pale);font-family:Alexandria,Arial,sans-serif;color:#183553}.wrap{width:min(1160px,calc(100% - 32px));margin:auto}.top{background:#fff;border-bottom:1px solid var(--line)}.top .wrap{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{font-weight:800;color:var(--dark);text-decoration:none}.brand small{display:block;font-size:9px;color:#66809a;letter-spacing:1px;margin-top:3px}.back{color:var(--blue);text-decoration:none;font-size:12px;font-weight:700}.hero{text-align:center;padding:62px 0 35px}.tag{display:inline-block;background:#e6f2ff;color:var(--blue);border-radius:999px;padding:8px 14px;font-size:11px;font-weight:700}.hero h1{font-size:34px;color:var(--dark);margin:15px 0 10px}.hero p{max-width:650px;margin:auto;color:var(--muted);font-size:13px;line-height:2}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:22px 0 50px}.plan{background:#fff;border:1px solid var(--line);border-radius:22px;padding:25px;position:relative;box-shadow:0 12px 32px #1762a20d;display:flex;flex-direction:column}.plan.featured{border:2px solid var(--blue);transform:translateY(-8px)}.ribbon{position:absolute;top:-13px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--blue);color:white;border-radius:999px;padding:6px 12px;font-size:10px;font-weight:700}.plan h2{font-size:21px;color:var(--dark);margin:5px 0 10px}.price{font-size:32px;font-weight:800;color:var(--blue);direction:ltr;text-align:right}.price small{font-size:12px}.stock{margin:12px 0 18px;background:#f4f9ff;border-radius:10px;padding:9px;font-size:11px;color:var(--muted)}.stock b{color:var(--blue);font-size:15px}.features{padding:0;list-style:none;flex:1}.features li{padding:10px 0;border-bottom:1px solid #eef4fb;font-size:11px;line-height:1.8}.features li:before{content:'✓';color:var(--blue);font-weight:800;margin-left:8px}.buy{display:block;width:100%;border:0;border-radius:11px;padding:14px;background:var(--blue);color:#fff;font:700 13px Alexandria;cursor:pointer;margin-top:20px}.buy[disabled]{background:#9eb6ce;cursor:not-allowed}.note{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;margin:0 0 50px;color:var(--muted);font-size:11px;line-height:2}.note b{color:var(--dark)}dialog{border:0;border-radius:20px;padding:0;width:min(520px,calc(100% - 28px));box-shadow:0 20px 70px #102a4f4d}dialog::backdrop{background:#102a4f88}.modal{padding:24px}.modal h2{color:var(--dark);font-size:19px;margin:0 0 7px}.modal p{color:var(--muted);font-size:11px;line-height:1.8}.close{float:left;border:0;background:#eef5fc;border-radius:9px;padding:7px 10px;cursor:pointer}.form{display:grid;gap:11px;margin-top:17px}.form label{font-size:11px;font-weight:700;color:var(--dark)}.form input,.form select{width:100%;margin-top:5px;border:1px solid #d4e5f7;border-radius:10px;padding:12px;font:12px Alexandria;outline:0}.pay{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pay label{border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}.pay input{width:auto;margin-left:6px}.receipt{display:none}.message{font-size:11px;min-height:20px;color:#b02b3a;line-height:1.8}.success{display:none;text-align:center;padding:35px 10px}.success.show{display:block}.success .tick{width:55px;height:55px;border-radius:50%;display:grid;place-items:center;margin:auto;background:#e8faf2;color:#168865;font-size:26px}.link{color:var(--blue);font-weight:700}.mycard{text-align:center;padding-bottom:50px;font-size:12px}.mycard a{color:var(--blue);font-weight:700}@media(max-width:800px){.plans{grid-template-columns:1fr}.plan.featured{transform:none}.hero{padding-top:40px}.hero h1{font-size:27px}} 
 </style>
+<style>
+.availability{margin:17px 0 18px;padding:15px 16px;border-radius:16px;background:linear-gradient(125deg,#eaf4ff,#f8fbff);border:1px solid #cce3ff;position:relative;overflow:hidden}.availability:before{content:'';position:absolute;width:100px;height:100px;border:18px solid #d9ebff;border-radius:50%;left:-48px;top:-58px;opacity:.6}.availability-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}.availability-copy{font-size:11px;font-weight:700;color:#416786}.availability-number{font-size:25px;font-weight:800;line-height:1;color:var(--blue);font-variant-numeric:tabular-nums}.availability-number small{font-size:10px;color:#60788f}.availability-track{height:6px;background:#d9e8f6;border-radius:999px;overflow:hidden;margin-top:12px}.availability-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4da9ff,#0866c6)}.availability.urgent{background:linear-gradient(125deg,#fff2e2,#fffaf3);border-color:#f6d4a7}.availability.urgent .availability-number,.availability.urgent .availability-copy{color:#a7590b}.availability.urgent .availability-track i{background:linear-gradient(90deg,#f5b14d,#db7515)}.availability.quiet{background:#f5f9ff}.availability.quiet .availability-copy{font-size:12px}.availability.sold-out{background:#f3f5f7;border-color:#e0e6ed}.availability.sold-out .availability-number{color:#68798b}
+</style>
 </head>
 <body>
 <header class="top"><div class="wrap"><a class="brand" href="/">التميز الابتكاري<small>INEXC TRAINING</small></a><a class="back" href="/">العودة إلى الموقع ←</a></div></header>
@@ -24,6 +27,7 @@ const API = window.INEXC_REGISTRATION_ENDPOINT;
 let plans = [];
 const esc = v => String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function description(p) {
+  if (p.featureLines) return p.featureLines.split('\n').map(x => x.trim()).filter(Boolean);
   const list = [];
   if (p.slug === 'launch') list.push('حجز دورتين أو دبلومين مباشرين أونلاين');
   if (p.slug === 'mastery') list.push('3 حجوزات تدريبية مباشرة أونلاين');
@@ -34,15 +38,23 @@ function description(p) {
   if (p.perks) list.push(p.perks);
   return [...new Set(list)];
 }
+function availability(p) {
+  const remaining=Math.max(0,Number(p.remaining)||0),maximum=Math.max(1,Number(p.maxCards)||1);
+  const mode=p.stockMode||'count',urgent=remaining>0&&remaining<=Number(p.lowStockThreshold??15);
+  const message=remaining===0?'اكتمل إصدار هذه البطاقة':urgent?p.lowStockLabel||'اقترب اكتمال الإصدار':p.stockLabel||'فرصتك ما زالت متاحة';
+  if(mode==='hidden'&&remaining>0)return '';
+  const number=mode==='limited'&&remaining>0?'<span class="availability-copy">'+esc(urgent?'عدد محدود جدًا من البطاقات':'إصدار محدود — احجز بطاقتك')+'</span>':'<span class="availability-number">'+remaining+' <small>بطاقة متاحة</small></span>';
+  return '<div class="availability '+(remaining===0?'sold-out':urgent?'urgent':mode==='limited'?'quiet':'')+'" role="status"><div class="availability-top"><span class="availability-copy">'+esc(message)+'</span>'+number+'</div>'+(mode==='count'&&remaining>0?'<div class="availability-track" aria-hidden="true"><i style="width:'+Math.min(100,Math.round(remaining/maximum*100))+'%"></i></div>':'')+'</div>';
+}
 function render() {
   const host = document.getElementById('plans');
   host.innerHTML = plans.map(p => {
     const soldOut = p.remaining <= 0;
     const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
-    return '<article class="plan ' + (p.slug === 'mastery' ? 'featured' : '') + '">' +
-      (p.slug === 'mastery' ? '<span class="ribbon">الأكثر توازنًا</span>' : '') +
+    return '<article class="plan ' + (p.featured ? 'featured' : '') + '">' +
+      (p.badgeText ? '<span class="ribbon">'+esc(p.badgeText)+'</span>' : '') +
       '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
-      '<div class="stock">متبقي <b>' + p.remaining + '</b> من أصل ' + p.maxCards + ' بطاقة</div>' +
+      availability(p) +
       '<ul class="features">' + items + '</ul>' +
       '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت البطاقات' : 'احصل على البطاقة') + '</button></article>';
   }).join('');
@@ -103,7 +115,7 @@ document.getElementById('orderForm').onsubmit = async event => {
 };
 fetch(API + '/memberships/plans')
   .then(response => response.ok ? response.json() : Promise.reject())
-  .then(data => { plans = data; render(); })
+  .then(data => { plans = data; const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' بطاقة'; render(); })
   .catch(() => document.getElementById('plans').innerHTML = '<p>تعذر تحميل البطاقات الآن. حاول لاحقًا.</p>');
 </script>
 </body></html>
