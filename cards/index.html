@@ -51,8 +51,8 @@ function render() {
   host.innerHTML = plans.map(p => {
     const soldOut = p.remaining <= 0;
     const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
-    return '<article class="plan ' + (p.featured ? 'featured' : '') + '">' +
-      (p.badgeText ? '<span class="ribbon">'+esc(p.badgeText)+'</span>' : '') +
+    return '<article class="plan ' + ((p.featured ?? (p.slug === 'mastery')) ? 'featured' : '') + '">' +
+      ((p.badgeText ?? (p.slug === 'mastery' ? 'الأكثر توازنًا' : '')) ? '<span class="ribbon">'+esc(p.badgeText ?? 'الأكثر توازنًا')+'</span>' : '') +
       '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
       availability(p) +
       '<ul class="features">' + items + '</ul>' +
