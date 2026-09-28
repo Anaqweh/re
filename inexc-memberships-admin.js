@@ -26,7 +26,10 @@
     const out=q('#membershipMessage');out.textContent='';
     try{
       const [plans,orders,cards,courses]=await Promise.all([call('/admin/memberships/plans'),call('/admin/memberships/orders'),call('/admin/memberships/cards'),call('/admin/courses')]);
-      q('#membershipSummary').innerHTML=plans.map(p=>'<div class="panel metric"><b>'+p.sold+' / '+p.maxCards+'</b><span>'+esc(p.name)+' · متبقي '+p.remaining+'</span></div>').join('');
+      const totals=plans.reduce((a,p)=>{for(const key of ['maxCards','sold','remaining','paidCount','pendingCount','expectedRevenueUsd','issuedValueUsd','verifiedRevenueUsd','verifiedRevenueAed'])a[key]=(a[key]||0)+Number(p[key]||0);return a},{});
+      const metric=(label,value)=>'<div style="padding:11px;background:#f3f8ff;border-radius:11px"><small style="display:block;color:#60788f">'+label+'</small><strong style="font-size:18px;color:#0866c6">'+value+'</strong></div>';
+      const revenue=(p)=>'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px">'+metric('إجمالي البطاقات',p.maxCards)+metric('محجوزة ومباعة',p.sold)+metric('المتبقي',p.remaining)+metric('بانتظار الدفع/المراجعة',p.pendingCount)+metric('بطاقات أُصدرت',p.paidCount)+metric('قيمة الطلبات المتوقعة',money(p.expectedRevenueUsd))+'</div><small style="display:block;margin-top:9px;color:#60788f">قيمة البطاقات الصادرة بسعر الطلب: '+money(p.issuedValueUsd)+' · المبالغ المسجلة بعد المطابقة: '+money(p.verifiedRevenueUsd)+' / '+Number(p.verifiedRevenueAed||0).toLocaleString('en-US')+' AED</small>';
+      q('#membershipSummary').innerHTML='<div class="panel" style="padding:17px;width:100%;border:1px solid #bcdcff"><h3 style="margin:0 0 12px;color:#103b70">ملخص جميع البطاقات</h3>'+revenue(totals)+'</div>'+plans.map(p=>'<div class="panel" style="padding:16px;width:100%;border:1px solid #dcecff"><h3 style="margin:0 0 10px;color:#103b70">'+esc(p.name)+'</h3>'+revenue(p)+'</div>').join('');
       q('#membershipPlans').innerHTML='<p class="note">العدد المتبقي مرتبط بالطلبات الفعلية. اختر طريقة عرضه لكل بطاقة.</p>'+plans.map(planEditor).join('')+planEditor();
       q('#membershipOrders').innerHTML=orders.length?orders.map(o=>{
         const active=!!o.card_number,rejected=o.status==='مرفوض',bank=o.payment_method==='bank';
