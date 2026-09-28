@@ -65,13 +65,15 @@ function openPlan(id) {
   document.getElementById('planId').value = id;
   document.getElementById('modalTitle').textContent = p.name;
   document.getElementById('modalInfo').textContent = 'قيمة البطاقة: $' + p.priceUsd + ' — بعد اعتماد الدفع تصدر بطاقتك الرقمية مباشرة.';
-  const linkChoice = document.querySelector('[name=method][value=link]');
-  linkChoice.disabled = !p.paymentLink;
-  linkChoice.closest('label').style.opacity = p.paymentLink ? '1' : '.45';
-  if (!p.paymentLink) {
-    document.querySelector('[name=method][value=bank]').checked = true;
-    document.getElementById('receiptWrap').style.display = 'block';
-  }
+  const enabled = p.paymentMethods || ['bank'];
+  document.querySelectorAll('[name=method]').forEach(input => {
+    const available = enabled.includes(input.value) && (input.value !== 'link' || !!p.paymentLink);
+    input.disabled = !available;
+    input.checked = false;
+    input.closest('label').hidden = !available;
+  });
+  const first = document.querySelector('[name=method]:not(:disabled)');
+  if (first) { first.checked = true; first.dispatchEvent(new Event('change')); }
   document.getElementById('message').textContent = '';
   document.getElementById('formView').style.display = 'block';
   document.getElementById('success').classList.remove('show');
@@ -86,7 +88,8 @@ document.getElementById('orderForm').onsubmit = async event => {
   event.preventDefault();
   const button = document.getElementById('submit');
   const message = document.getElementById('message');
-  const method = document.querySelector('[name=method]:checked').value;
+  const method = document.querySelector('[name=method]:checked')?.value;
+  if (!method) { message.textContent = 'لا توجد طريقة دفع مفعّلة لهذه البطاقة.'; return; }
   const file = document.getElementById('receipt').files[0];
   if (method === 'bank' && !file) { message.textContent = 'يرجى إرفاق وصل التحويل البنكي.'; return; }
   button.disabled = true; button.textContent = 'جارٍ الإرسال…'; message.textContent = '';
