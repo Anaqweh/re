@@ -581,10 +581,16 @@ app.get('/api/settings', async (_req, res, next) => {
 });
 
 function membershipPlanPublic(row, sold = 0) {
-  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',paymentMethods:row.payment_methods||['bank'],active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
+  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),paidCount:Number(row.paid_count||0),pendingCount:Number(row.pending_count||0),expectedRevenueUsd:Number(row.expected_revenue_usd||0),issuedValueUsd:Number(row.issued_value_usd||0),verifiedRevenueUsd:Number(row.verified_revenue_usd||0),verifiedRevenueAed:Number(row.verified_revenue_aed||0),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',paymentMethods:row.payment_methods||['bank'],active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
 }
 async function membershipPlans(includeInactive=false) {
-  const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold
+  const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold,
+    COUNT(o.id) FILTER (WHERE o.card_id IS NOT NULL) AS paid_count,
+    COUNT(o.id) FILTER (WHERE o.card_id IS NULL AND o.status IN ('بانتظار مراجعة الدفع','بانتظار الدفع')) AS pending_count,
+    COALESCE(SUM(o.total) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')),0) AS expected_revenue_usd,
+    COALESCE(SUM(o.total) FILTER (WHERE o.card_id IS NOT NULL),0) AS issued_value_usd,
+    COALESCE(SUM(o.verified_amount) FILTER (WHERE o.card_id IS NOT NULL AND o.verified_currency='USD'),0) AS verified_revenue_usd,
+    COALESCE(SUM(o.verified_amount) FILTER (WHERE o.card_id IS NOT NULL AND o.verified_currency='AED'),0) AS verified_revenue_aed
     FROM membership_plans p LEFT JOIN membership_orders o ON o.plan_id=p.id
     ${includeInactive?'':'WHERE p.active=true'} GROUP BY p.id ORDER BY p.sort_order ASC, p.price_usd ASC`);
   return result.rows.map(row=>membershipPlanPublic(row,row.sold));
