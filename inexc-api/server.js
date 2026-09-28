@@ -329,7 +329,8 @@ async function setupDatabase() {
     "feature_lines TEXT NOT NULL DEFAULT ''", "badge_text TEXT",
     "featured BOOLEAN NOT NULL DEFAULT FALSE", "stock_mode TEXT NOT NULL DEFAULT 'count'",
     "stock_label TEXT NOT NULL DEFAULT 'فرصتك ما زالت متاحة'",
-    "low_stock_threshold INTEGER NOT NULL DEFAULT 15", "low_stock_label TEXT NOT NULL DEFAULT 'اقترب اكتمال الإصدار'", "sort_order INTEGER NOT NULL DEFAULT 0"
+    "low_stock_threshold INTEGER NOT NULL DEFAULT 15", "low_stock_label TEXT NOT NULL DEFAULT 'اقترب اكتمال الإصدار'", "sort_order INTEGER NOT NULL DEFAULT 0",
+    "payment_methods TEXT[] NOT NULL DEFAULT ARRAY['bank']::TEXT[]"
   ]) await pool.query(`ALTER TABLE membership_plans ADD COLUMN IF NOT EXISTS ${column}`);
   await pool.query(`CREATE TABLE IF NOT EXISTS membership_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), reference TEXT UNIQUE NOT NULL,
@@ -579,7 +580,7 @@ app.get('/api/settings', async (_req, res, next) => {
 });
 
 function membershipPlanPublic(row, sold = 0) {
-  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
+  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',paymentMethods:row.payment_methods||['bank'],active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
 }
 async function membershipPlans(includeInactive=false) {
   const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold
@@ -643,7 +644,10 @@ app.post('/api/memberships/orders', upload.single('receipt'), async (req,res,nex
     if(!['bank','link'].includes(method)) return res.status(400).json({error:'اختر طريقة دفع صالحة.'});
     const planResult=await pool.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true',[planId]);
     if(!planResult.rowCount) return res.status(400).json({error:'هذه البطاقة غير متاحة حاليًا.'});
-    const plan=planResult.rows[0]; const sold=await pool.query(`SELECT COUNT(*) FROM membership_orders WHERE plan_id=$1 AND status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')`,[plan.id]);
+    const plan=planResult.rows[0];
+    if(!(plan.payment_methods||['bank']).includes(method)) return res.status(400).json({error:'طريقة الدفع هذه غير متاحة لهذه البطاقة.'});
+    if(method==='link'&&!plan.payment_link) return res.status(400).json({error:'رابط الدفع غير مفعّل لهذه البطاقة.'});
+    const sold=await pool.query(`SELECT COUNT(*) FROM membership_orders WHERE plan_id=$1 AND status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')`,[plan.id]);
     if(Number(sold.rows[0].count)>=Number(plan.max_cards)) return res.status(400).json({error:'نفدت هذه الفئة من البطاقات.'});
     if(method==='bank'&&!req.file) return res.status(400).json({error:'يرجى رفع وصل التحويل البنكي.'});
     const ref='CARD-'+Date.now().toString().slice(-8)+'-'+crypto.randomBytes(2).toString('hex').toUpperCase();
@@ -675,17 +679,20 @@ function membershipPlanInput(body) {
   if(!clean(body.name,100)||Object.values(numbers).some(v=>v===null)||!Number.isFinite(price)||price<0||price>100000||!Number.isFinite(discount)||discount<0||discount>100) throw Object.assign(new Error('تحقق من الاسم والسعر والأعداد ونسبة الخصم.'),{status:400});
   const link=clean(body.paymentLink,500);
   if(link && (!/^https:\/\//i.test(link)||!URL.canParse(link))) throw Object.assign(new Error('رابط الدفع يجب أن يبدأ بـ https://'),{status:400});
+  const paymentMethods=['bank','link'].filter(method=>Array.isArray(body.paymentMethods)&&body.paymentMethods.includes(method));
+  if(!paymentMethods.length) throw Object.assign(new Error('فعّل طريقة دفع واحدة على الأقل.'),{status:400});
+  if(paymentMethods.includes('link')&&!link) throw Object.assign(new Error('أدخل رابط الدفع قبل تفعيله.'),{status:400});
   const mode=['count','limited','hidden'].includes(body.stockMode)?body.stockMode:'count';
-  return [clean(body.name,100),price,numbers.maxCards,numbers.validMonths,numbers.bookingUnits,numbers.courseUnitCost,numbers.diplomaUnitCost,discount,numbers.earlyAccessHours,clean(body.perks,1000),link,body.active!==false,clean(body.featureLines,2000),clean(body.badgeText,80),body.featured===true,mode,clean(body.stockLabel,100),numbers.lowStockThreshold,numbers.sortOrder,clean(body.lowStockLabel,100)];
+  return [clean(body.name,100),price,numbers.maxCards,numbers.validMonths,numbers.bookingUnits,numbers.courseUnitCost,numbers.diplomaUnitCost,discount,numbers.earlyAccessHours,clean(body.perks,1000),link,body.active!==false,clean(body.featureLines,2000),clean(body.badgeText,80),body.featured===true,mode,clean(body.stockLabel,100),numbers.lowStockThreshold,numbers.sortOrder,clean(body.lowStockLabel,100),paymentMethods];
 }
 app.post('/api/admin/memberships/plans',auth,async(req,res,next)=>{try{
   const values=membershipPlanInput(req.body||{}),slug='custom-'+crypto.randomBytes(8).toString('hex');
-  const result=await pool.query(`INSERT INTO membership_plans (name,price_usd,max_cards,valid_months,booking_units,course_unit_cost,diploma_unit_cost,certificate_discount,early_access_hours,perks,payment_link,active,feature_lines,badge_text,featured,stock_mode,stock_label,low_stock_threshold,sort_order,low_stock_label,slug)
-    VALUES (${Array.from({length:21},(_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,[...values,slug]);
+  const result=await pool.query(`INSERT INTO membership_plans (name,price_usd,max_cards,valid_months,booking_units,course_unit_cost,diploma_unit_cost,certificate_discount,early_access_hours,perks,payment_link,active,feature_lines,badge_text,featured,stock_mode,stock_label,low_stock_threshold,sort_order,low_stock_label,payment_methods,slug)
+    VALUES (${Array.from({length:22},(_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,[...values,slug]);
   res.status(201).json(membershipPlanPublic(result.rows[0]));
 }catch(error){next(error);}});
 app.put('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
-  const values=membershipPlanInput(req.body||{});const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,feature_lines=$13,badge_text=$14,featured=$15,stock_mode=$16,stock_label=$17,low_stock_threshold=$18,sort_order=$19,low_stock_label=$20,updated_at=now() WHERE id=$21 RETURNING *`,[...values,req.params.id]);
+  const values=membershipPlanInput(req.body||{});const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,feature_lines=$13,badge_text=$14,featured=$15,stock_mode=$16,stock_label=$17,low_stock_threshold=$18,sort_order=$19,low_stock_label=$20,payment_methods=$21,updated_at=now() WHERE id=$22 RETURNING *`,[...values,req.params.id]);
   if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json(membershipPlanPublic(result.rows[0]));
 }catch(error){next(error);}});
 app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
