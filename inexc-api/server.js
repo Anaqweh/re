@@ -910,7 +910,7 @@ app.post('/api/admin/password-recovery', async (req,res,next) => {
     await pool.query("DELETE FROM admin_password_resets WHERE expires_at < now() OR used_at IS NOT NULL");
     const token=crypto.randomBytes(32).toString('hex'); const tokenHash=passwordHashValue(token);
     await pool.query("INSERT INTO admin_password_resets (token_hash,expires_at) VALUES ($1,now() + interval '30 minutes')",[tokenHash]);
-    const link='https://www.inexctraining.com/admin/?reset='+encodeURIComponent(token);
+    const link='https://www.inexctraining.com/admin/#reset='+encodeURIComponent(token);
     const content='<p>تم طلب استرجاع بيانات دخول لوحة إدارة INEXC.</p><p><b>اسم المستخدم:</b> '+escapeHtml(adminUsername)+'</p><p>لأمان الحساب لا نرسل كلمة المرور الحالية؛ استخدم الرابط التالي لإنشاء كلمة مرور جديدة. ينتهي الرابط خلال 30 دقيقة ويُستخدم مرة واحدة فقط.</p><p style="text-align:center"><a href="'+link+'" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:9px;padding:11px 20px;font-weight:700">إنشاء كلمة مرور جديدة</a></p><p style="font-size:12px;color:#64778c;direction:ltr;text-align:center">'+link+'</p><p style="font-size:12px;color:#64778c">إذا لم تطلب ذلك، تجاهل الرسالة ولن يتغير شيء.</p>';
     await sendEmail({to:adminRecoveryEmail,subject:'استرجاع دخول لوحة إدارة INEXC',html:emailShell({title:'استرجاع بيانات الدخول',preview:'رابط آمن لإعادة تعيين كلمة مرور لوحة الإدارة.',content})});
     res.json({ok:true,message:'أرسلنا اسم المستخدم ورابطًا آمنًا لإنشاء كلمة مرور جديدة إلى البريد المعتمد.'});
