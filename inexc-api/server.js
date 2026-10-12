@@ -891,7 +891,7 @@ function recoveryAllowed(req) {
 }
 app.post('/api/admin/login', async (req, res, next) => {
   try {
-    const username=clean(req.body?.username,160).toLowerCase() || adminUsername.toLowerCase();
+    const username=clean(req.body?.username,160).toLowerCase();
     const password = String(req.body?.password || '').slice(0, 256);
     if(username!==adminUsername.toLowerCase()) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة.' });
     const saved=await pool.query("SELECT value FROM app_settings WHERE key='admin_password_hash'");
