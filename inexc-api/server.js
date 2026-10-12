@@ -155,14 +155,10 @@ fs.mkdirSync(privateImportDir, { recursive: true });
 const messageRecipientImportUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, privateImportDir),
-    filename: (_req, file, cb) => cb(null, `message-list-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    filename: (_req, _file, cb) => cb(null, `message-list-${crypto.randomUUID()}`)
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const permitted = ['.csv', '.txt', '.xlsx'];
-    cb(permitted.includes(ext) ? null : new Error('ارفع قائمة CSV أو TXT أو Excel بصيغة XLSX.'), permitted.includes(ext));
-  }
+  // Detect the contents in readContactFile; extensions do not determine validity.
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }
 });
 
 function clean(value, max = 400) { return String(value ?? '').trim().slice(0, max); }

@@ -29,7 +29,7 @@ test('English aliases, tabs and email-only/name-only files import correctly', ()
 });
 test('Excel shared strings and multiple sheets preserve names including name-only rows', async () => {
   const rows = await readContactFile({originalname:'test.xlsx',path:fileURLToPath(new URL('./fixtures/shared-contacts.xlsx',import.meta.url))});
-  assert.equal(rows.length,4); assert.equal(rows[0].name,'أحمد، علي'); assert.equal(rows[1].name,'اسم بلا بريد'); assert.equal(rows[3].name,'غادة عناقوة');
+  assert.equal(rows.length,3); assert.equal(rows[0].name,'أحمد، علي'); assert.equal(rows[1].name,'اسم بلا بريد'); assert.equal(rows[2].name,'غادة عناقوة');
 });
 test('Excel inline strings decode text safely and retain sparse columns', async () => {
   const rows = await readContactFile({originalname:'test.xlsx',path:fileURLToPath(new URL('./fixtures/inline-contacts.xlsx',import.meta.url))});

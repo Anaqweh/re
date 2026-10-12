@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js message-contacts.js Dockerfile)
+inexc_files=(server.js message-contacts.js message-file-reader.py Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
