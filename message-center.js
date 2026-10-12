@@ -5,9 +5,10 @@
     if (!app || !tabs || !wrap || $('#message-center')) return;
 
     const escape = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[char]));
-    const state = { templates: [], lists: [], courses: [], editingTemplate: '', uploadedAttachment: '', importFile: null };
+    const state = { ready: false, templates: [], lists: [], courses: [], editingTemplate: '', uploadedAttachment: '', importFile: null };
     const api = () => window.INEXC_REGISTRATION_ENDPOINT || 'https://api.inexctraining.com/api';
     const call = async (path, options = {}) => {
+      if (options.method && options.method !== 'GET' && !state.ready) throw Error('يلزم إكمال تحديث خدمة الرسائل على الخادم أولًا.');
       const token = sessionStorage.getItem('inexc_do_admin') || '';
       if (!token) throw Error('انتهت جلسة الإدارة. سجّل الدخول ثم أعد المحاولة.');
       const headers = { Authorization: `Bearer ${token}`, ...(options.headers || {}) };
@@ -192,7 +193,19 @@
         document.querySelectorAll('[data-campaign-cancel]').forEach(button => button.onclick = async () => { if (!confirm('إلغاء هذه الرسالة المجدولة؟')) return; setBusy(button, true, 'جارٍ الإلغاء…'); try { await call('/admin/campaigns/'+button.dataset.campaignCancel+'/cancel', { method:'POST' }); await loadReports(); notify('تم إلغاء جدولة الرسالة.', true); } catch (error) { notify(error.message); } finally { setBusy(button, false); } });
       } catch (error) { target.innerHTML = `<div class="mc-empty">${escape(error.message)}</div>`; }
     }
-    async function loadAll() { await Promise.all([loadTemplates(), loadLists(), loadCourses()]); }
+    async function loadAll() {
+      state.ready = false;
+      const actions = ['mc-send','mc-send-test','mc-template-save','mc-save-manual-list','mc-import-list'];
+      actions.forEach(id => $('#'+id).disabled = true);
+      try {
+        const templates = await call('/admin/message-templates');
+        if (!Array.isArray(templates)) throw Error('استجابة الخدمة غير صالحة.');
+        state.templates = templates; state.ready = true; renderTemplates();
+        actions.forEach(id => $('#'+id).disabled = false);
+        notify('');
+        await Promise.all([loadLists(), loadCourses()]);
+      } catch (error) { notify('مركز الرسائل ينتظر إكمال تحديث الخدمة على الخادم. '+error.message); }
+    }
     function toggleAudience() { const choice = $('#mc-audience').value; $('#mc-course-wrap').hidden = choice !== 'course'; $('#mc-list-wrap').hidden = choice !== 'list'; $('#mc-custom-wrap').hidden = choice !== 'custom'; $('#mc-recipient-info').textContent = choice === 'selected' ? 'حدّد الأسماء من جدول التسجيلات أولًا، ثم ارجع إلى مركز الرسائل لفحصها.' : 'اضغط «فحص المستلمين» لتعرف العدد الفعلي قبل الإرسال.'; refreshPreview(); }
     async function checkRecipients() {
       const button = $('#mc-check-recipients'); setBusy(button, true, 'جارٍ الفحص…');
