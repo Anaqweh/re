@@ -883,7 +883,7 @@ app.post('/api/institution-requests', async (req, res, next) => {
 });
 
 const adminRecoveryEmail = String(process.env.ADMIN_RECOVERY_EMAIL || 'ahmadanakwa@gmail.com').trim();
-const adminUsername = String(process.env.ADMIN_USERNAME || 'admin').trim();
+const adminUsername = String(process.env.ADMIN_USERNAME || 'ahmadanakwa@gmail.com').trim();
 const passwordHashValue = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 function recoveryAllowed(req) {
   const key=String(req.ip || req.socket?.remoteAddress || 'unknown'); const now=Date.now(); const recent=(adminRecoveryAttempts.get(key)||[]).filter(time=>now-time<15*60*1000);
@@ -891,7 +891,9 @@ function recoveryAllowed(req) {
 }
 app.post('/api/admin/login', async (req, res, next) => {
   try {
+    const username=clean(req.body?.username,160).toLowerCase();
     const password = String(req.body?.password || '').slice(0, 256);
+    if(username!==adminUsername.toLowerCase()) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة.' });
     const saved=await pool.query("SELECT value FROM app_settings WHERE key='admin_password_hash'");
     const stored=saved.rows[0]?.value||'';
     const expectedHash=stored.startsWith('sha256:') ? stored.slice(7) : passwordHashValue(process.env.ADMIN_PASSWORD);
