@@ -10,6 +10,7 @@ import pg from 'pg';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 import { readContactFile } from './message-contacts.js';
+import { normaliseMessageBody, renderMessageBody, messageText, messageDirection } from './message-format.js';
 
 const { Pool } = pg;
 const app = express();
@@ -242,8 +243,10 @@ function parseCourseDocument(raw) {
   if (!description && axes) description = `تتناول الدورة ${courseAxes(axes).slice(0, 4).join('، ')}.`;
   return { name: clean(name, 180), description: clean(description, 1000), axes, outcomes: courseOutcomes(outcomesPart.join('\n')).join('\n'), ...metadata };
 }
-function emailShell({ title, preview, content }) {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">تواصل معنا عبر واتساب ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
+function emailShell({ title, preview, content, direction = 'rtl' }) {
+  const dir = direction === 'ltr' ? 'ltr' : 'rtl', align = dir === 'rtl' ? 'right' : 'left';
+  const english = dir === 'ltr';
+  return `<!doctype html><html lang="${english ? 'en' : 'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body dir="${dir}" style="direction:${dir};text-align:${align};margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">${english ? 'Innovative Excellence' : 'شركة التميز الابتكاري'}</div><div style="font-size:13px;margin-top:5px;opacity:.9">${english ? 'Training that makes a real difference' : 'برامج تدريبية تصنع أثرًا حقيقيًا'}</div></td></tr><tr><td dir="${dir}" align="${align}" style="padding:32px 34px;direction:${dir};text-align:${align}">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">${english ? 'This is an automated message from INEXC Training. Please do not reply directly.' : 'هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.'}<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">${english ? 'Contact us on WhatsApp' : 'تواصل معنا عبر واتساب'} ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
 async function sendEmail({ to, subject, html, attachmentPath = '', idempotencyKey = '' }) {
   if (!resendApiKey || !to) return;
@@ -576,22 +579,26 @@ function mergeMessageVariables(value, person = {}, courseName = '') {
 
 function messageEmailMarkup({ subject, body, ctaLabel = '', ctaUrl = '', person = {}, preference, courseName = '' }) {
   const renderedSubject = mergeMessageVariables(subject, person, courseName);
-  const renderedBody = mergeMessageVariables(body, person, courseName);
+  const rendered = renderMessageBody(body, { name: person.name || '', email: person.email || '', course: courseName });
+  const dir = rendered.direction, align = dir === 'rtl' ? 'right' : 'left', english = dir === 'ltr';
   const renderedCtaLabel = mergeMessageVariables(ctaLabel, person, courseName);
   const renderedCtaUrl = safeMessageUrl(mergeMessageVariables(ctaUrl, person, courseName));
-  const greeting = person.name ? `مرحبًا <strong>${escapeHtml(person.name)}</strong>،` : 'مرحبًا،';
+  const greeting = english
+    ? (person.name ? `Hello <strong>${escapeHtml(person.name)}</strong>,` : 'Hello,')
+    : (person.name ? `مرحبًا <strong>${escapeHtml(person.name)}</strong>،` : 'مرحبًا،');
   const action = renderedCtaLabel && renderedCtaUrl
-    ? `<div style="text-align:center;margin:26px 0 0"><a href="${escapeHtml(renderedCtaUrl)}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:800">${escapeHtml(renderedCtaLabel)}</a></div>`
+    ? `<div style="text-align:${align};margin:26px 0 0"><a href="${escapeHtml(renderedCtaUrl)}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:800">${escapeHtml(renderedCtaLabel)}</a></div>`
     : '';
   const unsubscribe = preference?.unsubscribe_token
-    ? `<p style="margin:22px 0 0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي رسائل INEXC؟ <a href="${emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)}" style="color:#0866c6">إلغاء الاشتراك</a></p>`
+    ? `<p dir="${dir}" style="margin:22px 0 0;text-align:${align};font-size:11px;color:#7890a8">${english ? 'Prefer not to receive INEXC emails?' : 'لا ترغب في تلقي رسائل INEXC؟'} <a href="${emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)}" style="color:#0866c6">${english ? 'Unsubscribe' : 'إلغاء الاشتراك'}</a></p>`
     : '';
+  const subjectDir = messageDirection(renderedSubject, dir);
   return {
     subject: renderedSubject,
     html: emailShell({
-      title: escapeHtml(renderedSubject),
-      preview: escapeHtml(renderedBody.slice(0, 120)),
-      content: `<div style="font-size:23px;font-weight:800;color:#103b70">${escapeHtml(renderedSubject)}</div><p style="margin:18px 0 0;font-size:14px;color:#304d67">${greeting}</p><div style="margin:12px 0 0;font-size:14px;color:#304d67;line-height:2">${escapeHtml(renderedBody).replace(/\n/g, '<br>')}</div>${action}<p style="margin:26px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>${unsubscribe}`
+      title: escapeHtml(renderedSubject), direction: dir,
+      preview: escapeHtml(rendered.text.slice(0, 120)),
+      content: `<div dir="${dir}" style="direction:${dir};text-align:${align}"><div dir="${subjectDir}" style="text-align:${subjectDir === 'rtl' ? 'right' : 'left'};font-size:23px;font-weight:800;color:#103b70">${escapeHtml(renderedSubject)}</div><p dir="${dir}" style="margin:18px 0 12px;text-align:${align};font-size:15px;color:#304d67">${greeting}</p><div dir="${dir}" style="margin:12px 0 0;direction:${dir};text-align:${align};font-size:16px;color:#304d67;line-height:1.9">${rendered.html}</div>${action}<p dir="${dir}" style="margin:26px 0 0;text-align:${align};font-size:14px">${english ? 'Kind regards,' : 'مع خالص التحية،'}<br><strong style="color:#103b70">${english ? 'The INEXC Training Team' : 'فريق INEXC Training'}</strong></p>${unsubscribe}</div>`
     })
   };
 }
@@ -1491,6 +1498,7 @@ app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single(
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
+app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 1 }));
 app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
@@ -1499,7 +1507,7 @@ app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
 });
 app.post('/api/admin/message-templates', auth, async (req, res, next) => {
   try {
-    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = clean(req.body?.body, 5000);
+    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = normaliseMessageBody(req.body?.body);
     const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
     if (!name) return res.status(400).json({ error: 'اكتب اسمًا للقالب.' });
     if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
@@ -1509,7 +1517,7 @@ app.post('/api/admin/message-templates', auth, async (req, res, next) => {
 });
 app.put('/api/admin/message-templates/:id', auth, async (req, res, next) => {
   try {
-    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = clean(req.body?.body, 5000);
+    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = normaliseMessageBody(req.body?.body);
     const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
     if (!name) return res.status(400).json({ error: 'اكتب اسمًا للقالب.' });
     if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
@@ -1587,13 +1595,13 @@ app.post('/api/admin/messages/test', auth, async (req, res) => {
   try {
     if (!resendApiKey) return res.status(503).json({ error: 'خدمة البريد غير مهيأة حاليًا.' });
     const test = normaliseMessageContact({ email: req.body?.email, name: req.body?.name });
-    const subject = clean(req.body?.subject, 160), body = clean(req.body?.message, 5000);
+    const subject = clean(req.body?.subject, 160), body = normaliseMessageBody(req.body?.message);
     const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
     if (!test.email || !subject || !body) return res.status(400).json({ error: 'أدخل بريد التجربة وعنوان الرسالة ونصها.' });
     if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
     const course = clean(req.body?.courseName, 180);
     const preference = await getEmailPreference(test.email);
-    const message = messageEmailMarkup({ subject: `[تجريبية] ${subject}`, body, ctaLabel, ctaUrl, person: test, preference, courseName: course });
+    const message = messageEmailMarkup({ subject: `${messageDirection(messageText(body)) === 'ltr' ? '[Test]' : '[تجريبية]'} ${subject}`, body, ctaLabel, ctaUrl, person: test, preference, courseName: course });
     await sendEmail({ to: test.email, subject: message.subject, html: message.html });
     res.json({ ok: true });
   } catch (error) { res.status(400).json({ error: error.message || 'تعذر إرسال الرسالة التجريبية.' }); }
@@ -1602,7 +1610,7 @@ app.post('/api/admin/messages', auth, async (req, res, next) => {
   try {
     if (!resendApiKey) return res.status(503).json({ error: 'خدمة البريد غير مهيأة حاليًا.' });
     const subject = clean(req.body?.subject, 160);
-    const message = clean(req.body?.message, 5000);
+    const message = normaliseMessageBody(req.body?.message);
     const ctaLabel = clean(req.body?.ctaLabel, 80);
     const ctaUrl = safeMessageUrl(req.body?.ctaUrl);
     const templateId = clean(req.body?.templateId, 80) || null;

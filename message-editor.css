@@ -1,0 +1,22 @@
+.mc-editor-shell{margin:8px 0 14px;border:1px solid #b9cee3;border-radius:12px;overflow:hidden;background:#fff;min-width:0}
+.mc-editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:#f4f8fc;border-bottom:1px solid #d5e3ef;direction:rtl}
+.mc-editor-shell button{border:1px solid transparent;border-radius:7px;background:transparent;color:#21476b;min-height:40px;min-width:40px;padding:7px 10px;font:inherit;font-size:14px;cursor:pointer;line-height:1.4}
+.mc-editor-shell button:hover{background:#e6eff8;border-color:#c4d8ea}
+.mc-editor-shell button[aria-pressed=true]{background:#dcecff;border-color:#8db8e6;color:#084785}
+.mc-editor-shell :focus-visible{outline:3px solid #0866c6;outline-offset:-3px}
+.mc-rich-editor{min-height:260px;max-height:650px;overflow:auto;padding:18px;outline:none;font-size:16px;line-height:1.9;color:#17324d;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box}
+.mc-rich-editor:focus{box-shadow:inset 0 0 0 2px #8db8e6}
+.mc-rich-editor:empty:before{content:attr(data-placeholder);color:#61788d;pointer-events:none}
+.mc-rich-editor p,.mc-rich-editor div{margin:0 0 12px;text-align:start}
+.mc-rich-editor ul,.mc-rich-editor ol{padding-inline:26px;margin:10px 0}
+.mc-rich-editor a{color:#0866c6;text-decoration:underline}
+.mc-editor-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-top:1px solid #d5e3ef;padding:6px 10px;background:#f8fbfe}
+.mc-editor-direction{display:flex;gap:4px}
+.mc-editor-count{font-size:13px;color:#526b80;direction:ltr}
+.mc-editor-count.mc-editor-over-limit{color:#b02b3a;font-weight:700}
+.mc-editor-shell>.mc-helper{padding:8px 12px;margin:0;font-size:12px;line-height:1.8;color:#526b80}
+.mc-editor-link{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px;background:#eaf4ff}
+.mc-editor-link[hidden]{display:none}
+.mc-editor-link label{flex-basis:100%;margin:0;font-size:13px}
+.mc-editor-link input{flex:1;min-width:150px;border:1px solid #b9cee3;border-radius:8px;padding:9px;background:#fff;font-size:14px;text-align:left}
+@media(max-width:560px){.mc-rich-editor{padding:13px;min-height:230px}.mc-editor-toolbar{gap:3px;padding:6px}.mc-editor-shell button{min-height:44px;padding:7px 8px}.mc-editor-direction button{min-width:0}}

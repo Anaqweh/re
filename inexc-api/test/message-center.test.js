@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { parseDelimited, contactsFromRows, worksheetRows, readContactFile } from '../message-contacts.js';
+import { richTextPrefix, normaliseMessageBody, renderMessageBody, messageText, messageDirection } from '../message-format.js';
 const source = fs.readFileSync(new URL('../server.js', import.meta.url), 'utf8');
 const functions = source.slice(source.indexOf('const alertEmailPattern'), source.indexOf('\nconst unsubscribeUrl'));
 function helpers(extra = {}) {
   const context = vm.createContext({
     clean: (v,n=400) => String(v??'').trim().slice(0,n),
-    URL, Date, setTimeout: fn => { fn(); }, console,
+    URL, Date, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     emailShell: v => JSON.stringify(v),
     emailPreferenceUnsubscribeUrl: () => 'https://example.com/unsubscribe',
@@ -51,7 +52,25 @@ test('Template variables stay plain text, unsafe URLs are rejected', () => {
   const h=helpers(); const rendered=h.messageEmailMarkup({subject:'<b>{{name}}</b>',body:'Line 1\n<script>bad</script>',person:{name:'A & B'},ctaLabel:'open',ctaUrl:'javascript:alert(1)'});
   const markup=JSON.parse(rendered.html);
   assert.equal(markup.title,'&lt;b&gt;A &amp; B&lt;/b&gt;'); assert.ok(markup.preview.includes('&lt;script&gt;'));
-  assert.ok(markup.content.includes('Line 1<br>'));assert.ok(!markup.content.includes('<script>'));assert.ok(!markup.content.includes('javascript:'));
+  assert.ok(markup.content.includes('Line 1</p>'));assert.ok(!markup.content.includes('<script>'));assert.ok(!markup.content.includes('javascript:'));
+});
+test('Message emails explicitly align Arabic right and English left in their content', () => {
+  const h=helpers();
+  for (const [body, direction, align] of [['مرحبًا بكم في برامجنا التدريبية', 'rtl', 'right'], ['Welcome to our training programs', 'ltr', 'left']]) {
+    const markup=JSON.parse(h.messageEmailMarkup({subject:'Test',body}).html);
+    assert.equal(markup.direction,direction);
+    assert.ok(markup.content.includes(`dir="${direction}"`));
+    assert.ok(markup.content.includes(`text-align:${align}`));
+  }
+});
+test('Email shell places direction and alignment directly on the content table cell', () => {
+  const context=vm.createContext({});
+  vm.runInContext(source.slice(source.indexOf('function emailShell('),source.indexOf('\nasync function sendEmail')),context);
+  for (const [direction,align] of [['rtl','right'],['ltr','left']]) {
+    const html=context.emailShell({title:'Test',preview:'Test',content:'body',direction});
+    assert.ok(html.includes(`<td dir="${direction}" align="${align}"`));
+    assert.ok(html.includes(`direction:${direction};text-align:${align}`));
+  }
 });
 test('Worker runs once while busy and releases its database lock', async () => {
   let releaseDue, releases=0, claimed=0, unlocks=0;
@@ -63,12 +82,14 @@ test('Worker runs once while busy and releases its database lock', async () => {
 });
 test('Delivery skips unsubscribed contacts, sends with idempotency key, and marks stale uncertainty failed', async()=>{
   const sent=[], updates=[];
+  const richBody=richTextPrefix+JSON.stringify({direction:'auto',blocks:[{type:'paragraph',runs:[{text:'{{name}}',bold:true}]}]});
   const rows=[{id:'1',email:'yes@example.com',recipient_name:'Yes'},{id:'2',email:'no@example.com'},{id:'3',email:'old@example.com',attempted_at:new Date(Date.now()-25*3600000)}];
   const h=helpers({pool:{query:async(sql,args)=>{
-    if(sql.startsWith('SELECT * FROM email_campaigns'))return {rows:[{status:'sending',subject:'Hello',body:'{{name}}'}]};
+    if(sql.startsWith('SELECT * FROM email_campaigns'))return {rows:[{status:'sending',subject:'Hello',body:richBody}]};
     if(sql.startsWith('SELECT id,email'))return {rows};
     if(sql.startsWith('SELECT count'))return {rows:[{sent:1,failed:1}]};updates.push({sql,args});return {rows:[]};}},getEmailPreference:async email=>({marketing_opt_out:email==='no@example.com'}),sendEmail:async message=>{sent.push(message);return{id:'mail-1'}}});
   await h.deliverMessageCampaign('campaign');assert.equal(sent.length,1);assert.equal(sent[0].idempotencyKey,'message/1');
+  assert.ok(JSON.parse(sent[0].html).content.includes('<strong>Yes</strong>'));assert.ok(!sent[0].html.includes('INEXC-RICH-TEXT'));
   assert.ok(updates.some(v=>v.sql.includes("status='skipped'"))); assert.ok(updates.some(v=>v.sql.includes("status='failed'")));
   assert.equal(updates.at(-1).args[0],'partial');
 });

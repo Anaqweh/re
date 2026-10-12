@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>اختبار تنسيق الرسائل</title>
+<style>body{margin:0;background:#eef5fc;font-family:Tahoma,Arial,sans-serif;color:#17324d}main{max-width:1000px;margin:24px auto;padding:20px;box-sizing:border-box}h1{font-size:24px}button{cursor:pointer}#preview{background:white;padding:24px;border-radius:12px;margin-top:20px}label{display:block;margin:12px 0 6px}nav{display:flex;gap:8px;flex-wrap:wrap}nav button{padding:10px;background:white;border:1px solid #b9cee3;border-radius:8px}#result{margin-top:12px}</style>
+<main><h1>اختبار تنسيق الرسائل</h1><nav><button id="arabic">مثال عربي</button><button id="english">مثال إنجليزي</button><button id="mixed">مثال مختلط</button><button id="reload">حفظ وإعادة فتح</button><button id="narrow">عرض الهاتف</button><button id="wide">عرض الكمبيوتر</button></nav><label for="sample-body">نص الرسالة التجريبي</label><textarea id="sample-body" placeholder="اكتب نصًا لاختبار التنسيق"></textarea><div id="result" role="status"></div><section id="preview" aria-label="معاينة الرسالة"></section></main>
+<script type="module">
+import { createMessageEditor } from '../../message-editor.js?v=20261012-richtext';
+import { renderMessageBody, messageText } from '../message-format.js?v=20261012-richtext';
+const editor=createMessageEditor(document.querySelector('textarea')).element;
+const preview=document.querySelector('#preview');
+function refresh(){const rendered=renderMessageBody(editor.value);preview.innerHTML=rendered.html;preview.dir=rendered.direction;preview.style.textAlign=rendered.direction==='rtl'?'right':'left';}
+editor.addEventListener('input',refresh);
+document.querySelector('#arabic').onclick=()=>{editor.value='زميلاتي المعلمات، زملائي المعلمين\nشكرًا لكل كلمة طيبة تزرعونها في قلوب طلبتكم.\nنتمنى لكم استراحة جميلة ووقتًا هادئًا مع من تحبون.';refresh();};
+document.querySelector('#english').onclick=()=>{editor.value='Dear teachers,\nThank you for the kindness and care you bring to your classrooms.\nWishing you a restful break.';refresh();};
+document.querySelector('#mixed').onclick=()=>{editor.value='مرحبًا بكم في برامجنا التدريبية.\nWelcome to INEXC Training.';refresh();};
+document.querySelector('#reload').onclick=()=>{const value=editor.value,text=messageText(value);editor.value=value;document.querySelector('#result').textContent=messageText(editor.value)===text?'تم حفظ النص والتنسيق وإعادة فتحهما.':'تعذر التحقق من الحفظ.';refresh();};
+document.querySelector('#narrow').onclick=()=>document.querySelector('main').style.maxWidth='360px';
+document.querySelector('#wide').onclick=()=>document.querySelector('main').style.maxWidth='1000px';
+document.querySelector('#arabic').click();
+</script></html>

@@ -1,3 +1,6 @@
+import { createMessageEditor } from './message-editor.js?v=20261012-richtext';
+import { messageText, messageDirection, renderMessageBody } from './inexc-api/message-format.js?v=20261012-richtext';
+
 (() => {
   const boot = () => {
     const $ = selector => document.querySelector(selector);
@@ -9,6 +12,7 @@
     const api = () => window.INEXC_REGISTRATION_ENDPOINT || 'https://api.inexctraining.com/api';
     const call = async (path, options = {}) => {
       if (options.method && options.method !== 'GET' && !state.ready) throw Error('يلزم إكمال تحديث خدمة الرسائل على الخادم أولًا.');
+      if (['POST','PUT'].includes(options.method) && /^\/admin\/(?:message-templates(?:\/[^/]+)?|messages(?:\/test)?)$/.test(path) && !state.richTextReady) throw Error('يلزم تحديث خدمة الرسائل لتفعيل حفظ التنسيق وإرساله. يمكنك تجهيز النص ومعاينته الآن.');
       const token = sessionStorage.getItem('inexc_do_admin') || '';
       if (!token) throw Error('انتهت جلسة الإدارة. سجّل الدخول ثم أعد المحاولة.');
       const headers = { Authorization: `Bearer ${token}`, ...(options.headers || {}) };
@@ -70,6 +74,8 @@
         </div>
       </section>`);
 
+    const editors = { body: createMessageEditor($('#mc-body')), template: createMessageEditor($('#mc-template-body')) };
+    ['mc-subject','mc-template-subject'].forEach(id => { $('#'+id).dir = 'auto'; $('#'+id).style.textAlign = 'start'; });
     const showMain = () => {
       document.querySelectorAll('.tabs button,.view').forEach(node => node.classList.remove('active'));
       tabs.querySelector('[data-view="message-center"]').classList.add('active');
@@ -85,21 +91,19 @@
     };
     document.querySelectorAll('[data-mc-view]').forEach(button => button.onclick = () => showSub(button.dataset.mcView));
 
-    const insertAtCursor = (input, value) => {
-      const start = input.selectionStart ?? input.value.length, end = input.selectionEnd ?? input.value.length;
-      input.value = input.value.slice(0, start) + value + input.value.slice(end);
-      input.focus(); input.selectionStart = input.selectionEnd = start + value.length; refreshPreview();
-    };
-    document.querySelectorAll('[data-variable]').forEach(button => button.onclick = () => insertAtCursor($('#mc-body'), button.dataset.variable));
+    document.querySelectorAll('[data-variable]').forEach(button => { button.onmousedown = event => event.preventDefault(); button.onclick = () => editors.body.insertText(button.dataset.variable); });
     ['mc-subject','mc-body','mc-cta-label','mc-cta-url','mc-test-name','mc-test-email'].forEach(id => $('#'+id).addEventListener('input', refreshPreview));
     function refreshPreview() {
       const sample = { name: $('#mc-test-name').value.trim() || 'اسم المستلم', email: $('#mc-test-email').value.trim() || 'name@example.com', course: $('#mc-course').value ? $('#mc-course option:checked').textContent : 'اسم الدورة' };
       const subject = merge($('#mc-subject').value.trim(), sample) || 'عنوان الرسالة';
-      const body = merge($('#mc-body').value.trim(), sample) || 'سيظهر نص رسالتك هنا قبل أن ترسله.';
+      const body = renderMessageBody($('#mc-body').value.trim() || 'سيظهر نص رسالتك هنا قبل أن ترسله.', sample);
       const label = merge($('#mc-cta-label').value.trim(), sample), url = merge($('#mc-cta-url').value.trim(), sample);
       $('#mc-preview-subject').textContent = subject;
-      $('#mc-preview-greeting').textContent = sample.name ? `مرحبًا ${sample.name}،` : 'مرحبًا،';
-      $('#mc-preview-body').textContent = body;
+      const preview = $('#mc-preview-body').parentElement;
+      preview.dir = body.direction; preview.style.direction = body.direction; preview.style.textAlign = body.direction === 'rtl' ? 'right' : 'left';
+      $('#mc-preview-subject').dir = messageDirection(subject, body.direction); $('#mc-preview-subject').style.textAlign = $('#mc-preview-subject').dir === 'rtl' ? 'right' : 'left';
+      $('#mc-preview-greeting').textContent = body.direction === 'rtl' ? (sample.name ? `مرحبًا ${sample.name}،` : 'مرحبًا،') : (sample.name === 'اسم المستلم' ? 'Hello,' : `Hello ${sample.name},`);
+      $('#mc-preview-body').style.whiteSpace = 'normal'; $('#mc-preview-body').innerHTML = body.html;
       $('#mc-preview-cta').hidden = !(label && /^https?:\/\//i.test(url));
       $('#mc-preview-cta').textContent = label || 'زر الإجراء';
       $('#mc-preview-cta').href = url || '#';
@@ -201,8 +205,10 @@
         const templates = await call('/admin/message-templates');
         if (!Array.isArray(templates)) throw Error('استجابة الخدمة غير صالحة.');
         state.templates = templates; state.ready = true; renderTemplates();
+        state.richTextReady = await call('/admin/message-capabilities').then(data => data.richText === 1).catch(() => false);
         actions.forEach(id => $('#'+id).disabled = false);
-        notify('');
+        ['mc-send','mc-send-test','mc-template-save'].forEach(id => $('#'+id).disabled = !state.richTextReady);
+        notify(state.richTextReady ? '' : 'يمكنك تجهيز النص ومعاينته. حدّث خدمة الرسائل على الخادم لتفعيل حفظ التنسيق والإرسال.');
         await Promise.all([loadLists(), loadCourses()]);
       } catch (error) { notify('مركز الرسائل ينتظر إكمال تحديث الخدمة على الخادم. '+error.message); }
     }
