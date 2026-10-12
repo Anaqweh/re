@@ -16,6 +16,7 @@ const port = Number(process.env.PORT || 3000);
 const uploadDir = '/app/uploads';
 const allowedOrigins = (process.env.PUBLIC_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const sessions = new Map();
+const adminRecoveryAttempts = new Map();
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const emailFrom = String(process.env.EMAIL_FROM || 'INEXC Training <registrations@inexctraining.com>').trim();
 const adminNotificationEmail = String(process.env.ADMIN_NOTIFICATION_EMAIL || '').trim();
@@ -375,6 +376,10 @@ async function setupDatabase() {
     WHERE badge_text IS NULL`);
   await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS admin_password_resets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), token_hash TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS testimonials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, content TEXT NOT NULL,
@@ -877,14 +882,48 @@ app.post('/api/institution-requests', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-app.post('/api/admin/login', (req, res) => {
-  const password = String(req.body?.password || '').slice(0, 256);
-  const expected = String(process.env.ADMIN_PASSWORD).slice(0, 256);
-  const passwordHash = crypto.createHash('sha256').update(password).digest();
-  const expectedHash = crypto.createHash('sha256').update(expected).digest();
-  if (!crypto.timingSafeEqual(passwordHash, expectedHash)) return res.status(401).json({ error: 'كلمة المرور غير صحيحة.' });
-  pruneSessions(); const token = crypto.randomBytes(32).toString('hex'); sessions.set(token, { expiresAt: Date.now() + 1000 * 60 * 60 * 8 });
-  res.json({ token, expiresIn: 28800 });
+const adminRecoveryEmail = String(process.env.ADMIN_RECOVERY_EMAIL || 'ahmadanakwa@gmail.com').trim();
+const adminUsername = String(process.env.ADMIN_USERNAME || 'admin').trim();
+const passwordHashValue = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
+function recoveryAllowed(req) {
+  const key=String(req.ip || req.socket?.remoteAddress || 'unknown'); const now=Date.now(); const recent=(adminRecoveryAttempts.get(key)||[]).filter(time=>now-time<15*60*1000);
+  if(recent.length>=2){adminRecoveryAttempts.set(key,recent);return false;} recent.push(now);adminRecoveryAttempts.set(key,recent);return true;
+}
+app.post('/api/admin/login', async (req, res, next) => {
+  try {
+    const password = String(req.body?.password || '').slice(0, 256);
+    const saved=await pool.query("SELECT value FROM app_settings WHERE key='admin_password_hash'");
+    const stored=saved.rows[0]?.value||'';
+    const expectedHash=stored.startsWith('sha256:') ? stored.slice(7) : passwordHashValue(process.env.ADMIN_PASSWORD);
+    const valid=crypto.timingSafeEqual(Buffer.from(passwordHashValue(password),'hex'),Buffer.from(expectedHash,'hex'));
+    if (!valid) return res.status(401).json({ error: 'كلمة المرور غير صحيحة.' });
+    pruneSessions(); const token = crypto.randomBytes(32).toString('hex'); sessions.set(token, { expiresAt: Date.now() + 1000 * 60 * 60 * 8 });
+    res.json({ token, expiresIn: 28800 });
+  } catch(error) { next(error); }
+});
+app.post('/api/admin/password-recovery', async (req,res,next) => {
+  try {
+    if(!recoveryAllowed(req)) return res.status(429).json({ error:'تم إرسال طلبين مؤخرًا. انتظر 15 دقيقة ثم أعد المحاولة.' });
+    if(!resendApiKey) return res.status(503).json({ error:'خدمة استرجاع الدخول غير مهيّأة حاليًا.' });
+    await pool.query("DELETE FROM admin_password_resets WHERE expires_at < now() OR used_at IS NOT NULL");
+    const token=crypto.randomBytes(32).toString('hex'); const tokenHash=passwordHashValue(token);
+    await pool.query("INSERT INTO admin_password_resets (token_hash,expires_at) VALUES ($1,now() + interval '30 minutes')",[tokenHash]);
+    const link='https://www.inexctraining.com/admin/?reset='+encodeURIComponent(token);
+    const content='<p>تم طلب استرجاع بيانات دخول لوحة إدارة INEXC.</p><p><b>اسم المستخدم:</b> '+escapeHtml(adminUsername)+'</p><p>استخدم الرابط التالي لإنشاء كلمة مرور جديدة. ينتهي الرابط خلال 30 دقيقة ويُستخدم مرة واحدة فقط.</p><p style="text-align:center"><a href="'+link+'" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:9px;padding:11px 20px;font-weight:700">إنشاء كلمة مرور جديدة</a></p><p style="font-size:12px;color:#64778c;direction:ltr;text-align:center">'+link+'</p><p style="font-size:12px;color:#64778c">إذا لم تطلب ذلك، تجاهل الرسالة ولن يتغير شيء.</p>';
+    await sendEmail({to:adminRecoveryEmail,subject:'استرجاع دخول لوحة إدارة INEXC',html:emailShell({title:'استرجاع بيانات الدخول',preview:'رابط آمن لإعادة تعيين كلمة مرور لوحة الإدارة.',content})});
+    res.json({ok:true,message:'أرسلنا رابط استرجاع بيانات الدخول إلى البريد المعتمد.'});
+  } catch(error) { next(error); }
+});
+app.post('/api/admin/password-reset', async (req,res,next) => {
+  try {
+    const token=clean(req.body?.token,200), password=String(req.body?.password||'').slice(0,256);
+    if(!token || password.length<8) return res.status(400).json({error:'أدخل كلمة مرور جديدة من 8 أحرف على الأقل.'});
+    const result=await pool.query("UPDATE admin_password_resets SET used_at=now() WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING id",[passwordHashValue(token)]);
+    if(!result.rowCount) return res.status(400).json({error:'رابط الاسترجاع غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.'});
+    await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('admin_password_hash',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()",['sha256:'+passwordHashValue(password)]);
+    sessions.clear();
+    res.json({ok:true,message:'تم حفظ كلمة المرور الجديدة. يمكنك تسجيل الدخول الآن.'});
+  } catch(error) { next(error); }
 });
 app.post('/api/admin/logout', auth, (req, res) => { sessions.delete(String(req.headers.authorization).replace(/^Bearer\s+/i, '')); res.json({ ok: true }); });
 app.get('/api/admin/settings', auth, async (_req, res, next) => {
