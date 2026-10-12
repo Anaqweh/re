@@ -5,7 +5,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
-COPY server.js ./
+COPY server.js message-contacts.js ./
 RUN mkdir -p /app/uploads
 EXPOSE 3000
 CMD ["npm", "start"]

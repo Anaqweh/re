@@ -9,6 +9,7 @@ import multer from 'multer';
 import pg from 'pg';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import { readContactFile } from './message-contacts.js';
 
 const { Pool } = pg;
 const app = express();
@@ -119,8 +120,9 @@ const messageAttachmentUpload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const blocked = ['application/x-msdownload', 'application/x-sh', 'application/x-bat'];
-    cb(blocked.includes(file.mimetype) ? new Error('لا يمكن إرسال ملفات تنفيذية أو غير آمنة بالبريد.') : null, !blocked.includes(file.mimetype));
+    const permitted = ['.pdf','.doc','.docx','.xls','.xlsx','.csv','.txt','.ppt','.pptx','.jpg','.jpeg','.png','.webp','.gif'];
+    const allowed = permitted.includes(path.extname(file.originalname).toLowerCase());
+    cb(allowed ? null : new Error('ارفع مستندًا أو صورة بصيغة مدعومة. لا تُقبل الملفات التنفيذية وصفحات HTML.'), allowed);
   }
 });
 const courseImportUpload = multer({
@@ -146,6 +148,20 @@ const courseAlertImportUpload = multer({
     const ext = path.extname(file.originalname).toLowerCase();
     const permitted = ['.csv', '.txt', '.xlsx'];
     cb(permitted.includes(ext) ? null : new Error('ارفع ملف CSV أو TXT أو Excel بصيغة XLSX.'), permitted.includes(ext));
+  }
+});
+const privateImportDir = '/app/private-imports';
+fs.mkdirSync(privateImportDir, { recursive: true });
+const messageRecipientImportUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, privateImportDir),
+    filename: (_req, file, cb) => cb(null, `message-list-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const permitted = ['.csv', '.txt', '.xlsx'];
+    cb(permitted.includes(ext) ? null : new Error('ارفع قائمة CSV أو TXT أو Excel بصيغة XLSX.'), permitted.includes(ext));
   }
 });
 
@@ -233,20 +249,27 @@ function parseCourseDocument(raw) {
 function emailShell({ title, preview, content }) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">شركة التميز الابتكاري</div><div style="font-size:13px;margin-top:5px;opacity:.9">برامج تدريبية تصنع أثرًا حقيقيًا</div></td></tr><tr><td style="padding:32px 34px">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">تواصل معنا عبر واتساب ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
-async function sendEmail({ to, subject, html, attachmentPath = '' }) {
+async function sendEmail({ to, subject, html, attachmentPath = '', idempotencyKey = '' }) {
   if (!resendApiKey || !to) return;
   const payload = { from: emailFrom, to: [to], subject, html };
   if (attachmentPath) {
     const fileName = path.basename(attachmentPath);
     const filePath = path.join(uploadDir, fileName);
-    if (fs.existsSync(filePath)) payload.attachments = [{ filename: fileName.replace(/^mail-[a-f0-9-]+-/, ''), content: fs.readFileSync(filePath).toString('base64') }];
+    if (!fs.existsSync(filePath)) throw new Error('تعذر العثور على المرفق. أعد رفعه قبل الإرسال.');
+    payload.attachments = [{ filename: fileName.replace(/^mail-[a-f0-9-]+-/, ''), content: fs.readFileSync(filePath).toString('base64') }];
   }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
+    signal: AbortSignal.timeout(20000),
     body: JSON.stringify(payload)
   });
-  if (!response.ok) throw new Error(`Resend: ${await response.text()}`);
+  if (!response.ok) {
+    const error = new Error(`Resend: ${await response.text()}`);
+    error.status = response.status;
+    error.retryAfter = Number(response.headers.get('retry-after')) || 2;
+    throw error;
+  }
   return response.json();
 }
 async function sendEmailWithRetry(message, attempts = 2) {
@@ -423,16 +446,42 @@ async function setupDatabase() {
     email TEXT PRIMARY KEY, unsubscribe_token TEXT UNIQUE NOT NULL,
     marketing_opt_out BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS message_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '',
+    cta_label TEXT NOT NULL DEFAULT '', cta_url TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS message_contacts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), full_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', normalized_email TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (full_name <> '' OR email <> '')
+  )`);
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS message_contacts_email_unique ON message_contacts(normalized_email) WHERE normalized_email <> \'\'');
+  await pool.query(`CREATE TABLE IF NOT EXISTS message_recipient_lists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS message_recipient_list_members (
+    list_id UUID NOT NULL REFERENCES message_recipient_lists(id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES message_contacts(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (list_id, contact_id)
+  )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS email_campaigns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), subject TEXT NOT NULL, body TEXT NOT NULL,
     audience TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  for (const column of [
+    'template_id UUID REFERENCES message_templates(id) ON DELETE SET NULL', "cta_label TEXT NOT NULL DEFAULT ''", "cta_url TEXT NOT NULL DEFAULT ''",
+    "attachment_path TEXT NOT NULL DEFAULT ''", "status TEXT NOT NULL DEFAULT 'sent'", 'scheduled_at TIMESTAMPTZ', 'sending_at TIMESTAMPTZ', 'sent_at TIMESTAMPTZ',
+    'total_recipients INTEGER NOT NULL DEFAULT 0', 'skipped_unsubscribed INTEGER NOT NULL DEFAULT 0', "course_name TEXT NOT NULL DEFAULT ''"
+  ]) await pool.query(`ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS ${column}`);
   await pool.query(`CREATE TABLE IF NOT EXISTS email_deliveries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), campaign_id UUID REFERENCES email_campaigns(id) ON DELETE CASCADE,
     email TEXT NOT NULL, recipient_name TEXT NOT NULL DEFAULT '', resend_email_id TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'sent', delivered_at TIMESTAMPTZ, opened_at TIMESTAMPTZ, clicked_at TIMESTAMPTZ,
     error TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query("ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent'");
+  await pool.query('ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS attempted_at TIMESTAMPTZ');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_resend_id_unique ON email_deliveries(resend_email_id) WHERE resend_email_id <> \'\'');
   const count = await pool.query('SELECT count(*)::int AS count FROM courses');
   if (count.rows[0].count === 0) {
@@ -484,6 +533,206 @@ async function getEmailPreference(email) {
 const emailPreferenceUnsubscribeUrl = token => 'https://api.inexctraining.com/api/email-preferences/unsubscribe?token=' + encodeURIComponent(token);
 
 const alertEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const messagePlaceholderPattern = /\{\{(name|email|course)\}\}/g;
+
+function safeMessageUrl(value) {
+  const raw = clean(value, 600);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '';
+  } catch (_error) { return ''; }
+}
+
+function normaliseMessageContact(value = {}) {
+  const email = clean(String(value.email || '').trim().toLowerCase(), 180);
+  const name = clean(String(value.name || value.full_name || '').trim(), 160);
+  return { name, email: alertEmailPattern.test(email) ? email : '' };
+}
+
+function parseMessageRecipientText(value) {
+  const rows = [];
+  for (const line of String(value || '').split(/\r?\n|;/)) {
+    const emails = (line.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []).map(email => email.toLowerCase());
+    const name = clean(line.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '').replace(/[<>,|]/g, ' ').trim(), 160);
+    if (emails.length) emails.forEach((email, index) => rows.push(normaliseMessageContact({ name: index === 0 ? name : '', email })));
+    else if (name) rows.push(normaliseMessageContact({ name, email: '' }));
+  }
+  return rows;
+}
+
+function normaliseMessageContacts(rows, limit = 1000) {
+  const output = [], seenEmails = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const contact = normaliseMessageContact(row || {});
+    if (contact.email && seenEmails.has(contact.email)) continue;
+    if (contact.email) seenEmails.add(contact.email);
+    if (contact.email || contact.name) output.push(contact);
+    if (output.length > limit) throw new Error(`الحد الأقصى ${limit} جهة. قسّم البيانات إلى قوائم أصغر.`);
+  }
+  return output;
+}
+
+function mergeMessageVariables(value, person = {}, courseName = '') {
+  const variables = { name: person.name || '', email: person.email || '', course: courseName || '' };
+  return String(value || '').replace(messagePlaceholderPattern, (_match, key) => variables[key] || '');
+}
+
+function messageEmailMarkup({ subject, body, ctaLabel = '', ctaUrl = '', person = {}, preference, courseName = '' }) {
+  const renderedSubject = mergeMessageVariables(subject, person, courseName);
+  const renderedBody = mergeMessageVariables(body, person, courseName);
+  const renderedCtaLabel = mergeMessageVariables(ctaLabel, person, courseName);
+  const renderedCtaUrl = safeMessageUrl(mergeMessageVariables(ctaUrl, person, courseName));
+  const greeting = person.name ? `مرحبًا <strong>${escapeHtml(person.name)}</strong>،` : 'مرحبًا،';
+  const action = renderedCtaLabel && renderedCtaUrl
+    ? `<div style="text-align:center;margin:26px 0 0"><a href="${escapeHtml(renderedCtaUrl)}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:800">${escapeHtml(renderedCtaLabel)}</a></div>`
+    : '';
+  const unsubscribe = preference?.unsubscribe_token
+    ? `<p style="margin:22px 0 0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي رسائل INEXC؟ <a href="${emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)}" style="color:#0866c6">إلغاء الاشتراك</a></p>`
+    : '';
+  return {
+    subject: renderedSubject,
+    html: emailShell({
+      title: escapeHtml(renderedSubject),
+      preview: escapeHtml(renderedBody.slice(0, 120)),
+      content: `<div style="font-size:23px;font-weight:800;color:#103b70">${escapeHtml(renderedSubject)}</div><p style="margin:18px 0 0;font-size:14px;color:#304d67">${greeting}</p><div style="margin:12px 0 0;font-size:14px;color:#304d67;line-height:2">${escapeHtml(renderedBody).replace(/\n/g, '<br>')}</div>${action}<p style="margin:26px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>${unsubscribe}`
+    })
+  };
+}
+
+async function resolveMessageRecipients(input = {}) {
+  const audience = clean(input.audience, 20);
+  const ids = Array.isArray(input.ids) ? input.ids.map(value => clean(value, 80)).filter(Boolean).slice(0, 3001) : [];
+  const courseId = clean(input.courseId, 80);
+  const listId = clean(input.listId, 80);
+  const supplied = [
+    ...normaliseMessageContacts(input.recipientRows, 3000),
+    ...parseMessageRecipientText(input.extraRecipients || input.extraEmails || '')
+  ].slice(0, 3001);
+  if (!['all', 'selected', 'course', 'unpaid', 'custom', 'list'].includes(audience)) throw new Error('اختر شريحة المستلمين.');
+  if (audience === 'selected' && !ids.length && !supplied.length) throw new Error('حدد شخصًا واحدًا على الأقل أو أضف عناوين خارجية.');
+  if (audience === 'course' && !courseId) throw new Error('اختر الدورة المطلوبة.');
+  if (audience === 'list' && !listId) throw new Error('اختر قائمة المستلمين.');
+  if (audience === 'custom' && !supplied.length) throw new Error('أضف اسمًا أو بريدًا واحدًا على الأقل.');
+  let registeredRecipients = [];
+  let courseName = '';
+  if (courseId) {
+    const course = await pool.query('SELECT name FROM courses WHERE id=$1', [courseId]);
+    courseName = course.rows[0]?.name || '';
+  }
+  if (audience === 'all') registeredRecipients = (await pool.query("SELECT DISTINCT email,name FROM registrations WHERE email <> '' ORDER BY email LIMIT 3001")).rows;
+  else if (audience === 'selected') registeredRecipients = (await pool.query("SELECT DISTINCT email,name FROM registrations WHERE id = ANY($1::uuid[]) AND email <> '' ORDER BY email", [ids])).rows;
+  else if (audience === 'course') registeredRecipients = (await pool.query("SELECT DISTINCT email,name FROM registrations WHERE course_id=$1 AND email <> '' ORDER BY email LIMIT 3001", [courseId])).rows;
+  else if (audience === 'unpaid') registeredRecipients = (await pool.query("SELECT DISTINCT email,name FROM registrations WHERE total > 0 AND status NOT IN ('مدفوع','مؤكد') AND email <> '' ORDER BY email LIMIT 3001")).rows;
+  else if (audience === 'list') registeredRecipients = (await pool.query(`SELECT c.email,c.full_name AS name FROM message_recipient_list_members m
+    JOIN message_contacts c ON c.id=m.contact_id WHERE m.list_id=$1 AND c.email<>'' ORDER BY c.created_at ASC LIMIT 3001`, [listId])).rows;
+  const seen = new Set();
+  const candidates = [...registeredRecipients, ...supplied].map(normaliseMessageContact).filter(person => {
+    if (!person.email || seen.has(person.email)) return false;
+    seen.add(person.email); return true;
+  }).slice(0, 3001);
+  if (candidates.length > 3000) throw new Error('الحد الأقصى للإرسال 3000 مستلم. اختر قائمة أصغر.');
+  if (!candidates.length) throw new Error('لا يوجد عنوان بريد صالح للإرسال. تُحفظ الأسماء بلا بريد في القوائم للمراجعة فقط.');
+  const preferences = await pool.query('SELECT email,marketing_opt_out FROM email_preferences WHERE email = ANY($1::text[])', [candidates.map(person => person.email)]);
+  const optedOut = new Set(preferences.rows.filter(row => row.marketing_opt_out).map(row => row.email));
+  return { audience, courseName, recipients: candidates.filter(person => !optedOut.has(person.email)), skippedUnsubscribed: candidates.filter(person => optedOut.has(person.email)).length, totalCandidates: candidates.length };
+}
+
+async function saveMessageRecipientList(name, rawRows) {
+  const listName = clean(name, 120);
+  const rows = normaliseMessageContacts(rawRows, 3000);
+  if (!listName) throw new Error('اكتب اسمًا واضحًا للقائمة.');
+  if (!rows.length) throw new Error('لم نجد أسماء أو عناوين صالحة في الملف.');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const created = await client.query('INSERT INTO message_recipient_lists(name) VALUES($1) RETURNING id,name,created_at', [listName]);
+    let withEmail = 0;
+    for (const row of rows) {
+      let contact;
+      if (row.email) {
+        withEmail += 1;
+        contact = await client.query(`INSERT INTO message_contacts(full_name,email,normalized_email) VALUES($1,$2,$2)
+          ON CONFLICT (normalized_email) WHERE normalized_email <> '' DO UPDATE SET full_name=CASE WHEN EXCLUDED.full_name<>'' THEN EXCLUDED.full_name ELSE message_contacts.full_name END, updated_at=now()
+          RETURNING id`, [row.name, row.email]);
+      } else {
+        contact = await client.query('INSERT INTO message_contacts(full_name,email,normalized_email) VALUES($1,\'\',\'\') RETURNING id', [row.name]);
+      }
+      await client.query('INSERT INTO message_recipient_list_members(list_id,contact_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [created.rows[0].id, contact.rows[0].id]);
+    }
+    await client.query('COMMIT');
+    return { ...created.rows[0], imported: rows.length, withEmail, needsEmail: rows.length - withEmail };
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+async function extractMessageContacts(file) {
+  return normaliseMessageContacts(await readContactFile(file), 3000);
+}
+
+async function deliverMessageCampaign(campaignId) {
+  const campaign = (await pool.query('SELECT * FROM email_campaigns WHERE id=$1', [campaignId])).rows[0];
+  if (!campaign || campaign.status !== 'sending') return;
+  const pending = await pool.query("SELECT id,email,recipient_name,attempted_at FROM email_deliveries WHERE campaign_id=$1 AND status='queued' ORDER BY created_at ASC", [campaignId]);
+  for (const delivery of pending.rows) {
+    try {
+      // Resend retains idempotency keys for 24h. Never replay an uncertain older attempt.
+      if (delivery.attempted_at && Date.now() - new Date(delivery.attempted_at).getTime() > 23 * 60 * 60 * 1000) {
+        throw new Error('توقّف الإرسال بعد محاولة قديمة غير مؤكدة. راجع سجل المزود قبل إعادة الإرسال.');
+      }
+      const preference = await getEmailPreference(delivery.email);
+      if (preference.marketing_opt_out) {
+        await pool.query("UPDATE email_deliveries SET status='skipped',error='ألغى المستلم اشتراكه قبل الإرسال.' WHERE id=$1", [delivery.id]);
+        continue;
+      }
+      const message = messageEmailMarkup({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url, person: { name: delivery.recipient_name, email: delivery.email }, preference, courseName: campaign.course_name });
+      await pool.query('UPDATE email_deliveries SET attempted_at=COALESCE(attempted_at,now()) WHERE id=$1', [delivery.id]);
+      let result;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await sendEmail({ to: delivery.email, subject: message.subject, html: message.html, attachmentPath: campaign.attachment_path, idempotencyKey: `message/${delivery.id}` });
+          if (!result?.id) throw new Error('لم يؤكّد مزود البريد قبول الرسالة.');
+          break;
+        } catch (error) {
+          const retryable = !error.status || error.status === 429 || error.status >= 500;
+          if (!retryable || attempt === 2) throw error;
+          await new Promise(resolve => setTimeout(resolve, Math.min(60000, Math.max(2, error.retryAfter || 2 ** (attempt + 1)) * 1000)));
+        }
+      }
+      await pool.query("UPDATE email_deliveries SET status='sent',resend_email_id=$1,error='' WHERE id=$2", [clean(result.id, 180), delivery.id]);
+    } catch (error) {
+      await pool.query("UPDATE email_deliveries SET status='failed',error=$1 WHERE id=$2", [clean(error.message, 500), delivery.id]);
+    }
+    await new Promise(resolve => setTimeout(resolve, 650));
+  }
+  const counts = (await pool.query(`SELECT count(*) FILTER (WHERE status IN ('sent','delivered','opened','clicked'))::int AS sent,
+    count(*) FILTER (WHERE status IN ('failed','bounced','complained'))::int AS failed FROM email_deliveries WHERE campaign_id=$1`, [campaignId])).rows[0];
+  const status = counts.failed ? (counts.sent ? 'partial' : 'failed') : 'sent';
+  await pool.query("UPDATE email_campaigns SET status=$1,sent_at=now(),sending_at=NULL WHERE id=$2", [status, campaignId]);
+}
+
+let messageWorkerRunning = false;
+async function processScheduledMessageCampaigns() {
+  if (messageWorkerRunning || !resendApiKey) return;
+  messageWorkerRunning = true;
+  let client, locked = false;
+  try {
+    client = await pool.connect();
+    // A connection-scoped database lock also prevents overlap across server replicas.
+    locked = (await client.query('SELECT pg_try_advisory_lock(84621931) AS locked')).rows[0].locked;
+    if (!locked) return;
+    const claimed = await client.query(`WITH due AS (
+      SELECT id FROM email_campaigns WHERE status IN ('queued','sending') OR (status='scheduled' AND scheduled_at<=now())
+      ORDER BY created_at ASC LIMIT 3 FOR UPDATE SKIP LOCKED
+    ) UPDATE email_campaigns c SET status='sending',sending_at=now() FROM due WHERE c.id=due.id RETURNING c.id`);
+    for (const row of claimed.rows) await deliverMessageCampaign(row.id);
+  } catch (error) { console.error('Scheduled message campaign error:', error); }
+  finally {
+    try { if (locked) await client.query('SELECT pg_advisory_unlock(84621931)'); }
+    catch (error) { client.release(error); client = null; console.error('Message worker unlock error:', error.message); }
+    finally { client?.release(); messageWorkerRunning = false; }
+  }
+}
+
 const unsubscribeUrl = token => `https://api.inexctraining.com/api/course-alerts/unsubscribe?token=${encodeURIComponent(token)}`;
 const coursePublicUrl = course => `https://www.inexctraining.com/course/?id=${encodeURIComponent(course.id)}`;
 
@@ -1246,64 +1495,165 @@ app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single(
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
+app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
+  try {
+    const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
+    res.json(result.rows);
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/message-templates', auth, async (req, res, next) => {
+  try {
+    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = clean(req.body?.body, 5000);
+    const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
+    if (!name) return res.status(400).json({ error: 'اكتب اسمًا للقالب.' });
+    if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
+    const result = await pool.query('INSERT INTO message_templates(name,subject,body,cta_label,cta_url) VALUES($1,$2,$3,$4,$5) RETURNING *', [name, subject, body, ctaLabel, ctaUrl]);
+    res.status(201).json(result.rows[0]);
+  } catch (error) { next(error); }
+});
+app.put('/api/admin/message-templates/:id', auth, async (req, res, next) => {
+  try {
+    const name = clean(req.body?.name, 120), subject = clean(req.body?.subject, 160), body = clean(req.body?.body, 5000);
+    const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
+    if (!name) return res.status(400).json({ error: 'اكتب اسمًا للقالب.' });
+    if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
+    const result = await pool.query('UPDATE message_templates SET name=$1,subject=$2,body=$3,cta_label=$4,cta_url=$5,updated_at=now() WHERE id=$6 RETURNING *', [name, subject, body, ctaLabel, ctaUrl, req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'لم نجد هذا القالب.' });
+    res.json(result.rows[0]);
+  } catch (error) { next(error); }
+});
+app.delete('/api/admin/message-templates/:id', auth, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM message_templates WHERE id=$1 RETURNING name', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'لم نجد هذا القالب.' });
+    res.json({ ok: true, name: result.rows[0].name });
+  } catch (error) { next(error); }
+});
+app.get('/api/admin/message-lists', auth, async (_req, res, next) => {
+  try {
+    const result = await pool.query(`SELECT l.id,l.name,l.created_at,l.updated_at,count(m.contact_id)::int AS total,
+      count(m.contact_id) FILTER (WHERE c.email<>'')::int AS with_email
+      FROM message_recipient_lists l LEFT JOIN message_recipient_list_members m ON m.list_id=l.id
+      LEFT JOIN message_contacts c ON c.id=m.contact_id GROUP BY l.id ORDER BY l.updated_at DESC`);
+    res.json(result.rows);
+  } catch (error) { next(error); }
+});
+app.get('/api/admin/message-lists/:id/contacts', auth, async (req, res, next) => {
+  try {
+    const page = Math.max(0, Math.min(1000, parseInt(req.query.page,10) || 0));
+    const result = await pool.query(`SELECT c.id,c.full_name,c.email,c.created_at FROM message_recipient_list_members m
+      JOIN message_contacts c ON c.id=m.contact_id WHERE m.list_id=$1 ORDER BY c.created_at DESC,c.id LIMIT 100 OFFSET $2`, [req.params.id,page*100]);
+    res.json(result.rows);
+  } catch (error) { next(error); }
+});
+app.put('/api/admin/message-contacts/:id', auth, async (req, res, next) => {
+  try {
+    const contact = normaliseMessageContact({ name: req.body?.name, email: req.body?.email });
+    if (!contact.name && !contact.email) return res.status(400).json({ error: 'اكتب الاسم أو البريد على الأقل.' });
+    if (req.body?.email && !contact.email) return res.status(400).json({ error: 'عنوان البريد غير صالح.' });
+    const result = await pool.query('UPDATE message_contacts SET full_name=$1,email=$2,normalized_email=$2,updated_at=now() WHERE id=$3 RETURNING id,full_name,email', [contact.name, contact.email, req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'لم نجد جهة الاتصال.' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'هذا البريد موجود بالفعل في جهة اتصال أخرى.' });
+    next(error);
+  }
+});
+app.post('/api/admin/message-lists', auth, async (req, res, next) => {
+  try {
+    const list = await saveMessageRecipientList(req.body?.name, req.body?.rows);
+    res.status(201).json(list);
+  } catch (error) { res.status(400).json({ error: error.message || 'تعذر حفظ القائمة.' }); }
+});
+app.post('/api/admin/message-lists/import-file', auth, messageRecipientImportUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'اختر ملف القائمة أولًا.' });
+    const rows = await extractMessageContacts(req.file);
+    const list = await saveMessageRecipientList(req.body?.name, rows);
+    res.status(201).json(list);
+  } catch (error) { next(Object.assign(error, { status: 400 })); }
+  finally { if (req.file) await fs.promises.unlink(req.file.path).catch(() => {}); }
+});
+app.delete('/api/admin/message-lists/:id', auth, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM message_recipient_lists WHERE id=$1 RETURNING name', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'لم نجد هذه القائمة.' });
+    res.json({ ok: true, name: result.rows[0].name });
+  } catch (error) { next(error); }
+});
+app.post('/api/admin/messages/preview-recipients', auth, async (req, res) => {
+  try {
+    const resolved = await resolveMessageRecipients(req.body || {});
+    res.json({ ok: true, total: resolved.totalCandidates, ready: resolved.recipients.length, skippedUnsubscribed: resolved.skippedUnsubscribed, courseName: resolved.courseName });
+  } catch (error) { res.status(400).json({ error: error.message || 'تعذر فحص المستلمين.' }); }
+});
+app.post('/api/admin/messages/test', auth, async (req, res) => {
+  try {
+    if (!resendApiKey) return res.status(503).json({ error: 'خدمة البريد غير مهيأة حاليًا.' });
+    const test = normaliseMessageContact({ email: req.body?.email, name: req.body?.name });
+    const subject = clean(req.body?.subject, 160), body = clean(req.body?.message, 5000);
+    const ctaLabel = clean(req.body?.ctaLabel, 80), ctaUrl = safeMessageUrl(req.body?.ctaUrl);
+    if (!test.email || !subject || !body) return res.status(400).json({ error: 'أدخل بريد التجربة وعنوان الرسالة ونصها.' });
+    if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
+    const course = clean(req.body?.courseName, 180);
+    const preference = await getEmailPreference(test.email);
+    const message = messageEmailMarkup({ subject: `[تجريبية] ${subject}`, body, ctaLabel, ctaUrl, person: test, preference, courseName: course });
+    await sendEmail({ to: test.email, subject: message.subject, html: message.html });
+    res.json({ ok: true });
+  } catch (error) { res.status(400).json({ error: error.message || 'تعذر إرسال الرسالة التجريبية.' }); }
+});
 app.post('/api/admin/messages', auth, async (req, res, next) => {
   try {
     if (!resendApiKey) return res.status(503).json({ error: 'خدمة البريد غير مهيأة حاليًا.' });
     const subject = clean(req.body?.subject, 160);
     const message = clean(req.body?.message, 5000);
-    const audience = clean(req.body?.audience, 20);
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(v => clean(v, 80)).filter(Boolean).slice(0, 500) : [];
-    const courseId = clean(req.body?.courseId, 80);
+    const ctaLabel = clean(req.body?.ctaLabel, 80);
+    const ctaUrl = safeMessageUrl(req.body?.ctaUrl);
+    const templateId = clean(req.body?.templateId, 80) || null;
     const attachmentPath = clean(req.body?.attachmentPath, 300);
+    const rawSchedule = clean(req.body?.scheduledAt, 80);
     if (attachmentPath && (!attachmentPath.startsWith('/uploads/') || !fs.existsSync(path.join(uploadDir, path.basename(attachmentPath))))) return res.status(400).json({ error: 'المرفق غير صالح أو انتهت صلاحيته.' });
-    const extraEmails = String(req.body?.extraEmails || '').replaceAll(String.fromCharCode(10), ',').split(/[,; ]+/)
-      .map(value => clean(value, 180).toLowerCase()).filter(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)).slice(0, 500);
     if (!subject || !message) return res.status(400).json({ error: 'عنوان الرسالة ونصها مطلوبان.' });
-    if (!['all', 'selected', 'course', 'unpaid', 'custom'].includes(audience)) return res.status(400).json({ error: 'اختر شريحة المستلمين.' });
-    if (audience === 'selected' && !ids.length && !extraEmails.length) return res.status(400).json({ error: 'اختر شخصًا واحدًا على الأقل أو أضف بريدًا خارجيًا.' });
-    if (audience === 'course' && !courseId) return res.status(400).json({ error: 'اختر الدورة المطلوبة.' });
-    if (audience === 'custom' && !extraEmails.length) return res.status(400).json({ error: 'أضف بريدًا إلكترونيًا صالحًا واحدًا على الأقل.' });
-    let registeredRecipients = [];
-    if (audience === 'all') registeredRecipients = (await pool.query('SELECT DISTINCT email,name FROM registrations WHERE email <> \'\' ORDER BY email LIMIT 500')).rows;
-    else if (audience === 'selected') registeredRecipients = (await pool.query('SELECT DISTINCT email,name FROM registrations WHERE id = ANY($1::uuid[]) AND email <> \'\' ORDER BY email', [ids])).rows;
-    else if (audience === 'course') registeredRecipients = (await pool.query('SELECT DISTINCT email,name FROM registrations WHERE course_id=$1 AND email <> \'\' ORDER BY email LIMIT 500', [courseId])).rows;
-    else if (audience === 'unpaid') registeredRecipients = (await pool.query(`SELECT DISTINCT email,name FROM registrations WHERE total > 0 AND status NOT IN ('مدفوع','مؤكد') AND email <> '' ORDER BY email LIMIT 500`)).rows;
-    const seen = new Set();
-    const candidates = [...registeredRecipients, ...extraEmails.map(email => ({ email, name: '' }))].filter(person => {
-      const key = person.email.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true;
-    }).slice(0, 500);
-    const withPreferences = await Promise.all(candidates.map(async person => ({ ...person, preference: await getEmailPreference(person.email) })));
-    const recipients = withPreferences.filter(person => person.preference.marketing_opt_out !== true);
-    const skippedUnsubscribed = withPreferences.length - recipients.length;
-    if (!recipients.length) return res.status(400).json({ error: skippedUnsubscribed ? 'كل العناوين المختارة ألغت اشتراكها سابقًا.' : 'لا يوجد مستلمون صالحون.' });
-    const body = escapeHtml(message).replace(/\n/g, '<br>');
-    const campaign = await pool.query('INSERT INTO email_campaigns(subject,body,audience) VALUES($1,$2,$3) RETURNING id', [subject, message, audience]);
-    const campaignId = campaign.rows[0].id;
-    const results = await Promise.all(recipients.map(async person => {
-      try {
-        const sent = await sendEmail({
-          to: person.email, subject, attachmentPath,
-          html: emailShell({ title: subject, preview: message.slice(0, 120), content: `<div style="font-size:23px;font-weight:800;color:#103b70">${escapeHtml(subject)}</div><p style="margin:18px 0 0;font-size:14px;color:#304d67">مرحبًا <strong>${escapeHtml(person.name || '')}</strong>،</p><p style="margin:12px 0 0;font-size:14px;color:#304d67">${body}</p><p style="margin:26px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p><p style="margin:22px 0 0;text-align:center;font-size:11px;color:#7890a8">لا ترغب في تلقي رسائل INEXC؟ <a href="${emailPreferenceUnsubscribeUrl(person.preference.unsubscribe_token)}" style="color:#0866c6">إلغاء الاشتراك</a></p>` })
-        });
-        await pool.query('INSERT INTO email_deliveries(campaign_id,email,recipient_name,resend_email_id,status) VALUES($1,$2,$3,$4,$5)', [campaignId, person.email, person.name || '', clean(sent?.id, 180), 'sent']);
-        return { ok: true };
-      } catch (error) {
-        await pool.query('INSERT INTO email_deliveries(campaign_id,email,recipient_name,status,error) VALUES($1,$2,$3,$4,$5)', [campaignId, person.email, person.name || '', 'failed', clean(error.message, 500)]);
-        console.error('Bulk email error:', error);
-        return { ok: false };
-      }
-    }));
-    const sent = results.filter(r => r.ok).length;
-    res.json({ ok: true, campaignId, sent, failed: results.length - sent, total: recipients.length, skippedUnsubscribed });
+    if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) return res.status(400).json({ error: 'اكتب نص الزر ورابطه معًا، أو اتركهما فارغين.' });
+    let scheduledAt = null;
+    if (rawSchedule) {
+      const parsed = new Date(rawSchedule);
+      if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) return res.status(400).json({ error: 'اختر موعدًا مستقبليًا للإرسال.' });
+      scheduledAt = parsed.toISOString();
+    }
+    if (templateId) {
+      const template = await pool.query('SELECT id FROM message_templates WHERE id=$1', [templateId]);
+      if (!template.rowCount) return res.status(400).json({ error: 'القالب المختار لم يعد موجودًا.' });
+    }
+    let resolved;
+    try { resolved = await resolveMessageRecipients(req.body || {}); }
+    catch (error) { return res.status(400).json({ error: error.message || 'تعذر تحديد المستلمين.' }); }
+    if (!resolved.recipients.length) return res.status(400).json({ error: resolved.skippedUnsubscribed ? 'كل العناوين المختارة ألغت اشتراكها سابقًا.' : 'لا يوجد مستلمون صالحون.' });
+    const client = await pool.connect();
+    let campaignId;
+    try {
+      await client.query('BEGIN');
+      const campaign = await client.query(`INSERT INTO email_campaigns(subject,body,audience,template_id,cta_label,cta_url,attachment_path,status,scheduled_at,total_recipients,skipped_unsubscribed,course_name)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, [subject, message, resolved.audience, templateId, ctaLabel, ctaUrl, attachmentPath, scheduledAt ? 'scheduled' : 'queued', scheduledAt, resolved.recipients.length, resolved.skippedUnsubscribed, resolved.courseName]);
+      campaignId = campaign.rows[0].id;
+      for (const person of resolved.recipients) await client.query("INSERT INTO email_deliveries(campaign_id,email,recipient_name,status) VALUES($1,$2,$3,'queued')", [campaignId, person.email, person.name]);
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+    if (scheduledAt) return res.status(201).json({ ok: true, campaignId, status: 'scheduled', scheduledAt, total: resolved.recipients.length, skippedUnsubscribed: resolved.skippedUnsubscribed });
+    res.status(202).json({ ok: true, campaignId, status: 'queued', total: resolved.recipients.length, skippedUnsubscribed: resolved.skippedUnsubscribed });
+    void processScheduledMessageCampaigns();
   } catch (error) { next(error); }
 });
 app.get('/api/admin/campaigns', auth, async (_req, res, next) => {
   try {
-    const result = await pool.query(`SELECT c.id,c.subject,c.audience,c.created_at,count(d.id)::int AS total,
-      count(*) FILTER (WHERE d.status='delivered')::int AS delivered,
+    const result = await pool.query(`SELECT c.id,c.subject,c.audience,c.status,c.scheduled_at,c.sent_at,c.created_at,c.total_recipients,c.skipped_unsubscribed,count(d.id)::int AS total,
+      count(*) FILTER (WHERE d.delivered_at IS NOT NULL OR d.status IN ('delivered','opened','clicked'))::int AS delivered,
       count(*) FILTER (WHERE d.status='opened' OR d.opened_at IS NOT NULL)::int AS opened,
       count(*) FILTER (WHERE d.status='clicked' OR d.clicked_at IS NOT NULL)::int AS clicked,
-      count(*) FILTER (WHERE d.status IN ('failed','bounced','complained'))::int AS failed
+      count(*) FILTER (WHERE d.status IN ('failed','bounced','complained'))::int AS failed,
+      count(*) FILTER (WHERE d.resend_email_id<>'' OR d.status IN ('sent','delivered','opened','clicked'))::int AS sent,
+      count(*) FILTER (WHERE d.status='queued')::int AS queued,
+      count(*) FILTER (WHERE d.status='skipped')::int AS skipped
       FROM email_campaigns c LEFT JOIN email_deliveries d ON d.campaign_id=c.id
       GROUP BY c.id ORDER BY c.created_at DESC LIMIT 100`);
     res.json(result.rows);
@@ -1315,7 +1665,15 @@ app.get('/api/admin/campaigns/:id', auth, async (req, res, next) => {
     res.json(result.rows);
   } catch (error) { next(error); }
 });
+app.post('/api/admin/campaigns/:id/cancel', auth, async (req, res, next) => {
+  try {
+    const campaign = await pool.query("UPDATE email_campaigns SET status='cancelled',sending_at=NULL WHERE id=$1 AND status='scheduled' RETURNING id", [req.params.id]);
+    if (!campaign.rowCount) return res.status(400).json({ error: 'يمكن إلغاء الرسالة وهي في حالة الجدولة فقط.' });
+    await pool.query("UPDATE email_deliveries SET status='cancelled',error='ألغيت جدولة الرسالة من لوحة الإدارة.' WHERE campaign_id=$1 AND status='queued'", [req.params.id]);
+    res.json({ ok: true });
+  } catch (error) { next(error); }
+});
 app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error.status === 400 || error instanceof multer.MulterError ? 400 : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
-setupDatabase().then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); setInterval(() => void processCourseAlertQueue(), 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
