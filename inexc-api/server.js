@@ -919,7 +919,7 @@ app.post('/api/admin/password-recovery', async (req,res,next) => {
 app.post('/api/admin/password-reset', async (req,res,next) => {
   try {
     const token=clean(req.body?.token,200), password=String(req.body?.password||'').slice(0,256);
-    if(!token || password.length<8) return res.status(400).json({error:'أدخل كلمة مرور جديدة من 8 أحرف على الأقل.'});
+    if(!token || !password) return res.status(400).json({error:'أدخل كلمة المرور.'});
     const result=await pool.query("UPDATE admin_password_resets SET used_at=now() WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING id",[passwordHashValue(token)]);
     if(!result.rowCount) return res.status(400).json({error:'رابط الاسترجاع غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.'});
     await pool.query("INSERT INTO app_settings (key,value,updated_at) VALUES ('admin_password_hash',$1,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()",['sha256:'+passwordHashValue(password)]);
