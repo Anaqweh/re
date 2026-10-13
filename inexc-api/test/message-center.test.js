@@ -5,12 +5,13 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { parseDelimited, contactsFromRows, worksheetRows, readContactFile } from '../message-contacts.js';
 import { richTextPrefix, normaliseMessageBody, renderMessageBody, messageText, messageDirection } from '../message-format.js';
+import { renderMail } from '../message-mail.js';
 const source = fs.readFileSync(new URL('../server.js', import.meta.url), 'utf8');
 const functions = source.slice(source.indexOf('const alertEmailPattern'), source.indexOf('\nconst unsubscribeUrl'));
 function helpers(extra = {}) {
   const context = vm.createContext({
     clean: (v,n=400) => String(v??'').trim().slice(0,n),
-    URL, Date, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
+    URL, Date, process, renderMail, applyMessageEvent:async()=>{}, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     emailShell: v => JSON.stringify(v),
     emailPreferenceUnsubscribeUrl: () => 'https://example.com/unsubscribe',
@@ -89,7 +90,18 @@ test('Delivery skips unsubscribed contacts, sends with idempotency key, and mark
     if(sql.startsWith('SELECT id,email'))return {rows};
     if(sql.startsWith('SELECT count'))return {rows:[{sent:1,failed:1}]};updates.push({sql,args});return {rows:[]};}},getEmailPreference:async email=>({marketing_opt_out:email==='no@example.com'}),sendEmail:async message=>{sent.push(message);return{id:'mail-1'}}});
   await h.deliverMessageCampaign('campaign');assert.equal(sent.length,1);assert.equal(sent[0].idempotencyKey,'message/1');
-  assert.ok(JSON.parse(sent[0].html).content.includes('<strong>Yes</strong>'));assert.ok(!sent[0].html.includes('INEXC-RICH-TEXT'));
+  assert.ok(sent[0].html.includes('<strong>Yes</strong>'));assert.ok(!sent[0].html.includes('INEXC-RICH-TEXT'));
   assert.ok(updates.some(v=>v.sql.includes("status='skipped'"))); assert.ok(updates.some(v=>v.sql.includes("status='failed'")));
   assert.equal(updates.at(-1).args[0],'partial');
+});
+test('All excluded recipients never report provider acceptance', async()=>{
+  const updates=[];
+  const h=helpers({pool:{query:async(sql,args)=>{
+    if(sql.startsWith('SELECT * FROM email_campaigns'))return {rows:[{status:'sending',subject:'Test',body:'Test'}]};
+    if(sql.startsWith('SELECT id,email'))return {rows:[{id:'excluded',email:'no@example.com'}]};
+    if(sql.startsWith('SELECT count'))return {rows:[{sent:0,failed:0}]};
+    updates.push({sql,args});return {rows:[]};
+  }},getEmailPreference:async()=>({marketing_opt_out:true}),sendEmail:async()=>{assert.fail('Excluded recipients must not reach provider')}});
+  await h.deliverMessageCampaign('campaign');
+  assert.equal(updates.at(-1).args[0],'completed');
 });

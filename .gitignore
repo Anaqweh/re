@@ -2,3 +2,7 @@ node_modules/
 *.txt.txt
 inexc-keys.txt.txt
 test-*.json
+
+# Local test dependency links and screenshots
+node_modules
+inexc-api/test/artifacts/
