@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js message-contacts.js message-file-reader.py message-format.js Dockerfile)
+inexc_files=(server.js message-contacts.js message-file-reader.py message-format.js message-mail.js message-studio.js message-studio-schema.js package.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
@@ -65,5 +65,5 @@ for inexc_attempt in {1..20}; do
   sleep 2
 done
 (( inexc_healthy == 1 )) || { echo 'API health or message-center route check failed.' >&2; exit 1; }
-echo 'INEXC message center deployed successfully. No emails were sent by this deployment script.'
+echo 'INEXC message center API deployed. This script does not create or send test campaigns; the worker resumes previously authorized queued/scheduled campaigns.'
 echo "Previous API files: $inexc_backup"

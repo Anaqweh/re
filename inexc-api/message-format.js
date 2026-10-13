@@ -2,6 +2,7 @@
 export const richTextPrefix = 'INEXC-RICH-TEXT:1\n';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const merge = (text, variables) => String(text || '').replace(/\{\{(name|email|course)\}\}/g, (_, key) => String(variables[key] || ''));
+export const messageColors = ['#17324d', '#0866c6', '#137b55', '#a33a2b', '#7355a4'];
 const invalid = message => Object.assign(new Error(message), { status: 400 });
 
 function personalizedRuns(runs, variables) {
@@ -33,9 +34,8 @@ export function safeInlineLink(value) {
 
 export function messageDirection(value, fallback = 'rtl') {
   const text = String(value || '').replace(/https?:\/\/\S+|[\w.+-]+@[\w.-]+|\{\{\w+\}\}/g, '');
-  const arabic = (text.match(/[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufefc]/g) || []).length;
-  const latin = (text.match(/[A-Za-z]/g) || []).length;
-  return arabic || latin ? (arabic >= latin ? 'rtl' : 'ltr') : fallback;
+  const first = text.match(/[A-Za-z\u0620-\u064a\u066e-\u06d3\u06fa-\u06fc]/)?.[0];
+  return first ? (/[A-Za-z]/.test(first) ? 'ltr' : 'rtl') : fallback;
 }
 
 export function messageDocument(value) {
@@ -50,10 +50,15 @@ export function messageDocument(value) {
     blocks: document.blocks.map(block => {
       if (!Array.isArray(block?.runs) || (runCount += block.runs.length) > 10000) throw invalid('تنسيق الكلمات أكبر من الحد المسموح. بسّط التنسيق ثم احفظ.');
       return {
-        type: ['bullet', 'number'].includes(block.type) ? block.type : 'paragraph',
+        type: ['bullet', 'number', 'heading', 'image', 'divider', 'button'].includes(block.type) ? block.type : 'paragraph',
+        direction: ['rtl','ltr'].includes(block.direction) ? block.direction : 'auto',
+        align: ['right','left','center'].includes(block.align) ? block.align : '',
+        ...(block.type === 'image' ? {src: safeInlineLink(block.src).startsWith('https:') ? safeInlineLink(block.src) : '', alt: String(block.alt || '').slice(0,200)} : {}),
+        ...(block.type === 'button' ? {href: safeInlineLink(block.href)} : {}),
         runs: block.runs.map(run => {
           const clean = { text: String(run?.text || '') };
           for (const mark of ['bold', 'italic', 'underline', 'strike']) if (run?.[mark] === true) clean[mark] = true;
+          if (messageColors.includes(run?.color)) clean.color = run.color;
           const href = safeInlineLink(run?.href); if (href) clean.href = href;
           return clean;
         })
@@ -63,7 +68,7 @@ export function messageDocument(value) {
 }
 
 export function messageText(value, variables = null) {
-  const text = messageDocument(value).blocks.map(block => block.runs.map(run => run.text).join('')).join('\n');
+  const text = messageDocument(value).blocks.map(block => (block.type === 'image' ? block.alt || '' : block.runs.map(run => run.text).join(''))).join('\n');
   return variables ? merge(text, variables) : text;
 }
 
@@ -71,9 +76,9 @@ export function normaliseMessageBody(value) {
   const raw = String(value || '').trim();
   if (raw.length > 80000) throw invalid('حجم تنسيق الرسالة كبير جدًا. قلّل التنسيق ثم أعد الحفظ.');
   const document = messageDocument(raw);
-  const text = document.blocks.map(block => block.runs.map(run => run.text).join('')).join('\n');
+  const text = document.blocks.map(block => (block.type === 'image' ? block.alt || '' : block.runs.map(run => run.text).join(''))).join('\n');
   if (text.length > 5000) throw invalid('الحد الأقصى لنص الرسالة 5000 حرف.');
-  if (!text.trim()) return '';
+  if (!text.trim() && !document.blocks.some(b => b.type === 'image' && b.src)) return '';
   return raw.startsWith(richTextPrefix) ? richTextPrefix + JSON.stringify(document) : raw;
 }
 
@@ -85,13 +90,15 @@ export function renderMessageBody(value, variables = null) {
   for (const block of document.blocks) {
     const runs = personalizedRuns(block.runs, variables);
     const text = runs.map(run => run.text).join('');
-    const dir = document.direction === 'auto' ? messageDirection(text, direction) : direction;
-    const alignment = dir === 'rtl' ? 'right' : 'left';
+    const dir = block.direction !== 'auto' && block.direction ? block.direction : document.direction === 'auto' ? messageDirection(text, direction) : direction;
+    const alignment = block.align || (dir === 'rtl' ? 'right' : 'left');
     const type = block.type === 'bullet' ? 'ul' : block.type === 'number' ? 'ol' : '';
     if (list && list !== type) { html += `</${list}>`; list = ''; }
     if (type && !list) { html += `<${type} dir="${dir}" style="margin:10px 0;padding:0 26px;direction:${dir};text-align:${alignment}">`; list = type; }
     const content = runs.map(run => {
       let text = escape(run.text).replace(/\n/g, '<br>');
+      text = text.replace(/(?:https?:\/\/[^\s<]+|[A-Za-z0-9.+_-]+@[A-Za-z0-9.-]+|\+?\d[\d .-]{3,}\d)/g, token => `<bdi dir="ltr" style="direction:ltr;unicode-bidi:isolate">${token}</bdi>`);
+      if (run.color) text = `<span style="color:${run.color}">${text}</span>`;
       if (run.bold) text = `<strong>${text}</strong>`;
       if (run.italic) text = `<em>${text}</em>`;
       if (run.underline) text = `<u>${text}</u>`;
@@ -99,8 +106,17 @@ export function renderMessageBody(value, variables = null) {
       if (run.href) text = `<a href="${escape(run.href)}" style="color:#0866c6;text-decoration:underline" target="_blank" rel="noopener noreferrer">${text}</a>`;
       return text;
     }).join('') || '<br>';
-    const tag = type ? 'li' : 'p';
-    html += `<${tag} dir="${dir}" style="margin:${type ? '4px 0' : '0 0 12px'};direction:${dir};text-align:${alignment};line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere">${content}</${tag}>`;
+    if (block.type === 'image') {
+      if (block.src) html += `<p data-block="image" data-direction="${block.direction || 'auto'}" data-align="${block.align || ''}" dir="${dir}" style="text-align:${alignment};margin:16px 0"><img src="${escape(block.src)}" alt="${escape(block.alt)}" width="540" style="max-width:100%;height:auto;display:inline-block;border:0" loading="lazy"></p>`;
+      continue;
+    }
+    if (block.type === 'divider') { html += '<hr style="border:0;border-top:1px solid #dce6f0;margin:24px 0">'; continue; }
+    if (block.type === 'button') {
+      html += `<p data-block="button" data-direction="${block.direction || 'auto'}" data-align="${block.align || ''}" dir="${dir}" style="text-align:${alignment};margin:20px 0"><a href="${escape(block.href || '')}" style="background:#0866c6;color:#fff;display:inline-block;padding:12px 24px;border-radius:6px;text-decoration:none">${content}</a></p>`;
+      continue;
+    }
+    const tag = type ? 'li' : block.type === 'heading' ? 'h2' : 'p';
+    html += `<${tag} dir="${dir}" data-direction="${block.direction || 'auto'}" data-align="${block.align || ''}" style="margin:${type ? '4px 0' : '0 0 12px'};direction:${dir};text-align:${alignment};line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere">${content}</${tag}>`;
   }
   if (list) html += `</${list}>`;
   return { html, text: plain, direction };

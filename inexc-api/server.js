@@ -9,6 +9,9 @@ import multer from 'multer';
 import pg from 'pg';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import { setupMessageStudio } from './message-studio-schema.js';
+import { installMessageStudio } from './message-studio.js';
+import { renderMail } from './message-mail.js';
 import { readContactFile } from './message-contacts.js';
 import { normaliseMessageBody, renderMessageBody, messageText, messageDirection } from './message-format.js';
 
@@ -51,21 +54,35 @@ app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: 
     const signatures = String(req.headers['svix-signature'] || '').split(' ').map(value => value.replace(/^v1,/, ''));
     const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
     const expected = crypto.createHmac('sha256', key).update(`${id}.${timestamp}.${raw}`).digest('base64');
-    if (!id || !timestamp || !signatures.some(signature => signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected)))) return res.status(401).json({ error: 'توقيع Webhook غير صالح.' });
+    if (!id || !timestamp || !Number.isFinite(Number(timestamp)) || Math.abs(Date.now()/1000-Number(timestamp))>300 || !signatures.some(signature => signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected)))) return res.status(401).json({ error: 'توقيع Webhook غير صالح.' });
     const event = JSON.parse(raw);
     const emailId = clean(event?.data?.email_id, 180);
     const type = clean(event?.type, 80);
-    const statusMap = { 'email.sent': 'sent', 'email.delivered': 'delivered', 'email.opened': 'opened', 'email.clicked': 'clicked', 'email.bounced': 'bounced', 'email.complained': 'complained', 'email.failed': 'failed' };
-    if (emailId && statusMap[type]) {
-      await pool.query(`UPDATE email_deliveries SET status=$1,
-        delivered_at=CASE WHEN $1='delivered' AND delivered_at IS NULL THEN now() ELSE delivered_at END,
-        opened_at=CASE WHEN $1='opened' AND opened_at IS NULL THEN now() ELSE opened_at END,
-        clicked_at=CASE WHEN $1='clicked' AND clicked_at IS NULL THEN now() ELSE clicked_at END
-        WHERE resend_email_id=$2`, [statusMap[type], emailId]);
+    if (emailId && ['email.sent','email.delivered','email.opened','email.clicked','email.bounced','email.complained','email.failed','email.suppressed'].includes(type)) {
+      await pool.query('INSERT INTO message_webhook_events(id,email_id,type) VALUES($1,$2,$3) ON CONFLICT(id) DO NOTHING',[id,emailId,type]);
+      await applyMessageEvent(emailId,type);
     }
     res.json({ ok: true });
   } catch (error) { console.error('Resend webhook error:', error); res.status(400).json({ error: 'Webhook غير صالح.' }); }
 });
+async function applyMessageEvent(emailId, type) {
+  const statusMap = {'email.sent':'sent','email.delivered':'delivered','email.opened':'opened','email.clicked':'clicked','email.bounced':'bounced','email.complained':'complained','email.failed':'failed','email.suppressed':'skipped'};
+  const status = statusMap[type]; if (!status) return;
+  const updated = await pool.query(`UPDATE email_deliveries SET
+    status=CASE WHEN status IN ('bounced','complained','failed','skipped') THEN status
+      WHEN $1 IN ('bounced','complained','failed','skipped') THEN $1
+      WHEN status='clicked' THEN status WHEN $1='clicked' THEN $1
+      WHEN status='opened' THEN status WHEN $1='opened' THEN $1
+      WHEN status='delivered' THEN status ELSE $1 END,
+    delivered_at=CASE WHEN $1='delivered' THEN COALESCE(delivered_at,now()) ELSE delivered_at END,
+    opened_at=CASE WHEN $1='opened' THEN COALESCE(opened_at,now()) ELSE opened_at END,
+    clicked_at=CASE WHEN $1='clicked' THEN COALESCE(clicked_at,now()) ELSE clicked_at END,
+    retryable=false WHERE resend_email_id=$2 RETURNING email`,[status,emailId]);
+  if (['bounced','complained','skipped'].includes(status)) for (const row of updated.rows) {
+    await pool.query('UPDATE message_contacts SET suppressed=true,updated_at=now() WHERE normalized_email=$1',[row.email]);
+    await pool.query('INSERT INTO email_preferences(email,unsubscribe_token,marketing_opt_out) VALUES($1,$2,true) ON CONFLICT(email) DO UPDATE SET marketing_opt_out=true,updated_at=now()',[row.email,crypto.randomBytes(24).toString('hex')]);
+  }
+}
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(uploadDir, { maxAge: '1h', index: false }));
 
@@ -248,9 +265,9 @@ function emailShell({ title, preview, content, direction = 'rtl' }) {
   const english = dir === 'ltr';
   return `<!doctype html><html lang="${english ? 'en' : 'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body dir="${dir}" style="direction:${dir};text-align:${align};margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">${english ? 'Innovative Excellence' : 'شركة التميز الابتكاري'}</div><div style="font-size:13px;margin-top:5px;opacity:.9">${english ? 'Training that makes a real difference' : 'برامج تدريبية تصنع أثرًا حقيقيًا'}</div></td></tr><tr><td dir="${dir}" align="${align}" style="padding:32px 34px;direction:${dir};text-align:${align}">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">${english ? 'This is an automated message from INEXC Training. Please do not reply directly.' : 'هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.'}<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">${english ? 'Contact us on WhatsApp' : 'تواصل معنا عبر واتساب'} ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
-async function sendEmail({ to, subject, html, attachmentPath = '', idempotencyKey = '' }) {
+async function sendEmail({ to, subject, html, text = '', headers = {}, attachmentPath = '', idempotencyKey = '' }) {
   if (!resendApiKey || !to) return;
-  const payload = { from: emailFrom, to: [to], subject, html };
+  const payload = { from: emailFrom, to: [to], subject, html, ...(text ? {text} : {}), ...(Object.keys(headers).length ? {headers} : {}) };
   if (attachmentPath) {
     const fileName = path.basename(attachmentPath);
     const filePath = path.join(uploadDir, fileName);
@@ -482,6 +499,7 @@ async function setupDatabase() {
   await pool.query("ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent'");
   await pool.query('ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS attempted_at TIMESTAMPTZ');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_resend_id_unique ON email_deliveries(resend_email_id) WHERE resend_email_id <> \'\'');
+  await setupMessageStudio(pool);
   const count = await pool.query('SELECT count(*)::int AS count FROM courses');
   if (count.rows[0].count === 0) {
     await pool.query(`INSERT INTO courses (name, description, trainer, course_date, location, category, price, certificate_mode, certificate_name, certificate_price, payment_methods, active)
@@ -524,9 +542,7 @@ async function extractAlertEmails(file) {
 
 async function getEmailPreference(email) {
   const normalized = clean(String(email || '').toLowerCase(), 190);
-  const existing = await pool.query('SELECT email,unsubscribe_token,marketing_opt_out FROM email_preferences WHERE email=$1', [normalized]);
-  if (existing.rowCount) return existing.rows[0];
-  const created = await pool.query('INSERT INTO email_preferences (email,unsubscribe_token) VALUES ($1,$2) RETURNING email,unsubscribe_token,marketing_opt_out', [normalized, crypto.randomBytes(24).toString('hex')]);
+  const created = await pool.query('INSERT INTO email_preferences (email,unsubscribe_token) VALUES ($1,$2) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING email,unsubscribe_token,marketing_opt_out', [normalized, crypto.randomBytes(24).toString('hex')]);
   return created.rows[0];
 }
 const emailPreferenceUnsubscribeUrl = token => 'https://api.inexctraining.com/api/email-preferences/unsubscribe?token=' + encodeURIComponent(token);
@@ -675,7 +691,7 @@ async function extractMessageContacts(file) {
 async function deliverMessageCampaign(campaignId) {
   const campaign = (await pool.query('SELECT * FROM email_campaigns WHERE id=$1', [campaignId])).rows[0];
   if (!campaign || campaign.status !== 'sending') return;
-  const pending = await pool.query("SELECT id,email,recipient_name,attempted_at FROM email_deliveries WHERE campaign_id=$1 AND status='queued' ORDER BY created_at ASC", [campaignId]);
+  const pending = await pool.query("SELECT id,email,recipient_name,attempted_at,payload_snapshot FROM email_deliveries WHERE campaign_id=$1 AND status='queued' ORDER BY created_at ASC", [campaignId]);
   for (const delivery of pending.rows) {
     try {
       // Resend retains idempotency keys for 24h. Never replay an uncertain older attempt.
@@ -683,16 +699,21 @@ async function deliverMessageCampaign(campaignId) {
         throw new Error('توقّف الإرسال بعد محاولة قديمة غير مؤكدة. راجع سجل المزود قبل إعادة الإرسال.');
       }
       const preference = await getEmailPreference(delivery.email);
-      if (preference.marketing_opt_out) {
+      const suppressed = (await pool.query('SELECT suppressed FROM message_contacts WHERE normalized_email=$1',[delivery.email])).rows[0]?.suppressed;
+      if (preference.marketing_opt_out || suppressed) {
         await pool.query("UPDATE email_deliveries SET status='skipped',error='ألغى المستلم اشتراكه قبل الإرسال.' WHERE id=$1", [delivery.id]);
         continue;
       }
-      const message = messageEmailMarkup({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url, person: { name: delivery.recipient_name, email: delivery.email }, preference, courseName: campaign.course_name });
-      await pool.query('UPDATE email_deliveries SET attempted_at=COALESCE(attempted_at,now()) WHERE id=$1', [delivery.id]);
+      const message = delivery.payload_snapshot || renderMail({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url,
+        person: {name:delivery.recipient_name,email:delivery.email}, settings:campaign.settings || {}, courseName:campaign.course_name,
+        unsubscribeUrl:emailPreferenceUnsubscribeUrl(preference.unsubscribe_token) });
+      // Persist exact content once: retrying an idempotency key requires an unchanged payload.
+      await pool.query('UPDATE email_deliveries SET attempted_at=COALESCE(attempted_at,now()),payload_snapshot=COALESCE(payload_snapshot,$2) WHERE id=$1', [delivery.id,message]);
       let result;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = await sendEmail({ to: delivery.email, subject: message.subject, html: message.html, attachmentPath: campaign.attachment_path, idempotencyKey: `message/${delivery.id}` });
+          await pool.query('UPDATE email_deliveries SET attempts=attempts+1 WHERE id=$1',[delivery.id]);
+          result = await sendEmail({ to: delivery.email, subject: message.subject, html: message.html, text:message.text || '', headers:{'List-Unsubscribe': '<'+emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)+'>'}, attachmentPath: campaign.attachment_path, idempotencyKey: `message/${delivery.id}` });
           if (!result?.id) throw new Error('لم يؤكّد مزود البريد قبول الرسالة.');
           break;
         } catch (error) {
@@ -701,15 +722,18 @@ async function deliverMessageCampaign(campaignId) {
           await new Promise(resolve => setTimeout(resolve, Math.min(60000, Math.max(2, error.retryAfter || 2 ** (attempt + 1)) * 1000)));
         }
       }
-      await pool.query("UPDATE email_deliveries SET status='sent',resend_email_id=$1,error='' WHERE id=$2", [clean(result.id, 180), delivery.id]);
+      await pool.query("UPDATE email_deliveries SET status='sent',resend_email_id=$1,error='',retryable=false WHERE id=$2", [clean(result.id, 180), delivery.id]);
+      const events = await pool.query('SELECT type FROM message_webhook_events WHERE email_id=$1 ORDER BY received_at',[result.id]);
+      for (const event of events.rows) await applyMessageEvent(result.id,event.type);
     } catch (error) {
-      await pool.query("UPDATE email_deliveries SET status='failed',error=$1 WHERE id=$2", [clean(error.message, 500), delivery.id]);
+      const retryable = (!error.status || error.status === 429 || error.status >= 500) && (!delivery.attempted_at || Date.now()-new Date(delivery.attempted_at).getTime()<23*3600000);
+      await pool.query("UPDATE email_deliveries SET status='failed',error=$1,retryable=$3 WHERE id=$2", [clean(error.message, 500), delivery.id,retryable]);
     }
-    await new Promise(resolve => setTimeout(resolve, 650));
+    await new Promise(resolve => setTimeout(resolve, Math.max(650,Number(process.env.MESSAGE_SEND_INTERVAL_MS)||1000)));
   }
   const counts = (await pool.query(`SELECT count(*) FILTER (WHERE status IN ('sent','delivered','opened','clicked'))::int AS sent,
     count(*) FILTER (WHERE status IN ('failed','bounced','complained'))::int AS failed FROM email_deliveries WHERE campaign_id=$1`, [campaignId])).rows[0];
-  const status = counts.failed ? (counts.sent ? 'partial' : 'failed') : 'sent';
+  const status = counts.failed ? (counts.sent ? 'partial' : 'failed') : (counts.sent ? 'sent' : 'completed');
   await pool.query("UPDATE email_campaigns SET status=$1,sent_at=now(),sending_at=NULL WHERE id=$2", [status, campaignId]);
 }
 
@@ -1332,7 +1356,8 @@ app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single
     let added = 0, existing = 0, unsubscribed = 0;
     for (const email of emails) {
       const preference = await getEmailPreference(email);
-      if (preference.marketing_opt_out) { unsubscribed += 1; continue; }
+      const suppressed = (await pool.query('SELECT suppressed FROM message_contacts WHERE normalized_email=$1',[delivery.email])).rows[0]?.suppressed;
+      if (preference.marketing_opt_out || suppressed) { unsubscribed += 1; continue; }
       const current = await pool.query('SELECT active,suppressed FROM course_alert_subscribers WHERE email=$1', [email]);
       if (current.rowCount) {
         if (current.rows[0].active) existing += 1; else unsubscribed += 1;
@@ -1494,11 +1519,13 @@ app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
+installMessageStudio({app,pool,auth,importUpload:messageRecipientImportUpload,resolveRecipients:resolveMessageRecipients,getPreference:getEmailPreference,sendEmail,worker:processScheduledMessageCampaigns,emailFrom,mailEnabled:!!resendApiKey,webhookEnabled:!!process.env.RESEND_WEBHOOK_SECRET,uploadDir});
+
 app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
-app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 1 }));
+app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 2 }));
 app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
@@ -1609,6 +1636,10 @@ app.post('/api/admin/messages/test', auth, async (req, res) => {
 app.post('/api/admin/messages', auth, async (req, res, next) => {
   try {
     if (!resendApiKey) return res.status(503).json({ error: 'خدمة البريد غير مهيأة حاليًا.' });
+    // Legacy clients retain their API shape. A persisted fingerprint protects response-loss retries too.
+    const submissionKey = clean(req.body?.requestId,120) || crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
+    const previous = await pool.query('SELECT id,status,total_recipients,scheduled_at FROM email_campaigns WHERE submission_key=$1',[submissionKey]);
+    if (previous.rowCount) { const old=previous.rows[0]; return res.json({ok:true,campaignId:old.id,status:old.status,total:old.total_recipients,scheduledAt:old.scheduled_at,reused:true}); }
     const subject = clean(req.body?.subject, 160);
     const message = normaliseMessageBody(req.body?.message);
     const ctaLabel = clean(req.body?.ctaLabel, 80);
@@ -1637,8 +1668,13 @@ app.post('/api/admin/messages', auth, async (req, res, next) => {
     let campaignId;
     try {
       await client.query('BEGIN');
-      const campaign = await client.query(`INSERT INTO email_campaigns(subject,body,audience,template_id,cta_label,cta_url,attachment_path,status,scheduled_at,total_recipients,skipped_unsubscribed,course_name)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, [subject, message, resolved.audience, templateId, ctaLabel, ctaUrl, attachmentPath, scheduledAt ? 'scheduled' : 'queued', scheduledAt, resolved.recipients.length, resolved.skippedUnsubscribed, resolved.courseName]);
+      const campaign = await client.query(`INSERT INTO email_campaigns(subject,body,audience,template_id,cta_label,cta_url,attachment_path,status,scheduled_at,total_recipients,skipped_unsubscribed,course_name,submission_key)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(submission_key) WHERE submission_key<>'' DO NOTHING RETURNING id`, [subject, message, resolved.audience, templateId, ctaLabel, ctaUrl, attachmentPath, scheduledAt ? 'scheduled' : 'queued', scheduledAt, resolved.recipients.length, resolved.skippedUnsubscribed, resolved.courseName,submissionKey]);
+      if (!campaign.rowCount) {
+        const old=(await client.query('SELECT id,status,total_recipients,scheduled_at FROM email_campaigns WHERE submission_key=$1',[submissionKey])).rows[0];
+        await client.query('COMMIT');
+        return res.json({ok:true,campaignId:old.id,status:old.status,total:old.total_recipients,scheduledAt:old.scheduled_at,reused:true});
+      }
       campaignId = campaign.rows[0].id;
       for (const person of resolved.recipients) await client.query("INSERT INTO email_deliveries(campaign_id,email,recipient_name,status) VALUES($1,$2,$3,'queued')", [campaignId, person.email, person.name]);
       await client.query('COMMIT');
@@ -1651,7 +1687,7 @@ app.post('/api/admin/messages', auth, async (req, res, next) => {
 app.get('/api/admin/campaigns', auth, async (_req, res, next) => {
   try {
     const result = await pool.query(`SELECT c.id,c.subject,c.audience,c.status,c.scheduled_at,c.sent_at,c.created_at,c.total_recipients,c.skipped_unsubscribed,count(d.id)::int AS total,
-      count(*) FILTER (WHERE d.delivered_at IS NOT NULL OR d.status IN ('delivered','opened','clicked'))::int AS delivered,
+      count(*) FILTER (WHERE d.delivered_at IS NOT NULL)::int AS delivered,
       count(*) FILTER (WHERE d.status='opened' OR d.opened_at IS NOT NULL)::int AS opened,
       count(*) FILTER (WHERE d.status='clicked' OR d.clicked_at IS NOT NULL)::int AS clicked,
       count(*) FILTER (WHERE d.status IN ('failed','bounced','complained'))::int AS failed,

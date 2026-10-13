@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node server.js", "check": "node --check server.js"},
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js",
+    "test": "node --test test/*.test.js",
+    "test:browser": "node test/studio-browser.cjs"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
@@ -11,5 +16,9 @@
     "multer": "^2.0.2",
     "pdf-parse": "^2.4.5",
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
+    "playwright": "^1.58.2"
   }
 }

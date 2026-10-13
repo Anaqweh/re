@@ -48,19 +48,23 @@ export function parseDelimited(raw, delimiter) {
   return rows;
 }
 
-export function contactsFromRows(rows) {
+export function contactsFromRows(rows, mapping = null, review = false) {
   const first = rows.findIndex(row => row.some(value => String(value || '').trim()));
   if (first < 0) return [];
   const headers = rows[first].map(headerKey);
-  const emailIndex = headers.findIndex(value => emailHeaders.has(value));
-  const nameIndex = headers.findIndex(value => nameHeaders.has(value));
+  const emailIndex = mapping ? Number(mapping.email ?? -1) : headers.findIndex(value => emailHeaders.has(value));
+  const nameIndex = mapping ? Number(mapping.name ?? -1) : headers.findIndex(value => nameHeaders.has(value));
+  const languageIndex = mapping ? Number(mapping.language ?? -1) : headers.findIndex(v=>['language','lang','اللغة'].includes(v));
+  const tagsIndex = mapping ? Number(mapping.tags ?? -1) : headers.findIndex(v=>['tags','التصنيفات','المجموعة'].includes(v));
   const hasHeader = emailIndex >= 0 || nameIndex >= 0;
-  return rows.slice(first + (hasHeader ? 1 : 0)).flatMap(row => {
+  return rows.slice(first + (mapping ? (mapping.header === false ? 0 : 1) : hasHeader ? 1 : 0)).flatMap(row => {
     if (hasHeader) {
       const name = String(row[nameIndex] || '').trim();
       // Addresses can be embedded in text, mailto links, or share one cell.
-      const emails = extractEmails(emailIndex >= 0 ? row[emailIndex] : row.join(' '));
-      return emails.length ? emails.map(email => ({ name, email })) : [{ name, email: '' }];
+      const rawEmail = String(emailIndex >= 0 ? row[emailIndex] || '' : row.join(' ')).trim();
+      const emails = extractEmails(rawEmail);
+      const meta = review ? {language: String(row[languageIndex] || ''), tags:String(row[tagsIndex] || '').split(/[,،]/).filter(Boolean)} : {};
+      return emails.length ? emails.map(email => ({ name, email, ...meta })) : [{ name, email: review && emailIndex >= 0 ? rawEmail : '', ...meta }];
     }
     const cells = row.map(value => String(value || '').trim()).filter(Boolean);
     const emails = cells.filter(value => emailPattern.test(value));
@@ -71,7 +75,7 @@ export function contactsFromRows(rows) {
     const text = cells.join(' ');
     const inlineEmails = extractEmails(text);
     const name = text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '').replace(/[<>|]/g, ' ').trim();
-    return inlineEmails.length ? inlineEmails.map((email, i) => ({ name: i ? '' : name, email })) : [{ name, email: '' }];
+    return inlineEmails.length ? inlineEmails.map((email, i) => ({ name: i ? '' : name, email })) : [{ name: review && text.includes('@') ? '' : name, email: review && text.includes('@') ? text : '' }];
   }).filter(row => row.name || row.email);
 }
 
@@ -102,7 +106,7 @@ export function worksheetRows(xml, sharedStrings = []) {
   return rows;
 }
 
-async function readOfficeArchive(file, run) {
+async function readOfficeArchive(file, run, options = {}) {
   const entries = (await run('unzip', ['-Z1', file.path])).split(/\r?\n/).filter(Boolean);
   if (entries.length > 2000) throw new Error('الملف يحتوي على أجزاء كثيرة جدًا. قسّمه إلى ملفات أصغر.');
   const sheets = entries.filter(name => /^xl\/worksheets\/[^/]+\.xml$/.test(name));
@@ -114,7 +118,12 @@ async function readOfficeArchive(file, run) {
       const xml = await run('unzip', ['-p', file.path, document]);
       // Join adjacent rich-text runs, but keep paragraphs and cells separate.
       const text = xml.replace(/<\/(?:[\w.-]+:)?(?:p|tc|table-cell|table-row)>/g, '\n').replace(/<[^>]*>/g, '');
-      contacts.push(...emailContacts(text));
+      if (options.review && document.startsWith('word/')) {
+        const tableRows=[...xml.matchAll(/<(?:[\w.-]+:)?tr\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?tr>/g)].map(row=>[...row[1].matchAll(/<(?:[\w.-]+:)?tc\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?tc>/g)].map(cell=>xmlText(cell[1])));
+        if(tableRows.length){options.tables.push(tableRows);contacts.push(...contactsFromRows(tableRows,null,true));}
+        const prose=xml.replace(/<(?:[\w.-]+:)?tbl\b[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?tbl>/g,'').replace(/<\/(?:[\w.-]+:)?p>/g,'\n').replace(/<[^>]*>/g,'');
+        contacts.push(...contactsFromRows(prose.split(/\n/).filter(line=>extractEmails(line).length).map(line=>[line]),null,true));
+      } else contacts.push(...emailContacts(text));
     }
     return contacts;
   }
@@ -127,7 +136,9 @@ async function readOfficeArchive(file, run) {
   const contacts = [];
   for (const sheet of sheets) {
     const xml = await run('unzip', ['-p', file.path, sheet]);
-    contacts.push(...contactsFromRows(worksheetRows(xml, shared)));
+    const table = worksheetRows(xml, shared);
+    options.tables?.push(table);
+    contacts.push(...contactsFromRows(table, null, options.review));
   }
   return contacts;
 }
@@ -138,14 +149,16 @@ function decodeText(buffer) {
   return buffer.toString('utf8');
 }
 
-function contactsFromText(raw, extension) {
+function contactsFromText(raw, extension, options = {}) {
   const firstLine = raw.replace(/^\uFEFF/, '').split(/\r?\n/)[0] || '';
   const delimiter = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ',';
   // Only structured lists retain names. Other documents contribute emails only.
   if (['.csv', '.tsv', '.txt'].includes(extension) || firstLine.split(delimiter).some(value => emailHeaders.has(headerKey(value)) || nameHeaders.has(headerKey(value)))) {
     try {
-      const contacts = contactsFromRows(parseDelimited(raw, delimiter));
-      if (contacts.some(row => row.email) || firstLine.split(delimiter).some(value => nameHeaders.has(headerKey(value)))) return contacts;
+      const table = parseDelimited(raw, delimiter);
+      const contacts = contactsFromRows(table, null, options.review);
+      options.tables?.push(table);
+      if (options.review || contacts.some(row => row.email) || firstLine.split(delimiter).some(value => nameHeaders.has(headerKey(value)))) return contacts;
     } catch { /* Irregular text need not obey CSV quoting rules. */ }
   }
   let text = raw.replace(/\\u([\da-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
@@ -156,7 +169,8 @@ function contactsFromText(raw, extension) {
   return emailContacts(/^\s*</.test(raw) ? `${raw}\n${text}` : text);
 }
 
-export async function readContactFile(file) {
+export async function readContactFile(file, options = {}) {
+  options = {...options, tables: []}; let ocrUsed = false;
   const stat = await fs.stat(file.path);
   if (stat.size > 5 * 1024 * 1024) throw new Error('حجم الملف يتجاوز 5MB. قسّمه إلى ملفات أصغر.');
   const data = await fs.readFile(file.path);
@@ -185,7 +199,7 @@ export async function readContactFile(file) {
   const isOle = data.subarray(0, 8).equals(Buffer.from('d0cf11e0a1b11ae1', 'hex'));
   const isBiff = [0x0009, 0x0209, 0x0409, 0x0809].includes(data.length >= 2 ? data.readUInt16LE(0) : -1);
   const isImage = data.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) || data.subarray(0, 3).equals(Buffer.from('ffd8ff', 'hex')) || /^GIF8|^BM|^II\*|^MM\x00\*/.test(data.subarray(0, 4).toString('latin1')) || data.subarray(8, 12).toString() === 'WEBP';
-  if (isZip) contacts = await readOfficeArchive(file, run);
+  if (isZip) contacts = await readOfficeArchive(file, run, options);
   else if (isPdf || isImage) {
     const pdfText = isPdf ? await run('pdftotext', ['-layout', file.path, '-']) : '';
     contacts = emailContacts(pdfText);
@@ -193,6 +207,7 @@ export async function readContactFile(file) {
     // OCR unreadable pages even when other pages already contain text addresses.
     let ocrPages = isPdf ? textPages.flatMap((text, index) => !/[\p{L}\p{N}]{3}/u.test(text) ? [index + 1] : []) : [1];
     if (ocrPages.length) {
+      ocrUsed = true;
       const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'inexc-email-ocr-'));
       try {
         if (isPdf) {
@@ -216,9 +231,10 @@ export async function readContactFile(file) {
     if (isWord) contacts = emailContacts(await run('antiword', [file.path]));
     else {
       const sheets = JSON.parse(await run('python3', [readerPath, 'xls', file.path]));
-      contacts = sheets.flatMap(contactsFromRows);
+      options.tables.push(...sheets);
+      contacts = sheets.flatMap(table => contactsFromRows(table,null,options.review));
     }
-  } else contacts = contactsFromText(decodeText(data), extension);
+  } else contacts = contactsFromText(decodeText(data), extension, options);
   const seen = new Set();
   const unique = contacts.filter(contact => {
     if (!contact.email) return Boolean(contact.name);
@@ -228,5 +244,5 @@ export async function readContactFile(file) {
   });
   if (unique.length > 3000) throw new Error('الحد الأقصى للقائمة 3000 جهة بعد إزالة التكرار. قسّم الملف إلى قوائم أصغر.');
   if (!unique.length) throw new Error('لم نعثر على بريد قابل للاستخراج. تأكد من وجود عناوين واضحة، أو احفظ الملف بصيغة Excel أو CSV. للصور وPDF المصوّر استخدم نسخة أوضح وغير محمية.');
-  return unique;
+  return options.review ? {rows:contacts,tables:options.tables,ocrUsed} : unique;
 }
