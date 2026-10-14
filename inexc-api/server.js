@@ -1,3 +1,4 @@
+import { assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -79,6 +80,7 @@ async function applyMessageEvent(emailId, type) {
     clicked_at=CASE WHEN $1='clicked' THEN COALESCE(clicked_at,now()) ELSE clicked_at END,
     retryable=false WHERE resend_email_id=$2 RETURNING email`,[status,emailId]);
   if (['bounced','complained','skipped'].includes(status)) for (const row of updated.rows) {
+    await suppressEmail(pool,row.email,{reason:type==='email.complained'?'complaint':type==='email.bounced'?'bounce':'blocked',source:'provider'});
     await pool.query('UPDATE message_contacts SET suppressed=true,updated_at=now() WHERE normalized_email=$1',[row.email]);
     await pool.query('INSERT INTO email_preferences(email,unsubscribe_token,marketing_opt_out) VALUES($1,$2,true) ON CONFLICT(email) DO UPDATE SET marketing_opt_out=true,updated_at=now()',[row.email,crypto.randomBytes(24).toString('hex')]);
   }
@@ -265,8 +267,9 @@ function emailShell({ title, preview, content, direction = 'rtl' }) {
   const english = dir === 'ltr';
   return `<!doctype html><html lang="${english ? 'en' : 'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body dir="${dir}" style="direction:${dir};text-align:${align};margin:0;background:#eef5fc;color:#17324d;font-family:Tahoma,Arial,sans-serif;line-height:1.8"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${preview}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5fc;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px rgba(15,70,120,.12)"><tr><td align="center" style="background:linear-gradient(135deg,#0866c6,#063f86);padding:30px 34px;color:#ffffff;text-align:center"><div style="font-size:12px;letter-spacing:1.6px;font-weight:700;opacity:.82">INEXC TRAINING</div><div style="font-size:25px;font-weight:800;margin-top:7px">${english ? 'Innovative Excellence' : 'شركة التميز الابتكاري'}</div><div style="font-size:13px;margin-top:5px;opacity:.9">${english ? 'Training that makes a real difference' : 'برامج تدريبية تصنع أثرًا حقيقيًا'}</div></td></tr><tr><td dir="${dir}" align="${align}" style="padding:32px 34px;direction:${dir};text-align:${align}">${content}</td></tr><tr><td style="padding:20px 34px;background:#f7fbff;border-top:1px solid #dceafb;text-align:center;color:#6b8095;font-size:11px">${english ? 'This is an automated message from INEXC Training. Please do not reply directly.' : 'هذه رسالة آلية من INEXC Training. يرجى عدم الرد عليها مباشرة.'}<br><a href="https://wa.me/971543475500" style="display:inline-block;margin:10px 0 7px;background:#18a957;color:#ffffff;text-decoration:none;padding:7px 14px;border-radius:999px;font-weight:700">${english ? 'Contact us on WhatsApp' : 'تواصل معنا عبر واتساب'} ‎+971 54 347 5500</a><br><span style="color:#0866c6;font-weight:700">inexctraining.com</span></td></tr></table></td></tr></table></body></html>`;
 }
-async function sendEmail({ to, subject, html, text = '', headers = {}, attachmentPath = '', idempotencyKey = '' }) {
+async function sendEmail({ to, subject, html, marketing = false, text = '', headers = {}, attachmentPath = '', idempotencyKey = '' }) {
   if (!resendApiKey || !to) return;
+  if (marketing) await assertMailAllowed(pool,to);
   const payload = { from: emailFrom, to: [to], subject, html, ...(text ? {text} : {}), ...(Object.keys(headers).length ? {headers} : {}) };
   if (attachmentPath) {
     const fileName = path.basename(attachmentPath);
@@ -543,7 +546,9 @@ async function extractAlertEmails(file) {
 async function getEmailPreference(email) {
   const normalized = clean(String(email || '').toLowerCase(), 190);
   const created = await pool.query('INSERT INTO email_preferences (email,unsubscribe_token) VALUES ($1,$2) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING email,unsubscribe_token,marketing_opt_out', [normalized, crypto.randomBytes(24).toString('hex')]);
-  return created.rows[0];
+  const preference=created.rows[0];
+  if ((await blockedEmails(pool,[normalized])).size) preference.marketing_opt_out=true;
+  return preference;
 }
 const emailPreferenceUnsubscribeUrl = token => 'https://api.inexctraining.com/api/email-preferences/unsubscribe?token=' + encodeURIComponent(token);
 
@@ -652,8 +657,9 @@ async function resolveMessageRecipients(input = {}) {
   }).slice(0, 3001);
   if (candidates.length > 3000) throw new Error('الحد الأقصى للإرسال 3000 مستلم. اختر قائمة أصغر.');
   if (!candidates.length) throw new Error('لا يوجد عنوان بريد صالح للإرسال. تُحفظ الأسماء بلا بريد في القوائم للمراجعة فقط.');
-  const preferences = await pool.query('SELECT email,marketing_opt_out FROM email_preferences WHERE email = ANY($1::text[])', [candidates.map(person => person.email)]);
-  const optedOut = new Set(preferences.rows.filter(row => row.marketing_opt_out).map(row => row.email));
+  const preferences = await pool.query('SELECT email,true AS marketing_opt_out FROM message_suppressions WHERE email = ANY($1::text[])', [candidates.map(person => person.email)]);
+  const optedOut = await blockedEmails(pool,candidates.map(person=>person.email));
+  preferences.rows.forEach(row=>optedOut.add(row.email));
   return { audience, courseName, recipients: candidates.filter(person => !optedOut.has(person.email)), skippedUnsubscribed: candidates.filter(person => optedOut.has(person.email)).length, totalCandidates: candidates.length };
 }
 
@@ -666,8 +672,10 @@ async function saveMessageRecipientList(name, rawRows) {
   try {
     await client.query('BEGIN');
     const created = await client.query('INSERT INTO message_recipient_lists(name) VALUES($1) RETURNING id,name,created_at', [listName]);
-    let withEmail = 0;
+    let withEmail = 0, skippedUnsubscribed=0;
+    const blocked=await blockedEmails(client,rows.map(r=>r.email));
     for (const row of rows) {
+      if(blocked.has(row.email)){skippedUnsubscribed++;continue;}
       let contact;
       if (row.email) {
         withEmail += 1;
@@ -677,10 +685,11 @@ async function saveMessageRecipientList(name, rawRows) {
       } else {
         contact = await client.query('INSERT INTO message_contacts(full_name,email,normalized_email) VALUES($1,\'\',\'\') RETURNING id', [row.name]);
       }
+      if(!contact.rowCount){skippedUnsubscribed++;withEmail--;continue;}
       await client.query('INSERT INTO message_recipient_list_members(list_id,contact_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [created.rows[0].id, contact.rows[0].id]);
     }
     await client.query('COMMIT');
-    return { ...created.rows[0], imported: rows.length, withEmail, needsEmail: rows.length - withEmail };
+    return { ...created.rows[0], imported: rows.length-skippedUnsubscribed, withEmail, needsEmail: rows.length-skippedUnsubscribed-withEmail, skippedUnsubscribed };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
@@ -691,7 +700,7 @@ async function extractMessageContacts(file) {
 async function deliverMessageCampaign(campaignId) {
   const campaign = (await pool.query('SELECT * FROM email_campaigns WHERE id=$1', [campaignId])).rows[0];
   if (!campaign || campaign.status !== 'sending') return;
-  const pending = await pool.query("SELECT id,email,recipient_name,attempted_at,payload_snapshot FROM email_deliveries WHERE campaign_id=$1 AND status='queued' ORDER BY created_at ASC", [campaignId]);
+  const pending = await pool.query("SELECT id,email,recipient_name,attempted_at,payload_snapshot,unsubscribe_token FROM email_deliveries WHERE campaign_id=$1 AND status='queued' ORDER BY created_at ASC", [campaignId]);
   for (const delivery of pending.rows) {
     try {
       // Resend retains idempotency keys for 24h. Never replay an uncertain older attempt.
@@ -704,16 +713,16 @@ async function deliverMessageCampaign(campaignId) {
         await pool.query("UPDATE email_deliveries SET status='skipped',error='ألغى المستلم اشتراكه قبل الإرسال.' WHERE id=$1", [delivery.id]);
         continue;
       }
-      const message = delivery.payload_snapshot || renderMail({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url,
+      const message = delivery.payload_snapshot || {...renderMail({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url,
         person: {name:delivery.recipient_name,email:delivery.email}, settings:campaign.settings || {}, courseName:campaign.course_name,
-        unsubscribeUrl:emailPreferenceUnsubscribeUrl(preference.unsubscribe_token) });
+        unsubscribeUrl:deliveryUnsubscribeUrl(delivery.unsubscribe_token) }),headers:{'List-Unsubscribe':'<'+deliveryUnsubscribeUrl(delivery.unsubscribe_token)+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
       // Persist exact content once: retrying an idempotency key requires an unchanged payload.
       await pool.query('UPDATE email_deliveries SET attempted_at=COALESCE(attempted_at,now()),payload_snapshot=COALESCE(payload_snapshot,$2) WHERE id=$1', [delivery.id,message]);
       let result;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           await pool.query('UPDATE email_deliveries SET attempts=attempts+1 WHERE id=$1',[delivery.id]);
-          result = await sendEmail({ to: delivery.email, subject: message.subject, html: message.html, text:message.text || '', headers:{'List-Unsubscribe': '<'+emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)+'>'}, attachmentPath: campaign.attachment_path, idempotencyKey: `message/${delivery.id}` });
+          result = await sendEmail({ to: delivery.email, marketing:true, subject: message.subject, html: message.html, text:message.text || '', headers:message.headers || {'List-Unsubscribe':'<'+emailPreferenceUnsubscribeUrl(preference.unsubscribe_token)+'>'}, attachmentPath: campaign.attachment_path, idempotencyKey: `message/${delivery.id}` });
           if (!result?.id) throw new Error('لم يؤكّد مزود البريد قبول الرسالة.');
           break;
         } catch (error) {
@@ -726,6 +735,7 @@ async function deliverMessageCampaign(campaignId) {
       const events = await pool.query('SELECT type FROM message_webhook_events WHERE email_id=$1 ORDER BY received_at',[result.id]);
       for (const event of events.rows) await applyMessageEvent(result.id,event.type);
     } catch (error) {
+      if(error.code==='EMAIL_SUPPRESSED'){await pool.query("UPDATE email_deliveries SET status='skipped',retryable=false,error=$1 WHERE id=$2",[error.message,delivery.id]);continue;}
       const retryable = (!error.status || error.status === 429 || error.status >= 500) && (!delivery.attempted_at || Date.now()-new Date(delivery.attempted_at).getTime()<23*3600000);
       await pool.query("UPDATE email_deliveries SET status='failed',error=$1,retryable=$3 WHERE id=$2", [clean(error.message, 500), delivery.id,retryable]);
     }
@@ -835,7 +845,7 @@ async function processCourseAlertQueue(options = {}) {
           course.hours ? `<span style="margin:0 5px">⏱ ${course.hours} ساعة تدريبية</span>` : ''
         ].filter(Boolean).join(' · ');
         const result = await sendEmail({
-          to: row.email,
+          to: row.email, marketing:true,
           subject: mergeCourseAlertTemplate(settings.subject, course),
           html: emailShell({
             title: course.name,
@@ -852,7 +862,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 3 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -1021,23 +1031,19 @@ app.post('/api/course-alerts', async (req, res, next) => {
     res.status(201).json({ ok: true, alreadySubscribed: false });
   } catch (error) { next(error); }
 });
-app.get('/api/course-alerts/unsubscribe', async (req, res, next) => {
-  try {
-    const token = clean(req.query.token, 100);
-    const result = await pool.query('UPDATE course_alert_subscribers SET active=false,suppressed=true,updated_at=now() WHERE unsubscribe_token=$1 RETURNING email', [token]);
-    if (result.rowCount) await pool.query("INSERT INTO email_preferences (email,unsubscribe_token,marketing_opt_out,updated_at) VALUES ($1,$2,true,now()) ON CONFLICT (email) DO UPDATE SET marketing_opt_out=true,updated_at=now()", [result.rows[0].email, crypto.randomBytes(24).toString('hex')]);
-    const message = result.rowCount ? 'تم إلغاء اشتراكك بنجاح. لن تصلك تنبيهات الدورات الجديدة بعد الآن.' : 'هذا الرابط غير صالح أو تم استخدامه مسبقًا.';
-    res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تنبيهات INEXC</title><body style="margin:0;background:#eef5fc;font-family:Tahoma,Arial,sans-serif;color:#17324d"><main style="max-width:520px;margin:12vh auto;background:#fff;padding:36px;border-radius:18px;text-align:center;box-shadow:0 10px 32px rgba(15,70,120,.12)"><h1 style="color:#0b4b91">تنبيهات الدورات</h1><p style="line-height:1.9">${message}</p><a href="https://www.inexctraining.com" style="color:#0866c6">العودة إلى الموقع</a></main></body></html>`);
-  } catch (error) { next(error); }
-});
-app.get('/api/email-preferences/unsubscribe', async (req, res, next) => {
-  try {
-    const token = clean(req.query.token, 100);
-    const result = await pool.query('UPDATE email_preferences SET marketing_opt_out=true,updated_at=now() WHERE unsubscribe_token=$1 RETURNING email', [token]);
-    const message = result.rowCount ? 'تم إلغاء اشتراكك بنجاح. لن تصلك الرسائل الجماعية أو تنبيهات الدورات لاحقًا.' : 'هذا الرابط غير صالح أو تم استخدامه مسبقًا.';
-    res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>إلغاء الاشتراك | INEXC</title><body style="margin:0;background:#eef5fc;font-family:Tahoma,Arial,sans-serif;color:#17324d"><main style="max-width:520px;margin:12vh auto;background:#fff;padding:36px;border-radius:18px;text-align:center;box-shadow:0 10px 32px rgba(15,70,120,.12)"><h1 style="color:#0b4b91">تم تحديث تفضيلات البريد</h1><p style="line-height:1.9">'+escapeHtml(message)+'</p><a href="https://www.inexctraining.com" style="color:#0866c6">العودة إلى الموقع</a></main></body></html>');
-  } catch (error) { next(error); }
-});
+installSuppressionRoutes({app,pool});
+for (const [route,table] of [['/api/course-alerts/unsubscribe','course_alert_subscribers'],['/api/email-preferences/unsubscribe','email_preferences']]) {
+  app.get(route,async(req,res,next)=>{
+    const client=await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const row=(await client.query('SELECT email FROM '+table+' WHERE unsubscribe_token=$1',[clean(req.query.token,100)])).rows[0];
+      if(row)await suppressEmail(client,row.email,{source:table+'-link'});
+      await client.query('COMMIT');
+      res.status(row?200:400).type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>إلغاء الاشتراك | INEXC</title><body style="font-family:Tahoma,Arial;background:#eef5fc;padding:32px;text-align:center"><h1>'+ (row?'تم إلغاء الاشتراك':'رابط غير صالح')+'</h1><p>'+(row?'لن تصلك رسائل INEXC الجماعية أو تنبيهات الدورات لاحقًا. يبقى الحظر محفوظًا حتى عند إعادة استيراد الملفات.':'تعذر التعرف إلى هذا الرابط.')+'</p></body></html>');
+    }catch(error){await client.query('ROLLBACK');next(error)}finally{client.release()}
+  });
+}
 app.get('/api/testimonials', async (_req, res, next) => {
   try {
     const setting = await pool.query("SELECT value FROM app_settings WHERE key='testimonials_visible'");
@@ -1314,7 +1320,7 @@ app.post('/api/admin/course-alerts/:id/send', auth, async (req, res, next) => {
     const course = publicCourse(courseResult.rows[0]);
     const settings = await getCourseAlertSettings();
     const sent = await sendEmail({
-      to: subscriber.email,
+      to: subscriber.email, marketing:true,
       subject: mergeCourseAlertTemplate(settings.subject, course),
       html: emailShell({
         title: course.name,
@@ -1336,7 +1342,7 @@ app.post('/api/admin/course-alerts/test', auth, async (req, res, next) => {
     const settings = await getCourseAlertSettings();
     const preference = await getEmailPreference(email);
     await sendEmail({
-      to: email,
+      to: email, marketing:true,
       subject: '[تجريبي] ' + mergeCourseAlertTemplate(settings.subject, course),
       html: emailShell({
         title: 'رسالة تجريبية لتنبيه دورة',
@@ -1356,7 +1362,7 @@ app.post('/api/admin/course-alerts/import', auth, courseAlertImportUpload.single
     let added = 0, existing = 0, unsubscribed = 0;
     for (const email of emails) {
       const preference = await getEmailPreference(email);
-      const suppressed = (await pool.query('SELECT suppressed FROM message_contacts WHERE normalized_email=$1',[delivery.email])).rows[0]?.suppressed;
+      const suppressed = (await pool.query('SELECT suppressed FROM message_contacts WHERE normalized_email=$1',[email])).rows[0]?.suppressed;
       if (preference.marketing_opt_out || suppressed) { unsubscribed += 1; continue; }
       const current = await pool.query('SELECT active,suppressed FROM course_alert_subscribers WHERE email=$1', [email]);
       if (current.rowCount) {
@@ -1525,7 +1531,7 @@ app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single(
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
-app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 2 }));
+app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 3 }));
 app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
@@ -1629,7 +1635,7 @@ app.post('/api/admin/messages/test', auth, async (req, res) => {
     const course = clean(req.body?.courseName, 180);
     const preference = await getEmailPreference(test.email);
     const message = messageEmailMarkup({ subject: `${messageDirection(messageText(body)) === 'ltr' ? '[Test]' : '[تجريبية]'} ${subject}`, body, ctaLabel, ctaUrl, person: test, preference, courseName: course });
-    await sendEmail({ to: test.email, subject: message.subject, html: message.html });
+    await sendEmail({ to: test.email, marketing:true, subject: message.subject, html: message.html });
     res.json({ ok: true });
   } catch (error) { res.status(400).json({ error: error.message || 'تعذر إرسال الرسالة التجريبية.' }); }
 });

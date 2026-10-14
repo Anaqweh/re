@@ -7,9 +7,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installSuppressionRoutes } from '../message-suppression.js';
 import { setupMessageStudio } from '../message-studio-schema.js';
 import { installMessageStudio, validEmail } from '../message-studio.js';
-export async function createHarness(){
+export async function createHarness({beforeSetup}={}){
  const db=new PGlite(), directory=await fs.mkdtemp(path.join(os.tmpdir(),'inexc-studio-test-'));
  await db.exec(`CREATE TABLE message_contacts(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),full_name TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT '',normalized_email TEXT NOT NULL DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
  CREATE UNIQUE INDEX message_contacts_email_unique ON message_contacts(normalized_email) WHERE normalized_email<>'';
@@ -19,19 +20,22 @@ export async function createHarness(){
  CREATE TABLE email_preferences(email TEXT PRIMARY KEY,unsubscribe_token TEXT UNIQUE NOT NULL,marketing_opt_out BOOLEAN NOT NULL DEFAULT false,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
  CREATE TABLE email_campaigns(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),subject TEXT NOT NULL,body TEXT NOT NULL,audience TEXT NOT NULL,cta_label TEXT DEFAULT '',cta_url TEXT DEFAULT '',attachment_path TEXT DEFAULT '',template_id UUID REFERENCES message_templates(id) ON DELETE SET NULL,status TEXT DEFAULT 'sent',scheduled_at TIMESTAMPTZ,sent_at TIMESTAMPTZ,sending_at TIMESTAMPTZ,total_recipients INTEGER DEFAULT 0,skipped_unsubscribed INTEGER DEFAULT 0,course_name TEXT DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT now());
  CREATE TABLE email_deliveries(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),campaign_id UUID REFERENCES email_campaigns(id),email TEXT NOT NULL,recipient_name TEXT DEFAULT '',status TEXT DEFAULT 'sent',resend_email_id TEXT DEFAULT '',error TEXT DEFAULT '',attempted_at TIMESTAMPTZ,delivered_at TIMESTAMPTZ,opened_at TIMESTAMPTZ,clicked_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ CREATE TABLE course_alert_subscribers(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),email TEXT UNIQUE NOT NULL,unsubscribe_token TEXT UNIQUE NOT NULL,active BOOLEAN NOT NULL DEFAULT true,suppressed BOOLEAN NOT NULL DEFAULT false,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
  CREATE TABLE courses(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),name TEXT NOT NULL);
  `);
  const query=async(sql,params)=>{if(!params&&sql.split(';').filter(v=>v.trim()).length>1){await db.exec(sql);return{rows:[],rowCount:0}}const result=await db.query(sql,params);return{...result,rowCount:result.affectedRows??result.rows.length}};
  let tail=Promise.resolve();
  const pool={query,connect:async()=>{let release;const prior=tail;tail=new Promise(r=>release=r);await prior;return{query,release}}};
+ if(beforeSetup)await beforeSetup(query);
  await setupMessageStudio(pool);await setupMessageStudio(pool);
  const app=express();app.use(express.json({limit:'1mb'}));
  const auth=(req,res,next)=>req.headers.authorization==='Bearer LOCAL-TEST-ONLY'?next():res.status(401).json({error:'Unauthorized'});
+ installSuppressionRoutes({app,pool});
  const sent=[];let workerCalls=0;
  async function resolveRecipients(p){let rows=[];if(p.audience==='list')rows=(await query('SELECT c.full_name AS name,c.email FROM message_contacts c JOIN message_recipient_list_members m ON m.contact_id=c.id WHERE m.list_id=$1',[p.listId])).rows;else rows=p.recipientRows||String(p.extraRecipients||'').split(/\r?\n/).map(line=>({email:(line.match(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+/)||[])[0]||'',name:line.replace(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+/,'').replace(/[,،<>]/g,'').trim()}));const seen=new Set();rows=rows.filter(r=>validEmail(r.email)&&!seen.has(r.email)&&seen.add(r.email));const optOut=new Set((await query('SELECT email FROM email_preferences WHERE marketing_opt_out')).rows.map(r=>r.email));return{recipients:rows.filter(r=>!optOut.has(r.email)),skippedUnsubscribed:rows.filter(r=>optOut.has(r.email)).length,totalCandidates:rows.length,courseName:''}}
  const getPreference=async email=>{await query('INSERT INTO email_preferences(email,unsubscribe_token) VALUES($1,$2) ON CONFLICT DO NOTHING',[email,crypto.randomUUID()]);return(await query('SELECT * FROM email_preferences WHERE email=$1',[email])).rows[0]};
  installMessageStudio({app,pool,auth,importUpload:multer({dest:directory,limits:{fileSize:5*1024*1024}}),resolveRecipients,getPreference,sendEmail:async mail=>{sent.push(mail);return{id:'fake-provider-'+sent.length}},worker:()=>{workerCalls++},emailFrom:'INEXC <test@example.invalid>',mailEnabled:true,webhookEnabled:false,uploadDir:directory});
- app.get('/api/admin/message-capabilities',auth,(_req,res)=>res.json({richText:2,studio:2}));
+ app.get('/api/admin/message-capabilities',auth,(_req,res)=>res.json({richText:2,studio:3}));
  app.get('/api/admin/message-lists',auth,async(_req,res)=>res.json((await query(`SELECT l.*,count(m.contact_id)::int AS total,count(c.email) FILTER(WHERE c.email<>'')::int AS with_email FROM message_recipient_lists l LEFT JOIN message_recipient_list_members m ON m.list_id=l.id LEFT JOIN message_contacts c ON c.id=m.contact_id GROUP BY l.id`)).rows));
  app.get('/api/admin/courses',auth,async(_req,res)=>res.json((await query('SELECT * FROM courses')).rows));
  app.get('/api/admin/registrations',auth,(_req,res)=>res.json([]));

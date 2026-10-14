@@ -1,3 +1,4 @@
+import { setupSuppressions } from './message-suppression.js';
 // Additive migrations only. Existing campaigns, templates, lists and contacts stay intact.
 export async function setupMessageStudio(db) {
   await db.query(`
@@ -42,6 +43,7 @@ export async function setupMessageStudio(db) {
     CREATE INDEX IF NOT EXISTS message_deliveries_email_idx ON email_deliveries(email);
     CREATE INDEX IF NOT EXISTS message_campaign_due_idx ON email_campaigns(status,scheduled_at);
   `);
+  await setupSuppressions(db);
   // Create useful groups once; later edits and deletions remain the administrator's choice.
   const first = await db.query('INSERT INTO message_studio_settings(id,value) VALUES(1,$1) ON CONFLICT(id) DO NOTHING RETURNING id',[{}]);
   if (first.rowCount) for (const name of ['المعلمون','المتدربون','المهتمون بالدورات']) {

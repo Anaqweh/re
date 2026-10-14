@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import { suppressEmail } from '../message-suppression.js';
 import { createHarness } from './studio-harness.js';
 import { richTextPrefix, renderMessageBody, normaliseMessageBody } from '../message-format.js';
 import { renderMail } from '../message-mail.js';
@@ -105,7 +106,7 @@ test('signed provider events require fresh signatures, remain cumulative, and re
  const h=await createHarness();t.after(()=>h.close());
  const source=await fs.readFile(new URL('../server.js',import.meta.url),'utf8');
  const key=Buffer.from('LOCAL-WEBHOOK-TEST-ONLY');let handler;
- const context=vm.createContext({app:{post:(_path,_parser,fn)=>{handler=fn}},express:{raw:()=>null},pool:h.pool,crypto,Buffer,Date,console,
+ const context=vm.createContext({app:{post:(_path,_parser,fn)=>{handler=fn}},express:{raw:()=>null},pool:h.pool,suppressEmail,crypto,Buffer,Date,console,
   process:{env:{RESEND_WEBHOOK_SECRET:'whsec_'+key.toString('base64')}},clean:(v,n)=>String(v??'').trim().slice(0,n)});
  vm.runInContext(source.slice(source.indexOf("app.post('/api/webhooks/resend'"),source.indexOf('app.use(express.json')),context);
  const invoke=async(type,{emailId='provider-1',timestamp=Math.floor(Date.now()/1000),badSignature=false,id=uid()}={})=>{

@@ -5,13 +5,14 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { parseDelimited, contactsFromRows, worksheetRows, readContactFile } from '../message-contacts.js';
 import { richTextPrefix, normaliseMessageBody, renderMessageBody, messageText, messageDirection } from '../message-format.js';
+import { blockedEmails, deliveryUnsubscribeUrl } from '../message-suppression.js';
 import { renderMail } from '../message-mail.js';
 const source = fs.readFileSync(new URL('../server.js', import.meta.url), 'utf8');
 const functions = source.slice(source.indexOf('const alertEmailPattern'), source.indexOf('\nconst unsubscribeUrl'));
 function helpers(extra = {}) {
   const context = vm.createContext({
     clean: (v,n=400) => String(v??'').trim().slice(0,n),
-    URL, Date, process, renderMail, applyMessageEvent:async()=>{}, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
+    URL, Date, process, renderMail, blockedEmails, deliveryUnsubscribeUrl, applyMessageEvent:async()=>{}, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     emailShell: v => JSON.stringify(v),
     emailPreferenceUnsubscribeUrl: () => 'https://example.com/unsubscribe',
@@ -104,4 +105,16 @@ test('All excluded recipients never report provider acceptance', async()=>{
   }},getEmailPreference:async()=>({marketing_opt_out:true}),sendEmail:async()=>{assert.fail('Excluded recipients must not reach provider')}});
   await h.deliverMessageCampaign('campaign');
   assert.equal(updates.at(-1).args[0],'completed');
+});
+
+test('upgrading preserves previous retry payload and headers while new deliveries retain their own unsubscribe token', async()=>{
+  const sent=[];
+  const snapshot={subject:'Original',html:'<p>Original</p>',text:'Original'};
+  const rows=[{id:'old-attempt',email:'old-attempt@example.com',attempted_at:new Date(),payload_snapshot:snapshot},{id:'new-attempt',email:'new-attempt@example.com',unsubscribe_token:'unique-delivery-token'}];
+  const h=helpers({pool:{query:async(sql)=>{
+    if(sql.startsWith('SELECT * FROM email_campaigns'))return{rows:[{status:'sending',subject:'New',body:'Welcome'}]};
+    if(sql.startsWith('SELECT id,email'))return{rows};if(sql.startsWith('SELECT count'))return{rows:[{sent:2,failed:0}]};return{rows:[]};
+  }},getEmailPreference:async()=>({marketing_opt_out:false,unsubscribe_token:'legacy'}),sendEmail:async mail=>{sent.push(mail);return{id:'provider'}}});
+  await h.deliverMessageCampaign('campaign');assert.equal(sent.length,2);assert.equal(sent[0].html,snapshot.html);assert.deepEqual(JSON.parse(JSON.stringify(sent[0].headers)),{'List-Unsubscribe':'<https://example.com/unsubscribe>'});
+  assert.match(sent[1].headers['List-Unsubscribe'],/unique-delivery-token/);assert.equal(sent[1].headers['List-Unsubscribe-Post'],'List-Unsubscribe=One-Click');
 });

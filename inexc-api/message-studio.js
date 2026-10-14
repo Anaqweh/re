@@ -1,3 +1,4 @@
+import { blockedEmails, assertMailAllowed, suppressEmail, suppressionError } from './message-suppression.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import { normaliseMessageBody } from './message-format.js';
@@ -37,7 +38,7 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     catch (error) {
       const reference = crypto.randomUUID().slice(0,8);
       console.error(`[message-studio:${reference}]`, error);
-      const status = error.code === '23505' ? 409 : error.code === '22P02' ? 400 : error.status || 500;
+      const status = ['23505','23514'].includes(error.code) ? 409 : error.code === '22P02' ? 400 : error.status || 500;
       res.status(status).json({ error: error.code === '23505' ? 'هذا البريد أو السجل موجود بالفعل. حدّث السجل الموجود.' : status < 500 ? error.message : 'تعذرت العملية على الخادم. أعد المحاولة؛ إذا استمرت المشكلة شارك مرجع الخطأ مع الإدارة.', reference });
     }
   });
@@ -56,17 +57,18 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     if (query.tag) add(`? = ANY(${alias}.tags)`, clean(query.tag,40));
     if (query.listId) add(`EXISTS(SELECT 1 FROM message_recipient_list_members m WHERE m.contact_id=${alias}.id AND m.list_id=?::uuid)`,requireId(query.listId));
     if (query.status === 'missing') clauses.push(`${alias}.email=''`);
-    if (query.status === 'suppressed') clauses.push(`(${alias}.suppressed OR EXISTS(SELECT 1 FROM email_preferences p WHERE p.email=${alias}.email AND p.marketing_opt_out))`);
-    if (query.status === 'eligible') clauses.push(`${alias}.email<>'' AND NOT ${alias}.suppressed AND NOT EXISTS(SELECT 1 FROM email_preferences p WHERE p.email=${alias}.email AND p.marketing_opt_out)`);
+    if (query.status === 'suppressed') clauses.push(`(${alias}.suppressed OR EXISTS(SELECT 1 FROM message_suppressions p WHERE p.email=${alias}.email))`);
+    if (query.status === 'eligible') clauses.push(`${alias}.email<>'' AND NOT ${alias}.suppressed AND NOT EXISTS(SELECT 1 FROM message_suppressions p WHERE p.email=${alias}.email)`);
     return { sql: clauses.join(' AND '), params };
   };
   async function reviewContacts(rawRows) {
     if (!Array.isArray(rawRows) || rawRows.length > 10000) throw fail('الحد الأقصى للمراجعة 10000 صف، وللحفظ 3000 جهة فريدة. قسّم الملف.');
     const rows = rawRows.map(contactRecord).filter(v => v.email || v.name);
     const existing = new Set((await pool.query('SELECT normalized_email FROM message_contacts WHERE normalized_email=ANY($1::text[])',[rows.map(v=>v.email).filter(Boolean)])).rows.map(v=>v.normalized_email));
-    const seen = new Set(), counts = { new:0, existing:0, duplicate:0, invalid:0, missing:0, total:rows.length };
+    const blocked=await blockedEmails(pool,rows.map(r=>r.email));
+    const seen = new Set(), counts = { new:0, existing:0, duplicate:0, invalid:0, missing:0, suppressed:0, total:rows.length };
     rows.forEach(row => {
-      row.state = row.invalid ? 'invalid' : !row.email ? 'missing' : seen.has(row.email) ? 'duplicate' : existing.has(row.email) ? 'existing' : 'new';
+      row.state = row.invalid ? 'invalid' : !row.email ? 'missing' : blocked.has(row.email) ? 'suppressed' : seen.has(row.email) ? 'duplicate' : existing.has(row.email) ? 'existing' : 'new';
       counts[row.state]++; if (row.email) seen.add(row.email);
     });
     return { rows, counts, mailboxVerified:false };
@@ -108,7 +110,7 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     }
     return { ...recipients, issues, scheduledAt };
   }
-  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:2,ocr:'local-tesseract'}));
+  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:3,suppressionShared:!!process.env.MESSAGE_SUPPRESSION_REMOTE_URL,ocr:'local-tesseract'}));
   route('put','/settings', async (req,res)=>{
     const settings = mailSettings(req.body);
     await pool.query("INSERT INTO message_studio_settings(id,value) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET value=EXCLUDED.value",[settings]);
@@ -122,7 +124,30 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
 +     (SELECT count(*)::int FROM email_deliveries WHERE delivered_at IS NOT NULL) AS delivered,
 +     (SELECT count(*)::int FROM email_deliveries WHERE status IN ('failed','bounced','complained')) AS failed,
 +     (SELECT count(*)::int FROM message_contacts) AS contacts`.replaceAll('\n+','\n'));
-    res.json({...result.rows[0],webhookEnabled});
+    const totals=(await pool.query(`SELECT count(*)::int AS suppressed,count(*) FILTER(WHERE reason IN ('unsubscribe','legacy') OR email IN (SELECT email FROM message_unsubscribe_events))::int AS unsubscribed,count(*) FILTER(WHERE reason='legacy')::int AS historical FROM message_suppressions`)).rows[0];
+    const latest=(await pool.query(`SELECT c.id,c.subject,c.unsubscribe_tracking,(SELECT count(*)::int FROM message_unsubscribe_events e WHERE e.campaign_id=c.id) AS unsubscribed FROM email_campaigns c WHERE EXISTS(SELECT 1 FROM email_deliveries d WHERE d.campaign_id=c.id AND (d.attempted_at IS NOT NULL OR d.resend_email_id<>'')) ORDER BY COALESCE(c.sending_at,c.sent_at,c.created_at) DESC,c.id DESC LIMIT 1`)).rows[0] || null;
+    res.json({...result.rows[0],...totals,latestCampaign:latest,webhookEnabled});
+  });
+  route('get','/suppressions',async(req,res)=>{
+    const q='%'+clean(req.query.search,180).replace(/[\\%_]/g,'\\$&')+'%',page=Math.max(0,Number(req.query.page)||0);
+    const total=(await pool.query('SELECT count(*)::int AS total FROM message_suppressions WHERE email ILIKE $1',[q])).rows[0].total;
+    const rows=(await pool.query(`SELECT s.*,e.created_at AS unsubscribed_at,c.subject AS campaign_subject FROM message_suppressions s LEFT JOIN message_unsubscribe_events e ON e.email=s.email LEFT JOIN email_campaigns c ON c.id=e.campaign_id WHERE s.email ILIKE $1 ORDER BY s.created_at DESC,s.email LIMIT 50 OFFSET $2`,[q,page*50])).rows;
+    res.json({rows,total,page});
+  });
+  route('get','/suppressions-export',async(_req,res)=>{
+    const rows=(await pool.query('SELECT email,reason,source,created_at FROM message_suppressions ORDER BY email')).rows;
+    res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="inexc-permanent-suppressions.json"'}).send(JSON.stringify({format:'inexc-suppressions-v1',exportedAt:new Date().toISOString(),suppressions:rows},null,2));
+  });
+  route('post','/suppressions-import',async(req,res)=>{
+    if(req.body.format!=='inexc-suppressions-v1'||!Array.isArray(req.body.suppressions)||req.body.suppressions.length>3000)throw fail('اختر ملف سجل الحظر بصيغته الأصلية، بحد أقصى 3000 بريد لكل دفعة.');
+    const rows=req.body.suppressions.map(r=>({email:clean(r.email,181).toLowerCase(),reason:['unsubscribe','bounce','complaint','blocked','legacy'].includes(r.reason)?r.reason:'legacy'}));
+    if(rows.some(r=>!validEmail(r.email)))throw fail('يتضمن سجل الحظر بريدًا غير صالح؛ لم تُحفظ الدفعة.');
+    const result=await tx(async client=>{
+      const before=(await client.query('SELECT count(*)::int AS n FROM message_suppressions')).rows[0].n;
+      for(const r of rows)await suppressEmail(client,r.email,{reason:r.reason,source:'imported-registry'});
+      const after=(await client.query('SELECT count(*)::int AS n FROM message_suppressions')).rows[0].n;
+      return {added:after-before,total:after};
+    });res.json(result);
   });
   route('get','/drafts', async (_req,res)=>res.json((await pool.query('SELECT id,payload,version,created_at,updated_at FROM message_drafts WHERE campaign_id IS NULL ORDER BY updated_at DESC LIMIT 200')).rows));
   route('put','/drafts/:id', async (req,res)=>{
@@ -184,8 +209,10 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     if (!validEmail(email)) throw fail('اكتب عنوان بريد تجريبي صحيحًا.');
     const courseName = payload.courseId ? (await pool.query('SELECT name FROM courses WHERE id=$1',[payload.courseId])).rows[0]?.name || '' : '';
     const issues = checkMessage(payload,{course:courseName}); if (issues.length) throw fail(issues.join('\n'));
+    await assertMailAllowed(pool,email);
     const preference = await getPreference(email);
-    const requestHash = hash({email,payload});
+    if(preference.marketing_opt_out) throw suppressionError();
+    const requestHash = hash({email,payload,name:clean(req.body.name,160)});
     if (payload.attachmentPath && (!/^\/uploads\/mail-[a-z\d-]+-[a-z\d._-]+$/i.test(payload.attachmentPath) || !(await fs.stat(uploadDir+'/'+payload.attachmentPath.split('/').pop()).catch(()=>null))?.isFile())) throw fail('المرفق غير صالح أو غير موجود؛ أعد رفعه قبل التجربة.');
     const mail = renderMail({subject:'[TEST] '+payload.subject,body:payload.message,ctaLabel:payload.ctaLabel,ctaUrl:payload.ctaUrl,courseName,settings:payload,person:{email,name:clean(req.body.name,160)},unsubscribeUrl:'https://api.inexctraining.com/api/email-preferences/unsubscribe?token='+preference.unsubscribe_token});
     mail.attachmentPath=payload.attachmentPath;
@@ -194,13 +221,14 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     if (saved.request_hash !== requestHash) throw fail('تغيّر محتوى التجربة. أعد فتح نافذة التجربة.',409);
     if (saved.provider_id) return res.json({accepted:true,id:saved.provider_id});
     if (Date.now() - new Date(saved.created_at).getTime() > 23*3600000) throw fail('انتهت فترة إعادة المحاولة الآمنة. راجع المزود قبل إرسال تجربة جديدة.');
-    const sent = await sendEmail({to:email,...saved.payload,idempotencyKey:'studio-test/'+id});
+    await assertMailAllowed(pool,email);
+    const sent = await sendEmail({to:email,marketing:true,...saved.payload,idempotencyKey:'studio-test/'+id});
     if (!sent?.id) throw fail('لم يؤكد المزود قبول رسالة التجربة.',502);
     await pool.query('UPDATE message_test_requests SET provider_id=$1 WHERE id=$2',[sent.id,id]);
     res.json({accepted:true,id:sent.id});
   });
   route('get','/campaigns', async (_req,res)=>{
-    res.json((await pool.query(`SELECT c.*,count(d.id)::int AS total,
+    res.json((await pool.query(`SELECT c.*,(SELECT count(*)::int FROM message_unsubscribe_events e WHERE e.campaign_id=c.id) AS unsubscribed,count(d.id)::int AS total,
       count(d.id) FILTER(WHERE d.resend_email_id<>'')::int AS accepted,
       count(d.id) FILTER(WHERE d.delivered_at IS NOT NULL)::int AS delivered,
       count(d.id) FILTER(WHERE d.status IN ('failed','bounced','complained'))::int AS failed,
@@ -211,9 +239,9 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
       FROM email_campaigns c LEFT JOIN email_deliveries d ON d.campaign_id=c.id GROUP BY c.id ORDER BY c.created_at DESC LIMIT 200`)).rows);
   });
   route('get','/campaigns/:id', async (req,res)=>{
-    const campaign = (await pool.query('SELECT * FROM email_campaigns WHERE id=$1',[requireId(req.params.id)])).rows[0];
+    const campaign = (await pool.query('SELECT c.*,(SELECT count(*)::int FROM message_unsubscribe_events e WHERE e.campaign_id=c.id) AS unsubscribed FROM email_campaigns c WHERE c.id=$1',[requireId(req.params.id)])).rows[0];
     if (!campaign) throw fail('الرسالة غير موجودة.',404);
-    const deliveries = (await pool.query('SELECT id,email,recipient_name,status,resend_email_id,delivered_at,opened_at,clicked_at,error,retryable,attempted_at,attempts FROM email_deliveries WHERE campaign_id=$1 ORDER BY created_at,id',[campaign.id])).rows;
+    const deliveries = (await pool.query('SELECT d.id,d.email,d.recipient_name,d.status,d.resend_email_id,d.delivered_at,d.opened_at,d.clicked_at,d.error,d.retryable,d.attempted_at,d.attempts,(SELECT e.created_at FROM message_unsubscribe_events e WHERE e.delivery_id=d.id) AS unsubscribed_at FROM email_deliveries d WHERE d.campaign_id=$1 ORDER BY d.created_at,d.id',[campaign.id])).rows;
     res.json({campaign,deliveries});
   });
   route('put','/campaigns/:id', async (req,res)=>{
@@ -250,16 +278,19 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
   route('get','/contacts', async (req,res)=>{
     const where = contactWhere(req.query), page = Math.max(0,Math.min(10000,Number(req.query.page)||0));
     const total = (await pool.query('SELECT count(*)::int AS total FROM message_contacts c WHERE '+where.sql,where.params)).rows[0].total;
-    const rows = (await pool.query(`SELECT c.*,COALESCE(p.marketing_opt_out,false) AS opted_out FROM message_contacts c LEFT JOIN email_preferences p ON p.email=c.email WHERE ${where.sql} ORDER BY c.created_at DESC,c.id LIMIT 50 OFFSET $${where.params.length+1}`,[...where.params,page*50])).rows;
+    const rows = (await pool.query(`SELECT c.*,(p.email IS NOT NULL) AS opted_out FROM message_contacts c LEFT JOIN message_suppressions p ON p.email=c.email WHERE ${where.sql} ORDER BY c.created_at DESC,c.id LIMIT 50 OFFSET $${where.params.length+1}`,[...where.params,page*50])).rows;
     res.json({rows,total,page,pageSize:50,mailboxVerified:false});
   });
   route('post','/contacts', async (req,res)=>{
     const r = contactRecord(req.body); if (r.invalid || (!r.name && !r.email)) throw fail('أدخل اسمًا أو بريدًا بصيغة صحيحة.');
+    if(r.email) await assertMailAllowed(pool,r.email);
     const result = await pool.query('INSERT INTO message_contacts(full_name,email,normalized_email,language,tags,source) VALUES($1,$2,$2,$3,$4,$5) RETURNING *',[r.name,r.email,r.language,r.tags,r.source||'إضافة يدوية']);
+    if(!result.rowCount)throw suppressionError();
     res.status(201).json(result.rows[0]);
   });
   route('put','/contacts/:id', async (req,res)=>{
     const r = contactRecord(req.body); if (r.invalid || (!r.name && !r.email)) throw fail('أدخل اسمًا أو بريدًا بصيغة صحيحة.');
+    if(r.email) await assertMailAllowed(pool,r.email);
     const changed = await pool.query('UPDATE message_contacts SET full_name=$1,email=$2,normalized_email=$2,language=$3,tags=$4,source=$5,updated_at=now() WHERE id=$6 RETURNING *',[r.name,r.email,r.language,r.tags,r.source,requireId(req.params.id)]);
     if (!changed.rowCount) throw fail('جهة الاتصال غير موجودة.',404); res.json(changed.rows[0]);
   });
@@ -292,7 +323,8 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     }); selections.delete(req.body.token); res.json({affected:result});
   });
   route('get','/contacts-export', async (req,res)=>{
-    const w = contactWhere(req.query), rows = (await pool.query('SELECT full_name,email,language,tags,source FROM message_contacts c WHERE '+w.sql+' ORDER BY created_at,id',w.params)).rows;
+    const w = contactWhere(req.query); let rows = (await pool.query('SELECT full_name,email,language,tags,source FROM message_contacts c WHERE '+w.sql+" AND NOT c.suppressed AND NOT EXISTS(SELECT 1 FROM message_suppressions s WHERE s.email=c.email) ORDER BY created_at,id",w.params)).rows;
+    const blocked=await blockedEmails(pool,rows.map(r=>r.email)); rows=rows.filter(r=>!blocked.has(r.email));
     res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-contacts.csv"'}).send(csv([['الاسم','البريد الإلكتروني','اللغة','التصنيفات','المصدر'],...rows.map(r=>[r.full_name,r.email,r.language,r.tags.join('، '),r.source])]));
   });
   route('post','/import/inspect', async (req,res)=>{
@@ -318,19 +350,21 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     const result = await tx(async client=>{
       let listId = req.body.listId ? requireId(req.body.listId) : null;
       if (!listId && clean(req.body.listName,120)) listId = (await client.query('INSERT INTO message_recipient_lists(name) VALUES($1) RETURNING id',[clean(req.body.listName,120)])).rows[0].id;
-      let added=0, existing=0;
+      let added=0, existing=0, suppressed=0;
+      const blocked=await blockedEmails(client,rows.map(r=>r.email));
       for (const r of rows) {
+        if(blocked.has(r.email)){suppressed++;continue;}
         const source = r.source || clean(req.body.source,180), labelTags=tags([...r.tags,...tags(req.body.tags)]);
         let found = r.email ? (await client.query('SELECT id FROM message_contacts WHERE normalized_email=$1',[r.email])).rows[0] : null;
         if (found) existing++;
         else {
           const inserted = await client.query(`INSERT INTO message_contacts(full_name,email,normalized_email,language,tags,source) VALUES($1,$2,$2,$3,$4,$5) ON CONFLICT(normalized_email) WHERE normalized_email<>'' DO NOTHING RETURNING id`,[r.name,r.email,r.language,labelTags,source]);
           if(inserted.rowCount){ found=inserted.rows[0]; added++; }
-          else { found=(await client.query('SELECT id FROM message_contacts WHERE normalized_email=$1',[r.email])).rows[0]; existing++; }
+          else { found=(await client.query('SELECT id FROM message_contacts WHERE normalized_email=$1',[r.email])).rows[0]; if(!found){suppressed++;continue;} existing++; }
         }
         if(listId) await client.query('INSERT INTO message_recipient_list_members(list_id,contact_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[listId,found.id]);
       }
-      return {added,existing,listId};
+      return {added,existing,suppressed,listId};
     }); res.status(201).json(result);
   });
   route('post','/groups', async (req,res)=>{
