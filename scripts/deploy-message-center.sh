@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js message-contacts.js message-file-reader.py message-format.js message-mail.js message-mail-legacy.js message-studio.js message-studio-schema.js message-suppression.js package.json Dockerfile)
+inexc_files=(server.js message-contacts.js message-file-reader.py message-format.js message-mail.js message-mail-legacy.js message-mail-v4.js message-format-v4.js message-design.js message-font-faces.js message-studio.js message-studio-schema.js message-suppression.js package.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
@@ -58,7 +58,7 @@ docker compose up -d --no-build --no-deps api
 
 inexc_healthy=0
 for inexc_attempt in {1..20}; do
-  if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("messageStudioVersion")==4 else 1)' 2>/dev/null; then
+  if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("messageStudioVersion")==5 else 1)' 2>/dev/null; then
     inexc_route_status="$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/message-capabilities)"
     if [[ "$inexc_route_status" == 401 ]]; then inexc_healthy=1; break; fi
   fi

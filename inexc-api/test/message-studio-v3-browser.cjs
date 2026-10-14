@@ -13,7 +13,7 @@ const {chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwr
   await page.goto(h.url+'/admin-portal.html');await page.locator('[data-view="message-center"]').click();await page.getByText('رسالة جيدة تبدأ بفكرة واضحة.').waitFor();
   await page.locator('[data-nav="templates"]').click();await page.locator('[data-inspect-preset="0"]').waitFor();
   await page.waitForFunction(()=>[...document.querySelectorAll('[data-template-preview]')].every(e=>e.getAttribute('srcdoc')?.includes('<h1')||e.getAttribute('srcdoc')?.includes('أثر')));
-  assert.equal(await page.locator('[data-template-preview]').count(),7);
+  assert.equal(await page.locator('[data-template-preview]').count(),8);
   for(let i=0;i<7;i++){const frame=page.frameLocator('[data-template-preview="'+i+'"]');await frame.locator('body').getByText(i===2?'مرحبًا أحمد،':i===6?'Make room for your next idea.':['خطوتك القادمة تبدأ بمهارة.','فكرة واحدة قد تغيّر طريقة عملك.','','أفكار تستحق مساحة من يومك.','كل مشاركة تترك أثرًا.','التطوير يبدأ بفهم الاحتياج.'][i],{exact:true}).waitFor();}
   await page.locator('[data-template-preview]').last().scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(artifacts,'templates-v3-desktop.png'),fullPage:true});
   await page.locator('[data-inspect-preset="0"]').click();await page.frameLocator('#ms-template-full').getByRole('heading',{name:'خطوتك القادمة تبدأ بمهارة.'}).waitFor();

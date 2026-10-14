@@ -1,8 +1,10 @@
-import { richTextPrefix, messageDocument, messageText, messageDirection, renderMessageBody, safeInlineLink, messageColors } from './inexc-api/message-format.js?v=20261012-studio2';
+import {emailFonts,fontSizes,fontStack,fontIdFromCSS,fontCSS,buttonSettings,buttonHref,renderButton} from './inexc-api/message-design.js?v=20261015-studio5';
+import {createButtonDesigner} from './message-button-editor.js?v=20261015-studio5';
+import { richTextPrefix, messageDocument, messageText, messageDirection, renderMessageBody, safeInlineLink, messageColors } from './inexc-api/message-format.js?v=20261015-studio5';
 
 export function createMessageEditor(textarea) {
   if (!document.querySelector('[data-message-editor-style]')) {
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('./message-editor.css?v=20261012-studio2', import.meta.url).href; link.dataset.messageEditorStyle = ''; document.head.append(link);
+    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('./message-editor.css?v=20261015-studio5', import.meta.url).href; link.dataset.messageEditorStyle = ''; document.head.append(link);
   }
   const id = textarea.id, placeholder = textarea.placeholder;
   const shell = document.createElement('div'); shell.className = 'mc-editor-shell';
@@ -26,7 +28,9 @@ export function createMessageEditor(textarea) {
   textarea.replaceWith(shell);
   const editor = shell.querySelector('.mc-rich-editor');
   editor.dataset.placeholder = placeholder;
-  let direction = 'auto', savedRange = null;
+  let direction = 'auto', savedRange = null, baseFont='ibm', baseSize=16;
+  const fontStyle=document.createElement('style');shell.append(fontStyle);
+  const loadedFonts=new Set();const loadFont=id=>{if(!id||loadedFonts.has(id))return;loadedFonts.add(id);fontStyle.textContent=fontCSS([...loadedFonts]);};
 
   function documentFromEditor(root = editor) {
     const blocks = []; let current = null;
@@ -36,7 +40,7 @@ export function createMessageEditor(textarea) {
         if (!node.textContent) return;
         current ||= { type: list || 'paragraph', runs: [] };
         const run = { text: node.textContent, ...marks }, previous = current.runs.at(-1);
-        if (previous && ['bold','italic','underline','strike','href','color'].every(key => previous[key] === run[key])) previous.text += run.text;
+        if (previous && ['bold','italic','underline','strike','href','color','font','size'].every(key => previous[key] === run[key])) previous.text += run.text;
         else current.runs.push(run);
         return;
       }
@@ -46,7 +50,7 @@ export function createMessageEditor(textarea) {
       if (tag === 'IMG') { flush(); blocks.push({type:'image',src:node.getAttribute('src')||'',alt:node.getAttribute('alt')||'',runs:[],...placement}); return; }
       if (tag === 'HR') { flush(); blocks.push({type:'divider',runs:[]}); return; }
       if (node.dataset.block === 'image') { flush(); const img=node.querySelector('img'); if(img)blocks.push({type:'image',src:img.getAttribute('src'),alt:img.alt,runs:[],...placement}); return; }
-      if (node.dataset.block === 'button') { flush(); const a=node.querySelector('a'); if(a)blocks.push({type:'button',href:a.getAttribute('href'),runs:[{text:a.textContent}],...placement}); return; }
+      if (node.dataset.block === 'button') { flush(); const a=node.querySelector('a'); if(a){let design;try{design=JSON.parse(node.dataset.button||'null')}catch{}blocks.push({type:'button',href:a.getAttribute('href'),...(design?{button:buttonSettings(design)}:{}),runs:[{text:a.textContent}],...placement});} return; }
       if (tag === 'BR') { if (node.parentElement.childNodes.length === 1) return; current ||= { type: list || 'paragraph', runs: [] }; current.runs.push({ text: '\n', ...marks }); return; }
       if (tag === 'UL' || tag === 'OL') { flush(); [...node.childNodes].forEach(child => walk(child, marks, tag === 'UL' ? 'bullet' : 'number')); flush(); return; }
       const block = ['P','DIV','LI','H1','H2','H3','BLOCKQUOTE'].includes(tag);
@@ -58,7 +62,9 @@ export function createMessageEditor(textarea) {
       if (['S','STRIKE','DEL'].includes(tag) || node.style.textDecoration.includes('line-through')) next.strike = true;
       const rgb = node.style.color.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
       const color = rgb ? '#'+rgb.slice(1).map(n=>Number(n).toString(16).padStart(2,'0')).join('') : node.getAttribute('color') || node.style.color;
-      if(messageColors.includes(color)) next.color=color;
+      if(/^#[a-f0-9]{6}$/i.test(color||''))next.color=color;
+      const font=node.dataset.font||fontIdFromCSS(node.getAttribute('face')||node.style.fontFamily);if(font)next.font=font;
+      const size=parseFloat(node.style.fontSize);if(node.style.fontSize.endsWith('px')&&size>=8&&size<=96)next.size=size;
       if (tag === 'A') { const href = safeInlineLink(node.getAttribute('href')); if (href) next.href = href; }
       [...node.childNodes].forEach(child => walk(child, next, list));
       if (block) flush();
@@ -68,6 +74,7 @@ export function createMessageEditor(textarea) {
   }
 
   function sync() {
+    documentFromEditor().blocks.flatMap(b=>b.runs).forEach(r=>loadFont(r.font));
     const text = editor.innerText || '';
     const dir = direction === 'auto' ? messageDirection(text) : direction;
     editor.dir = dir; editor.style.textAlign = dir === 'rtl' ? 'right' : 'left';
@@ -104,6 +111,12 @@ export function createMessageEditor(textarea) {
     if (name === 'removeFormat') document.execCommand('unlink', false);
     changed();
   }
+  shell.querySelector('.mc-editor-toolbar').insertAdjacentHTML('afterbegin',`<div class="mc-font-controls"><label>خط الكلمات<select data-font aria-label="خط الكلمات المحددة"><option value="">خط الرسالة</option>${['خطوط عربية','خطوط إنجليزية','خطوط النظام'].map(g=>`<optgroup label="${g}">${emailFonts.filter(f=>f.group===g).map(f=>`<option value="${f.id}">${f.label}</option>`).join('')}</optgroup>`).join('')}</select></label><label>الحجم<select data-size aria-label="حجم الكلمات المحددة"><option value="">تلقائي</option>${fontSizes.map(n=>`<option value="${n}">${n}px</option>`).join('')}</select></label><button type="button" data-text-size="up" aria-label="تكبير النص المحدد">A+</button><button type="button" data-text-size="down" aria-label="تصغير النص المحدد">A−</button></div>`);
+  function textSize(size){rememberSelection();restoreSelection();document.execCommand('styleWithCSS',false,false);document.execCommand('fontSize',false,'7');editor.querySelectorAll('font[size="7"]').forEach(n=>{n.removeAttribute('size');n.style.fontSize=size+'px'});changed();}
+  const fontSelect=shell.querySelector('[data-font]'),sizeSelect=shell.querySelector('[data-size]');fontSelect.onmousedown=rememberSelection;sizeSelect.onmousedown=rememberSelection;
+  fontSelect.onchange=()=>{const f=emailFonts.find(f=>f.id===fontSelect.value)||emailFonts.find(f=>f.id===baseFont);loadFont(f.id);command('fontName',f.family)};
+  sizeSelect.onchange=()=>textSize(Number(sizeSelect.value)||baseSize);
+  shell.querySelectorAll('[data-text-size]').forEach(b=>b.onclick=()=>{const node=savedRange?.startContainer,el=node?.nodeType===Node.ELEMENT_NODE?node:node?.parentElement,current=el&&editor.contains(el)?parseFloat(getComputedStyle(el).fontSize):baseSize;const n=b.dataset.textSize==='up'?(fontSizes.find(n=>n>current)||72):([...fontSizes].reverse().find(n=>n<current)||10);sizeSelect.value=String(n);textSize(n)});
   shell.querySelectorAll('button').forEach(button => button.addEventListener('mousedown', event => event.preventDefault()));
   shell.querySelectorAll('[data-command]').forEach(button => button.onclick = () => command(button.dataset.command));
   shell.querySelectorAll('[data-direction]').forEach(button => button.onclick = () => { direction = button.dataset.direction; sync(); editor.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -146,7 +159,12 @@ export function createMessageEditor(textarea) {
   shell.querySelector('[data-divider]').onclick=()=>command('insertHTML','<hr><p><br></p>');
   let insertType='image';
   const media=shell.querySelector('.mc-editor-media');
-  shell.querySelectorAll('[data-insert]').forEach(button=>button.onclick=()=>{rememberSelection();insertType=button.dataset.insert;media.hidden=false;media.querySelector('[data-media-label]').textContent=insertType==='image'?'نص بديل يصف الصورة':'نص الزر';media.querySelector('input').focus();});
+  const buttonPanel=document.createElement('div');buttonPanel.className='mc-button-panel';buttonPanel.hidden=true;buttonPanel.innerHTML='<strong>إضافة زر أو تعديل الزر المحدد</strong><div data-button-designer></div><div class="row"><button type="button" data-button-apply>إدراج الزر</button><button type="button" data-button-cancel>إغلاق</button></div><p data-button-error role="status"></p>';media.after(buttonPanel);let designer,editingButton=null;
+  shell.querySelectorAll('[data-insert]').forEach(button=>button.onclick=()=>{rememberSelection();insertType=button.dataset.insert;if(insertType==='button'){openButtonDesigner();return;}media.hidden=false;media.querySelector('[data-media-label]').textContent=insertType==='image'?'نص بديل يصف الصورة':'نص الزر';media.querySelector('input').focus();});
+  function openButtonDesigner(){rememberSelection();const selection=window.getSelection();const node=selection?.anchorNode?.nodeType===Node.ELEMENT_NODE?selection.anchorNode:selection?.anchorNode?.parentElement;editingButton=node?.closest('[data-block="button"]');if(editingButton&&!editor.contains(editingButton))editingButton=null;let initial={};if(editingButton){try{initial=JSON.parse(editingButton.dataset.button||'{}')}catch{}initial={...initial,label:editingButton.textContent,target:initial.target||editingButton.querySelector('a')?.getAttribute('href')||''};}designer=createButtonDesigner(buttonPanel.querySelector('[data-button-designer]'),{value:initial});buttonPanel.hidden=false;media.hidden=true;buttonPanel.querySelector('[data-button-apply]').textContent=editingButton?'حفظ تعديل الزر':'إدراج الزر';buttonPanel.querySelector('[data-button-error]').textContent='';buttonPanel.querySelector('input').focus();}
+  buttonPanel.querySelector('[data-button-cancel]').onclick=()=>{buttonPanel.hidden=true;restoreSelection()};
+  buttonPanel.querySelector('[data-button-apply]').onclick=()=>{const error=designer.validate();if(error){buttonPanel.querySelector('[data-button-error]').textContent=error;return;}const b=designer.read();const block={type:'button',href:buttonHref(b),button:b,align:b.align,runs:[{text:b.label}]};const html=renderMessageBody(richTextPrefix+JSON.stringify({blocks:[block]}),null,{font:baseFont}).html;if(editingButton&&editor.contains(editingButton)){const range=document.createRange();range.selectNode(editingButton);savedRange=range;}command('insertHTML',html+(editingButton?'':'<p><br></p>'));buttonPanel.hidden=true;editingButton=null;};
+  editor.addEventListener('click',event=>{const link=event.target.closest('a');if(link){event.preventDefault();const block=link.closest('[data-block="button"]');if(block){const range=document.createRange();range.selectNodeContents(block);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);rememberSelection();openButtonDesigner();}}});
   shell.querySelector('[data-media-close]').onclick=()=>{media.hidden=true;restoreSelection();};
   shell.querySelector('[data-media-apply]').onclick=()=>{
     const url=safeInlineLink(media.querySelector('[data-media-url]').value),text=media.querySelector('[data-media-text]').value.trim();
@@ -158,5 +176,5 @@ export function createMessageEditor(textarea) {
   shell.querySelectorAll('[data-move]').forEach(button=>button.onclick=()=>{const block=activeBlock();if(!block)return;const sibling=button.dataset.move==='up'?block.previousElementSibling:block.nextElementSibling;if(!sibling)return;if(button.dataset.move==='up')sibling.before(block);else sibling.after(block);changed();});
   editor.value = textarea.value;
   const label = shell.previousElementSibling; if (label?.tagName === 'LABEL') label.htmlFor = id;
-  return { element: editor, insertText: text => command('insertText', text), insertBody: body => command('insertHTML',renderMessageBody(body).html) };
+  return { element: editor, setTypography:({font='ibm',size=16,lineHeight=1.9}={})=>{baseFont=font;baseSize=size;loadFont(font);editor.style.fontFamily=fontStack(font);editor.style.fontSize=size+'px';editor.style.lineHeight=lineHeight;editor.querySelectorAll('p,li,h2').forEach(el=>el.style.lineHeight=lineHeight);}, insertText: text => command('insertText', text), insertBody: body => command('insertHTML',renderMessageBody(body).html) };
 }

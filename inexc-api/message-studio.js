@@ -110,7 +110,7 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     }
     return { ...recipients, issues, scheduledAt };
   }
-  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:4,suppressionShared:!!process.env.MESSAGE_SUPPRESSION_REMOTE_URL,ocr:'local-tesseract'}));
+  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:5,suppressionShared:!!process.env.MESSAGE_SUPPRESSION_REMOTE_URL,ocr:'local-tesseract'}));
   route('put','/settings', async (req,res)=>{
     const settings = mailSettings(req.body);
     await pool.query("INSERT INTO message_studio_settings(id,value) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET value=EXCLUDED.value",[settings]);

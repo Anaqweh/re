@@ -1,4 +1,4 @@
-import { messageDocument, messageText, messageDirection, normaliseMessageBody, renderMessageBody, safeInlineLink } from './message-format.js';
+import { messageDocument, messageText, messageDirection, normaliseMessageBody, renderMessageBody, safeInlineLink } from './message-format-v4.js';
 export const escapeMail = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clean = (v,n) => String(v || '').trim().slice(0,n);
 export function mailSettings(input = {}) {
