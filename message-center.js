@@ -9,7 +9,7 @@ async function boot() {
     try{
       const response=await fetch((window.INEXC_REGISTRATION_ENDPOINT||'https://api.inexctraining.com/api')+'/admin/message-capabilities',{headers:{Authorization:'Bearer '+(sessionStorage.getItem('inexc_do_admin')||'')},signal:AbortSignal.timeout(12000)});
       const caps=await response.json();
-      if(response.ok && caps.studio>=2){const studio=await import(caps.studio>=3?'./message-studio-ui.js?v=20261015-studio3':'./message-studio-v2-ui.js?v=20261015-compat');openStudio=await studio.mountMessageStudio(button);openStudio();}
+      if(response.ok && caps.studio>=2){const studio=await import(caps.studio>=4?'./message-studio-ui.js?v=20261015-blue4':caps.studio>=3?'./message-studio-v3-ui.js?v=20261015-studio3':'./message-studio-v2-ui.js?v=20261015-compat');openStudio=await studio.mountMessageStudio(button);openStudio();}
       else {button.remove();await import('./message-center-legacy.js?v=20261015-studio3');document.querySelector('[data-view="message-center"]')?.click();}
     }catch{button.remove();await import('./message-center-legacy.js?v=20261015-studio3');document.querySelector('[data-view="message-center"]')?.click();}
     finally{button.disabled=false;}

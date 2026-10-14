@@ -862,7 +862,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 3 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 4 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -1531,7 +1531,7 @@ app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single(
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
-app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 3 }));
+app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 4 }));
 app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
