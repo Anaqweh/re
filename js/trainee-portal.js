@@ -227,120 +227,40 @@
       </div>`;
   }
 
-  function renderDigitalIdCard(data, tier) {
-    const p = data.profile;
-    const d = data.digitalId;
-    if (!d) return '';
-
-    const avatarHtml = p.avatar_url
-      ? `<img src="${escapeHtml(p.avatar_url)}" alt="">`
-      : escapeHtml(initials(p.full_name || p.email));
-
-    const certsHtml = (d.certificates || []).length
-      ? d.certificates.map(c => `
-          <li>
-            <span>${escapeHtml(c.course_name || 'دورة INEXC')}</span>
-            <em>${escapeHtml(c.certificate_number || '')}</em>
-          </li>
-        `).join('')
-      : '<li class="did-empty">لا توجد شهادات معروضة بعد</li>';
-
-    return `
-      <div class="card did-wrap">
-        <div class="card-head did-card-head">
-          <div>
-            <h3>🪪 البطاقة الرقمية للمتدرب</h3>
-            <p class="did-subtitle">Digital ID — للتحقق والمشاركة المهنية</p>
-          </div>
-          <div class="did-actions-top">
-            <button type="button" class="btn-sm outline copy-digital-id-btn">نسخ الرابط</button>
-            <a href="${escapeHtml(d.linkedInUrl)}" target="_blank" rel="noopener noreferrer" class="btn-sm linkedin-btn">LinkedIn</a>
-          </div>
-        </div>
-
-        <div class="digital-id-card digital-id-card-preview">
-          <div class="did-visual">
-            <div class="did-top">
-              <img src="${LOGO}" data-fallback="${LOGO_FB}" alt="INEXC — Innovative Excellence" class="inexc-logo did-logo" ${LOGO_ONERR}>
-              <span class="did-badge">Digital ID</span>
-            </div>
-            <div class="did-body">
-              <div class="did-photo">${avatarHtml}</div>
-              <div class="did-info">
-                <div class="did-id-no">${escapeHtml(d.idNumber)}</div>
-                <h4>${escapeHtml(p.full_name || 'متدرب INEXC')}</h4>
-                <p class="did-specialty">${escapeHtml(p.specialty || p.country || 'INEXC Trainee')}</p>
-                <span class="tier-badge ${d.tierKey} did-tier">${d.tierIcon} ${escapeHtml(d.tierLabel)}</span>
-                <div class="did-stats">
-                  <div><strong>${d.certCount}</strong><span>شهادة</span></div>
-                  <div><strong>${d.trainingHours}</strong><span>ساعة تدريب</span></div>
-                  <div><strong>${data.professionalValue?.overallReadiness || 0}%</strong><span>جاهزية</span></div>
-                </div>
-              </div>
-              <div class="did-qr">
-                <img src="${escapeHtml(d.qrUrl)}" alt="QR Code" width="108" height="108">
-                <span>امسح للتحقق</span>
-              </div>
-            </div>
-            <div class="did-certs">
-              <h5>الشهادات المعتمدة</h5>
-              <ul>${certsHtml}</ul>
-            </div>
-            <div class="did-footer">
-              <span>verify.inexc · ${escapeHtml(d.verifyUrl.replace(/^https?:\/\//, '').slice(0, 42))}...</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="did-actions">
-          <a href="${escapeHtml(d.verifyUrl)}" target="_blank" rel="noopener noreferrer" class="btn-sm">فتح الصفحة العامة</a>
-          <button type="button" class="btn-sm outline print-digital-id-btn">طباعة / PDF</button>
-          <a href="${escapeHtml(d.linkedInUrl)}" target="_blank" rel="noopener noreferrer" class="btn-sm linkedin-btn">مشاركة على LinkedIn</a>
-        </div>
-        <p class="digital-id-msg profile-save-msg" hidden></p>
-      </div>`;
+  let cardAssets;
+  function ensureCardAssets() {
+    if (cardAssets) return cardAssets;
+    const sheet = document.createElement('link');
+    sheet.rel = 'stylesheet'; sheet.href = '/css/trainee-card.css?v=20261016-card1';
+    document.head.append(sheet);
+    const script = src => new Promise((resolve, reject) => {
+      const node = document.createElement('script'); node.src = src;
+      node.onload = resolve; node.onerror = reject; document.head.append(node);
+    });
+    cardAssets = (async () => {
+      if (!global.INEXCQRCode) await script('/vendor/inexc-qr.js?v=20261016-card1');
+      if (!global.TraineeCard) await script('/js/trainee-card.js?v=20261016-card1');
+    })().catch(error => { cardAssets = null; throw error; });
+    return cardAssets;
   }
 
-  function bindDigitalIdEvents(data) {
-    const url = data.digitalId?.verifyUrl;
-    const shareText = data.digitalId?.shareText || url;
+  function renderDigitalIdCard(data) {
+    if (!data.digitalId) return '';
+    return '<section class="card did-wrap tc-portal-card"><div class="card-head"><h3>بطاقة المتدرب الرقمية</h3></div><div class="tc-portal-slot"><p>جارٍ تجهيز البطاقة…</p></div></section>';
+  }
 
-    document.querySelectorAll('.copy-digital-id-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!url) return;
-        const wrap = btn.closest('.did-wrap');
-        const msg = wrap?.querySelector('.digital-id-msg');
-        try {
-          await navigator.clipboard.writeText(shareText);
-          if (msg) {
-            msg.textContent = 'تم نسخ رابط البطاقة الرقمية';
-            msg.className = 'digital-id-msg profile-save-msg success';
-            msg.hidden = false;
-          }
-        } catch {
-          if (msg) {
-            msg.textContent = url;
-            msg.className = 'digital-id-msg profile-save-msg success';
-            msg.hidden = false;
-          }
-        }
+  async function bindDigitalIdEvents(data) {
+    if (!data.digitalId) return;
+    try {
+      await ensureCardAssets();
+      document.querySelectorAll('.tc-portal-slot').forEach(target => {
+        global.TraineeCard.mount(target, data, { demo: data.isLocalSession === true });
       });
-    });
-
-    document.querySelectorAll('.print-digital-id-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const card = btn.closest('.did-wrap')?.querySelector('.digital-id-card');
-        if (card) {
-          card.id = 'digitalIdPrintTarget';
-        }
-        document.body.classList.add('printing-digital-id');
-        window.print();
-        setTimeout(() => {
-          document.body.classList.remove('printing-digital-id');
-          if (card) card.removeAttribute('id');
-        }, 500);
+    } catch {
+      document.querySelectorAll('.tc-portal-slot').forEach(target => {
+        target.textContent = 'تعذّر تحميل البطاقة. حدّث الصفحة للمحاولة مجددًا.';
       });
-    });
+    }
   }
 
   function renderCertUpgradeCard(offer) {

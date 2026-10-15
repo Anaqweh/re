@@ -94,12 +94,12 @@
   function buildDigitalId(profile, tier, certificates, professionalValue, baseUrl) {
     const root = (baseUrl || getPortalBaseUrl()).replace(/\/$/, '');
     const verifyUrl = root + '/digital-id.html?id=' + encodeURIComponent(profile.id);
-    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(verifyUrl);
+    const qrUrl = ''; // QR is generated locally by the shared card component.
     const idNumber = 'INEXC-' + String(profile.id || '').replace(/-/g, '').slice(0, 8).toUpperCase();
     const certCount = (certificates || []).length;
     const trainingHours = professionalValue?.trainingHours || 0;
     const shareText = [
-      'بطاقتي الرقمية المعتمدة من INEXC Innovative Excellence',
+      'بطاقتي الرقمية لدى INEXC Innovative Excellence',
       profile.full_name || 'متدرب INEXC',
       tier.icon + ' ' + tier.label,
       certCount + ' شهادة · ' + trainingHours + ' ساعة تدريب',
