@@ -23,6 +23,7 @@ document.head.appendChild(inexcCourseAlertsStyle);
       section.querySelector('#alertBatchSize').value = String(settings.batchSize || 100);
       section.querySelector('#alertSubject').value = settings.subject || '';
       section.querySelector('#alertMessage').value = settings.message || '';
+      window.INEXCAdminDrafts?.restoreScope(section.querySelector('#alertSettingsForm'), true);
     } catch (error) { section.querySelector('#alertSettingsResult').textContent = error.message; }
   }
   async function loadAlertCourses() {
@@ -57,6 +58,7 @@ document.head.appendChild(inexcCourseAlertsStyle);
       const saved = await call('/admin/course-alerts/settings', { method:'POST', body:JSON.stringify({ enabled:section.querySelector('#alertsEnabled').checked, delayMinutes:Number(section.querySelector('#alertDelay').value), deliveryMode:section.querySelector('#alertDeliveryMode').value, batchSize:Number(section.querySelector('#alertBatchSize').value), subject:section.querySelector('#alertSubject').value.trim(), message:section.querySelector('#alertMessage').value.trim() }) });
       section.querySelector('#alertsEnabled').checked = saved.enabled !== false;
       section.querySelector('#alertDelay').value = String(saved.delayMinutes);
+      window.INEXCAdminDrafts?.captureScope(section.querySelector('#alertSettingsForm'));
       output.style.color='#168865'; output.textContent = saved.enabled ? (saved.deliveryMode === 'manual' ? 'تم حفظ وضع الدفعات اليدوي والعدد المختار.' : 'تم حفظ الإرسال التلقائي والعدد المختار.') : 'تم تعطيل الإرسال التلقائي مؤقتًا.';
     } catch (error) { output.style.color='var(--bad)'; output.textContent=error.message; }
     finally { button.disabled=false; button.textContent='حفظ الإعداد'; }
