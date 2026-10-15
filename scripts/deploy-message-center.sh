@@ -58,7 +58,7 @@ docker compose up -d --no-build --no-deps api
 
 inexc_healthy=0
 for inexc_attempt in {1..20}; do
-  if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if (lambda h: h.get("messageStudioVersion")==5 and h.get("subscriptionsVersion")==1)(json.load(sys.stdin)) else 1)' 2>/dev/null; then
+  if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if (lambda h: h.get("messageStudioVersion")==5 and h.get("subscriptionsVersion")==2)(json.load(sys.stdin)) else 1)' 2>/dev/null; then
     inexc_route_status="$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/message-capabilities)"
     if [[ "$inexc_route_status" == 401 ]]; then inexc_healthy=1; break; fi
   fi
