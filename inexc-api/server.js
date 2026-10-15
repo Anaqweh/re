@@ -1,3 +1,5 @@
+import { setupLandingPages } from './landing-schema.js';
+import { installLandingPages } from './landing-pages.js';
 import { assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -42,7 +44,7 @@ const pool = new Pool({
 });
 
 app.use(cors({ origin(origin, callback) {
-  if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+  if (!origin || allowedOrigins.includes(origin) || origin === (process.env.LANDING_PUBLIC_ORIGIN || 'https://api.inexctraining.com')) return callback(null, true);
   return callback(new Error('Origin not allowed'));
 }}));
 app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
@@ -503,6 +505,7 @@ async function setupDatabase() {
   await pool.query('ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS attempted_at TIMESTAMPTZ');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_resend_id_unique ON email_deliveries(resend_email_id) WHERE resend_email_id <> \'\'');
   await setupMessageStudio(pool);
+  await setupLandingPages(pool);
   const count = await pool.query('SELECT count(*)::int AS count FROM courses');
   if (count.rows[0].count === 0) {
     await pool.query(`INSERT INTO courses (name, description, trainer, course_date, location, category, price, certificate_mode, certificate_name, certificate_price, payment_methods, active)
@@ -862,7 +865,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 5 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 5, landingPagesVersion: 1 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -1525,6 +1528,7 @@ app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
+installLandingPages({app,pool,auth,uploadDir,publicOrigin:process.env.LANDING_PUBLIC_ORIGIN||'https://api.inexctraining.com'});
 installMessageStudio({app,pool,auth,importUpload:messageRecipientImportUpload,resolveRecipients:resolveMessageRecipients,getPreference:getEmailPreference,sendEmail,worker:processScheduledMessageCampaigns,emailFrom,mailEnabled:!!resendApiKey,webhookEnabled:!!process.env.RESEND_WEBHOOK_SECRET,uploadDir});
 
 app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single('file'), (req, res) => {

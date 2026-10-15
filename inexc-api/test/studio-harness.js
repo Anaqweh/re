@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { installSuppressionRoutes } from '../message-suppression.js';
 import { setupMessageStudio } from '../message-studio-schema.js';
 import { installMessageStudio, validEmail } from '../message-studio.js';
-export async function createHarness({beforeSetup}={}){
+export async function createHarness({beforeSetup,extend}={}){
  const db=new PGlite(), directory=await fs.mkdtemp(path.join(os.tmpdir(),'inexc-studio-test-'));
  await db.exec(`CREATE TABLE message_contacts(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),full_name TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT '',normalized_email TEXT NOT NULL DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
  CREATE UNIQUE INDEX message_contacts_email_unique ON message_contacts(normalized_email) WHERE normalized_email<>'';
@@ -35,6 +35,7 @@ export async function createHarness({beforeSetup}={}){
  async function resolveRecipients(p){let rows=[];if(p.audience==='list')rows=(await query('SELECT c.full_name AS name,c.email FROM message_contacts c JOIN message_recipient_list_members m ON m.contact_id=c.id WHERE m.list_id=$1',[p.listId])).rows;else rows=p.recipientRows||String(p.extraRecipients||'').split(/\r?\n/).map(line=>({email:(line.match(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+/)||[])[0]||'',name:line.replace(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+/,'').replace(/[,،<>]/g,'').trim()}));const seen=new Set();rows=rows.filter(r=>validEmail(r.email)&&!seen.has(r.email)&&seen.add(r.email));const optOut=new Set((await query('SELECT email FROM email_preferences WHERE marketing_opt_out')).rows.map(r=>r.email));return{recipients:rows.filter(r=>!optOut.has(r.email)),skippedUnsubscribed:rows.filter(r=>optOut.has(r.email)).length,totalCandidates:rows.length,courseName:''}}
  const getPreference=async email=>{await query('INSERT INTO email_preferences(email,unsubscribe_token) VALUES($1,$2) ON CONFLICT DO NOTHING',[email,crypto.randomUUID()]);return(await query('SELECT * FROM email_preferences WHERE email=$1',[email])).rows[0]};
  installMessageStudio({app,pool,auth,importUpload:multer({dest:directory,limits:{fileSize:5*1024*1024}}),resolveRecipients,getPreference,sendEmail:async mail=>{sent.push(mail);return{id:'fake-provider-'+sent.length}},worker:()=>{workerCalls++},emailFrom:'INEXC <test@example.invalid>',mailEnabled:true,webhookEnabled:false,uploadDir:directory});
+ if(extend)await extend({app,pool,auth,directory});
  app.get('/api/admin/message-capabilities',auth,(_req,res)=>res.json({richText:2,studio:5}));
  app.get('/api/admin/message-lists',auth,async(_req,res)=>res.json((await query(`SELECT l.*,count(m.contact_id)::int AS total,count(c.email) FILTER(WHERE c.email<>'')::int AS with_email FROM message_recipient_lists l LEFT JOIN message_recipient_list_members m ON m.list_id=l.id LEFT JOIN message_contacts c ON c.id=m.contact_id GROUP BY l.id`)).rows));
  app.get('/api/admin/courses',auth,async(_req,res)=>res.json((await query('SELECT * FROM courses')).rows));
