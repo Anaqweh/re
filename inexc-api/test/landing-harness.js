@@ -1,5 +1,0 @@
-import express from 'express';
-import {createHarness} from './studio-harness.js';
-import {setupLandingPages} from '../landing-schema.js';
-import {installLandingPages} from '../landing-pages.js';
-export async function createLandingHarness(){const h=await createHarness({extend:async({app,pool,auth,directory})=>{await setupLandingPages(pool);await setupLandingPages(pool);installLandingPages({app,pool,auth,uploadDir:directory,publicOrigin:'http://localhost'});app.use('/uploads',express.static(directory))}});const request=async(route='',method='GET',body,{publicRoute=false,auth=true}={})=>{const r=await fetch(h.url+(publicRoute?route:'/api/admin/landing-pages'+route),{method,headers:{...(auth?{Authorization:'Bearer LOCAL-TEST-ONLY'}:{}),...(body instanceof FormData?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:body instanceof FormData?body:JSON.stringify(body)})});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{data=raw}return{status:r.status,data,headers:r.headers}};return{...h,request}}
