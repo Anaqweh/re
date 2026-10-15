@@ -20,6 +20,7 @@ test('optional primary button: custom destination, toggle, saved draft, preview 
  Object.assign(w,{fetch,AbortSignal,INEXC_REGISTRATION_ENDPOINT:h.url+'/api',emailFonts,fontStack,fontCSS,renderMail,mailIdentityDefaults,messageText,messageDirection,richTextPrefix,presets:[],newSubscriberIcon:'',createMessageEditor:element=>({element,setTypography(){}})});
  w.sessionStorage.setItem('inexc_do_admin','LOCAL-TEST-ONLY');
  const source=(await fs.readFile(new URL('../../message-studio-ui.js',import.meta.url),'utf8')).replace(/^import .*\n/gm,'').replaceAll('export ','').replaceAll('import.meta.url',JSON.stringify(h.url+'/message-studio-ui.js'));
+ w.eval((await fs.readFile(new URL('../../message-subscriptions-ui.js',import.meta.url),'utf8')).replace(/^import .*\n/gm,'').replaceAll('export ',''));
  w.eval(source);
  const $=s=>w.document.querySelector(s);
  const open=await w.mountMessageStudio($('#main'));await open();

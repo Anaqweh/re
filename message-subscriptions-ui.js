@@ -25,24 +25,59 @@ export async function loadSubscriptionManager({target,call,api,notify,supported,
 }
 
 export const newSubscriberIcon='<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="7" r="3.5"/><path d="M2.5 21v-2.5a6.5 6.5 0 0 1 13 0V21M19 7v8m-4-4h8"/></svg>';
+let noticeRevision=0,reviewingSubscribers=null;
+export function subscriberNoticeRevision(){return noticeRevision;}
+export function updateSubscriberNotice(count,revision=noticeRevision){
+ if(reviewingSubscribers||revision!==noticeRevision||!Number.isFinite(Number(count)))return;
+ document.querySelectorAll('[data-new-subscriber-count]').forEach(node=>{
+  node.textContent=Number(count).toLocaleString('ar-AE');node.hidden=!Number(count);
+  node.setAttribute('aria-label',count+' مشترك جديد');
+ });
+}
+async function reviewOpenedSubscribers(call,cutoff){
+ if(reviewingSubscribers)return reviewingSubscribers;
+ noticeRevision++;
+ reviewingSubscribers=(async()=>{
+  let page=0,data=await call('/subscriptions/new?filter=new&page=0');
+  // A fixed boundary keeps later signups unread while existing pages are acknowledged.
+  while(cutoff&&data.rows.length){
+   const emails=data.rows.filter(row=>new Date(row.subscribed_at)<=new Date(cutoff)).map(row=>row.email);
+   if(emails.length)await call('/subscriptions/new/seen','POST',{emails});
+   else page++;
+   // Reviewed rows leave the unread result, so read this same page again.
+   if(!emails.length&&page*50>=data.total)break;
+   data=await call('/subscriptions/new?filter=new&page='+page);
+  }
+  return await call('/subscriptions/new?countOnly=1');
+ })().finally(()=>{reviewingSubscribers=null;noticeRevision++;});
+ return reviewingSubscribers;
+}
 export async function loadNewSubscribers({target,call,notify,onCount,onCompose,onContacts,supported}){
  if(!supported){target.innerHTML='<div class="card"><h2>المشتركون الجدد</h2><p>يلزم تحديث خدمة مركز الرسائل لتفعيل التسجيل الفوري وقائمة المشتركين الجدد.</p></div>';return;}
- let page=0,current;
+ let page=0,current,loadRevision=0;
+ const view=Symbol('new-subscribers');target.subscriberView=view;
  target.innerHTML=`<div class="row between section-head"><div><h2 class="row">${newSubscriberIcon} المشتركون الجدد</h2><p class="muted">من سجّل عبر رابط الاشتراك يظهر هنا ويُضاف مباشرة إلى جهات الاتصال.</p></div><div class="row"><button id="new-contacts">جهات الاتصال</button><button id="new-compose" class="primary" disabled>إنشاء رسالة للمشتركين</button></div></div><div id="new-stats" class="stats"></div><div class="card section-space"><div class="row between"><div class="row"><input id="new-search" type="search" placeholder="ابحث بالاسم أو البريد" aria-label="البحث في المشتركين"><select id="new-filter" aria-label="فلترة المشتركين"><option value="all">كل التسجيلات</option><option value="new">الجدد غير المراجعين</option></select></div><div class="row"><button id="new-refresh">تحديث</button><button id="new-seen" disabled>اعتبار المعروض مراجَعًا</button></div></div><div id="new-table" class="section-space"></div><div id="new-pager" class="pager"></div></div>`;
  const $=s=>target.querySelector(s);
- async function load(){
+ async function load(review=false){
+  const revision=++loadRevision,noticeAtStart=subscriberNoticeRevision();
   $('#new-table').innerHTML='<p class="muted">جارٍ تحميل المشتركين…</p>';
   try{
-   const data=await call('/subscriptions/new?'+new URLSearchParams({page,search:$('#new-search').value,filter:$('#new-filter').value}));current=data;onCount(data.stats.unread);
+   const data=await call('/subscriptions/new?'+new URLSearchParams({page,search:$('#new-search').value,filter:$('#new-filter').value}));
+   if(target.subscriberView!==view||revision!==loadRevision)return;
+   current=data;onCount(data.stats.unread,noticeAtStart);
    $('#new-stats').innerHTML=[['المشتركون من الرابط',data.stats.total],['جدد لم تراجعهم بعد',data.stats.unread]].map(([label,n])=>`<div class="stat"><span>${label}</span><b>${Number(n).toLocaleString('ar-AE')}</b></div>`).join('');
    $('#new-compose').disabled=!data.listId||!data.stats.total;$('#new-seen').disabled=!data.rows.some(r=>!r.seen_at);
    $('#new-table').innerHTML=data.rows.length?`<div class="table-wrap"><table><thead><tr><th>الاسم والبريد</th><th>التسجيل</th><th>الحالة</th><th>المصدر</th><th>تاريخ الاشتراك</th></tr></thead><tbody>${data.rows.map(s=>`<tr><td><strong>${esc(s.full_name||'بدون اسم')}</strong><small dir="ltr">${esc(s.email)}</small></td><td>${!s.seen_at?'<span class="badge">جديد</span>':'<span class="muted">تمت المراجعة</span>'}<small>${s.added_new_contact===true?'جديد في جهات الاتصال':s.added_new_contact===false?'بريد موجود سابقًا':'مسجل من الرابط'}</small></td><td><span class="badge ${s.status==='active'?'good':s.status==='blocked'?'bad':'warn'}">${{active:'مضاف لجهات الاتصال',blocked:'ألغى الاشتراك أو موقوف',removed:'حُذفت جهة الاتصال'}[s.status]}</span></td><td>${esc(s.subject||'الرابط العام')}</td><td>${date(s.subscribed_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><h3>لا توجد تسجيلات مطابقة</h3><p>ستظهر هنا الاشتراكات القادمة من الرابط. يمكنك تغيير البحث أو الفلتر.</p></div>';
    $('#new-pager').innerHTML=`<button id="new-prev" ${page===0?'disabled':''}>السابقة</button><span>صفحة ${page+1} من ${Math.max(1,Math.ceil(data.total/50))}</span><button id="new-next" ${(page+1)*50>=data.total?'disabled':''}>التالية</button>`;
    $('#new-prev').onclick=()=>{page--;load()};$('#new-next').onclick=()=>{page++;load()};
-  }catch(e){$('#new-table').innerHTML='<div class="notice error">'+esc(e.message)+'</div>';}
+   if(review&&data.stats.unread){
+    try{const counts=await reviewOpenedSubscribers(call,data.rows[0]?.subscribed_at);onCount(counts.unread);if(target.subscriberView===view)await load();}
+    catch(error){if(target.subscriberView===view)notify('تعذر تحديث إشعار المشتركين. اضغط تحديث للمحاولة مجددًا. '+error.message,'error');}
+   }
+  }catch(e){if(target.subscriberView===view&&revision===loadRevision)$('#new-table').innerHTML='<div class="notice error">'+esc(e.message)+'</div>';}
  }
- let timer;$('#new-search').oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{page=0;load()},250)};$('#new-filter').onchange=()=>{page=0;load()};$('#new-refresh').onclick=load;
+ let timer;$('#new-search').oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{page=0;load()},250)};$('#new-filter').onchange=()=>{page=0;load()};$('#new-refresh').onclick=()=>load(true);
  $('#new-contacts').onclick=onContacts;$('#new-compose').onclick=()=>onCompose(current.listId);
  $('#new-seen').onclick=async()=>{const button=$('#new-seen');button.disabled=true;try{await call('/subscriptions/new/seen','POST',{emails:current.rows.filter(r=>!r.seen_at).map(r=>r.email)});await load();notify('تم تحديث حالة المراجعة.','success')}catch(e){notify(e.message,'error');button.disabled=false}};
- await load();
+ await load(true);
 }

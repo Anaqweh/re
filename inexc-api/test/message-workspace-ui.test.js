@@ -18,6 +18,7 @@ async function editor(h,storage={}){
  };
  Object.assign(w,{fetch:checkedFetch,AbortSignal,INEXC_REGISTRATION_ENDPOINT:h.url+'/api',emailFonts,fontStack,fontCSS,renderMail,mailIdentityDefaults,messageText,messageDirection,richTextPrefix,presets:[],newSubscriberIcon:'',createMessageEditor:element=>({element,setTypography(){}})});
  w.sessionStorage.setItem('inexc_do_admin','LOCAL-TEST-ONLY');for(const [key,value]of Object.entries(storage))w.sessionStorage.setItem(key,value);
+ w.eval((await fs.readFile(new URL('../../message-subscriptions-ui.js',import.meta.url),'utf8')).replace(/^import .*\n/gm,'').replaceAll('export ',''));
  w.eval(source.replace(/^import .*\n/gm,'').replaceAll('export ','').replaceAll('import.meta.url',JSON.stringify(h.url+'/message-studio-ui.js')));
  const $=s=>w.document.querySelector(s),open=await w.mountMessageStudio($('#main'));await open();
  return{w,$,requests,storage:()=>Object.fromEntries(Object.entries(w.sessionStorage)),input:(selector,value)=>{const el=$(selector);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new w.Event('input',{bubbles:true}));}};
