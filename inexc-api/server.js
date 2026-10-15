@@ -1,4 +1,6 @@
-import { assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
+import {setupMessageSubscriptions, installMessageSubscriptions} from './message-subscriptions.js';
+import {subscriptionUrl} from './message-subscription-links.js';
+import { normalizeEmail, assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -503,6 +505,7 @@ async function setupDatabase() {
   await pool.query('ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS attempted_at TIMESTAMPTZ');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_resend_id_unique ON email_deliveries(resend_email_id) WHERE resend_email_id <> \'\'');
   await setupMessageStudio(pool);
+  await setupMessageSubscriptions(pool);
   const count = await pool.query('SELECT count(*)::int AS count FROM courses');
   if (count.rows[0].count === 0) {
     await pool.query(`INSERT INTO courses (name, description, trainer, course_date, location, category, price, certificate_mode, certificate_name, certificate_price, payment_methods, active)
@@ -715,6 +718,7 @@ async function deliverMessageCampaign(campaignId) {
       }
       const message = delivery.payload_snapshot || {...renderMail({ subject: campaign.subject, body: campaign.body, ctaLabel: campaign.cta_label, ctaUrl: campaign.cta_url,
         person: {name:delivery.recipient_name,email:delivery.email}, settings:campaign.settings || {}, courseName:campaign.course_name,
+        shareUrl:subscriptionUrl(campaign.subscription_code,true),
         unsubscribeUrl:deliveryUnsubscribeUrl(delivery.unsubscribe_token) }),headers:{'List-Unsubscribe':'<'+deliveryUnsubscribeUrl(delivery.unsubscribe_token)+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
       // Persist exact content once: retrying an idempotency key requires an unchanged payload.
       await pool.query('UPDATE email_deliveries SET attempted_at=COALESCE(attempted_at,now()),payload_snapshot=COALESCE(payload_snapshot,$2) WHERE id=$1', [delivery.id,message]);
@@ -862,7 +866,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 5 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 5, subscriptionsVersion: 1 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -1525,13 +1529,14 @@ app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
+installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled:!!resendApiKey});
 installMessageStudio({app,pool,auth,importUpload:messageRecipientImportUpload,resolveRecipients:resolveMessageRecipients,getPreference:getEmailPreference,sendEmail,worker:processScheduledMessageCampaigns,emailFrom,mailEnabled:!!resendApiKey,webhookEnabled:!!process.env.RESEND_WEBHOOK_SECRET,uploadDir});
 
 app.post('/api/admin/message-attachments', auth, messageAttachmentUpload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'اختر ملفًا لإرفاقه.' });
   res.status(201).json({ ok: true, attachmentPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname });
 });
-app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 5 }));
+app.get('/api/admin/message-capabilities', auth, (_req, res) => res.json({ richText: 2, studio: 5, subscriptions: 1 }));
 app.get('/api/admin/message-templates', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT id,name,subject,body,cta_label,cta_url,created_at,updated_at FROM message_templates ORDER BY updated_at DESC');
@@ -1719,7 +1724,7 @@ app.post('/api/admin/campaigns/:id/cancel', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
-app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
+app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error.status === 400 || error instanceof multer.MulterError ? 400 : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
 setupDatabase().then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });

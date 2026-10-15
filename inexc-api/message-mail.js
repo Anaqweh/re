@@ -1,3 +1,4 @@
+import {subscriptionUrl} from './message-subscription-links.js';
 import {mailSettings as version4Settings,renderMail as renderVersion4} from './message-mail-v4.js';
 import {fontStack,fontCSS,fontById,buttonSettings,buttonHref,renderButton,safeButtonHref} from './message-design.js';
 import { messageDocument, messageText, messageDirection, renderMessageBody, safeInlineLink } from './message-format.js';
@@ -10,8 +11,9 @@ export function mailIdentityDefaults(english=false) {
   return {brandName:'INEXC Training',brandTagline:english?'Knowledge. Practice. Impact.':'معرفة. تطبيق. أثر.',eyebrow:'',headline:'',intro:'',footerText:english?'INEXC Training · Professional learning':'INEXC Training · للتعلّم والتطوير المهني',footerLinkLabel:'inexctraining.com',footerLinkUrl:'https://www.inexctraining.com/',unsubscribeLabel:english?'Unsubscribe from these emails':'إلغاء الاشتراك في هذه الرسائل',signature:english?'Kind regards,\nThe INEXC Training Team':'مع خالص التحية،\nفريق INEXC Training'};
 }
 export function mailSettings(input={}) {
-  if(input.designVersion!==3)return version4Settings(input);
-  const config={...version4Settings({...input,designVersion:2}),designVersion:3};
+  const share={shareEnabled:input.shareEnabled===true,shareText:clean(input.shareText,350),shareLabel:clean(input.shareLabel,80)};
+  if(input.designVersion!==3)return {...version4Settings(input),...share};
+  const config={...version4Settings({...input,designVersion:2}),designVersion:3,...share};
   config.fontFamily=fontById(input.fontFamily)?input.fontFamily:'tahoma';
   config.headingFont=fontById(input.headingFont)?input.headingFont:config.fontFamily;
   const number=(v,min,max,def)=>Number.isFinite(Number(v))&&Number(v)>=min&&Number(v)<=max?Number(v):def;
@@ -63,7 +65,7 @@ function geometry(p,kind='grid',dark=false){
   }
   return table(`<tr><td>${mark}</td></tr>`,'width:112px;','width="112" aria-hidden="true" dir="ltr"');
 }
-export function renderMail(args){
+function renderDesignMail(args){
   const {subject,body,ctaLabel='',ctaUrl='',person={},courseName='',settings={},unsubscribeUrl=''}=args;
   const input=mailSettings(settings);
   if(input.designVersion===2)return renderVersion4(args);
@@ -118,4 +120,17 @@ export function renderMail(args){
   const html=`<!doctype html><html lang="${english?'en':'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeMail(title)}</title><style>${fontCSS(usedFonts)}body,table,td{font-family:${fontStack(config.fontFamily)}}h1,h2{font-family:${fontStack(config.headingFont)}}.mail-copy h2{font-size:${Math.max(20,Math.round(config.headingSize*.72))}px}table{mso-table-lspace:0;mso-table-rspace:0}td{overflow-wrap:anywhere;word-break:break-word}img{max-width:100%}a{overflow-wrap:anywhere}@media only screen and (max-width:600px){.mail-outer{padding:12px 6px!important}.mail-shell{width:100%!important}.mail-pad{padding:24px 20px!important}.mail-panel{display:block!important;box-sizing:border-box!important;width:100%!important}.mail-brand,.mail-tagline{display:block!important;width:100%!important;text-align:${align}!important;padding:0!important}.mail-tagline{padding-top:8px!important}h1{font-size:${Math.min(config.headingSize,30)}px!important}}</style></head><body dir="${dir}" style="margin:0;padding:0;background:${plain?'#ffffff':'#edf2f8'};color:${p.ink};font-family:${escapeMail(fontStack(config.fontFamily))}"><div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${escapeMail(preview)}</div>${table(`<tr><td class="mail-outer" align="center" style="padding:32px 12px"><!--[if mso]><table role="presentation" width="640" cellspacing="0" cellpadding="0"><tr><td><![endif]-->${table(`${heading}${hero}${panelSection}<tr><td class="mail-pad mail-copy" dir="${rendered.direction}" align="${align}" style="padding:32px 36px;direction:${rendered.direction};text-align:${align};font-family:${escapeMail(fontStack(config.fontFamily))};font-size:${config.bodySize}px;line-height:${config.lineHeight}">${rendered.html}${action}${extraActions}${signature}</td></tr>${footer}`,'width:100%;max-width:640px;table-layout:fixed;text-align:'+align+';direction:'+dir+';background:#ffffff;border-radius:'+(config.layout==='signature'?'18px':'0')+';border:1px solid '+(plain?'#ffffff':p.line)+';','width="100%" class="mail-shell"')}<!--[if mso]></td></tr></table><![endif]-->${unsubscribe}</td></tr>`,'width:100%;','width="100%"')}</body></html>`;
   const plainText=[config.headerEnabled?merge(config.brandName):'',config.headerEnabled?merge(config.brandTagline):'',!plain&&config.heroEnabled?[config.eyebrow,config.headline,config.intro].map(merge).filter(Boolean).join('\n'): '',!plain?panels.map(v=>[v.label,v.title,v.text].map(merge).filter(Boolean).join('\n')).join('\n\n'):'',rendered.text,...config.buttons.map(b=>`${merge(b.label)}: ${buttonHref({...b,message:merge(b.message)})}`),ctaLabel&&/^https?:/.test(actionUrl)?`${merge(ctaLabel)}: ${actionUrl}`:'',config.signatureEnabled?merge(config.signature):'',config.footerEnabled?merge(config.footerText):'',config.footerEnabled&&config.footerLinkLabel&&/^https?:/.test(footerUrl)?`${merge(config.footerLinkLabel)}: ${footerUrl}`:'',unsubscribeUrl?`${merge(unsubscribeLabel)}: ${unsubscribeUrl}`:''].filter(Boolean).join('\n\n');
   return {subject:title,html,text:plainText,direction:rendered.direction};
+}
+
+// Opt-in per message: historical campaigns keep their exact previous content.
+export function renderMail(args){
+  const mail=renderDesignMail(args),settings=mailSettings(args.settings||{});
+  if(!settings.shareEnabled)return mail;
+  const english=mail.direction==='ltr',url=args.shareUrl||subscriptionUrl('',true);
+  let valid;try{const parsed=new URL(url);valid=parsed.origin==='https://www.inexctraining.com'&&parsed.pathname==='/subscribe.html';}catch{}
+  if(!valid)return mail;
+  const text=settings.shareText||(english?'Know someone who would enjoy these emails? Share the subscription link.':'تعرف شخصًا قد تهمّه رسائلنا؟ شاركه رابط الاشتراك.');
+  const label=settings.shareLabel||(english?'Share with a friend':'شارك مع صديق');
+  const section=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:8px 18px 30px"><table role="presentation" width="100%" style="max-width:640px;background:#eef6ff;border:1px solid #cbdff7"><tr><td dir="${english?'ltr':'rtl'}" align="center" style="padding:22px;font-family:Tahoma,Arial,sans-serif;font-size:15px;line-height:1.9;color:#414a57"><p style="margin:0 0 12px">${escapeMail(text)}</p><a href="${escapeMail(url)}" style="display:inline-block;padding:10px 22px;background:#0868ce;color:white;text-decoration:none;border-radius:6px;font-weight:bold">${escapeMail(label)}</a></td></tr></table></td></tr></table>`;
+  return {...mail,html:mail.html.replace('</body>',section+'</body>'),text:mail.text+'\n\n'+text+'\n'+label+': '+url};
 }

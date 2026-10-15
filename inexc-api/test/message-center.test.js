@@ -1,3 +1,4 @@
+import {subscriptionUrl} from '../message-subscription-links.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ const functions = source.slice(source.indexOf('const alertEmailPattern'), source
 function helpers(extra = {}) {
   const context = vm.createContext({
     clean: (v,n=400) => String(v??'').trim().slice(0,n),
-    URL, Date, process, renderMail, blockedEmails, deliveryUnsubscribeUrl, applyMessageEvent:async()=>{}, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
+    URL, Date, process, renderMail, subscriptionUrl, blockedEmails, deliveryUnsubscribeUrl, applyMessageEvent:async()=>{}, setTimeout: fn => { fn(); }, console, normaliseMessageBody, renderMessageBody, messageText, messageDirection,
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     emailShell: v => JSON.stringify(v),
     emailPreferenceUnsubscribeUrl: () => 'https://example.com/unsubscribe',
@@ -117,4 +118,27 @@ test('upgrading preserves previous retry payload and headers while new deliverie
   }},getEmailPreference:async()=>({marketing_opt_out:false,unsubscribe_token:'legacy'}),sendEmail:async mail=>{sent.push(mail);return{id:'provider'}}});
   await h.deliverMessageCampaign('campaign');assert.equal(sent.length,2);assert.equal(sent[0].html,snapshot.html);assert.deepEqual(JSON.parse(JSON.stringify(sent[0].headers)),{'List-Unsubscribe':'<https://example.com/unsubscribe>'});
   assert.match(sent[1].headers['List-Unsubscribe'],/unique-delivery-token/);assert.equal(sent[1].headers['List-Unsubscribe-Post'],'List-Unsubscribe=One-Click');
+});
+
+test('registration CSV hides opted-out addresses while retaining transaction rows and fails closed',async()=>{
+  const routeSource=source.split('\n').find(line=>line.startsWith("app.get('/api/admin/export.csv'"));
+  let handler,output,error;
+  const rows=[{reference:'REG-1',name:'Blocked',email:' BLOCKED@EXAMPLE.COM ',total:100},{reference:'REG-2',name:'Allowed',email:'allowed@example.com',total:200}];
+  const pool={query:async(sql)=>({rows:sql.startsWith('SELECT reference')?rows:[{email:'blocked@example.com'}]})};
+  const context=vm.createContext({app:{get:(_path,_auth,fn)=>handler=fn},auth:()=>{},pool,blockedEmails,normalizeEmail:value=>String(value||'').trim().toLowerCase()});
+  vm.runInContext(routeSource,context);
+  const response={set(){return this},send(v){output=v}};
+  await handler({},response,e=>error=e);assert.equal(error,undefined);assert.match(output,/REG-1/);assert.match(output,/100/);assert.match(output,/allowed@example.com/);assert.doesNotMatch(output,/blocked@example.com/i);
+  process.env.MESSAGE_SUPPRESSION_REMOTE_URL='http://invalid.example';process.env.MESSAGE_SUPPRESSION_SYNC_KEY='x'.repeat(40);
+  try{output=null;await handler({},response,e=>error=e);assert.equal(error.status,503);assert.equal(output,null);}finally{delete process.env.MESSAGE_SUPPRESSION_REMOTE_URL;delete process.env.MESSAGE_SUPPRESSION_SYNC_KEY;}
+});
+
+test('new campaign sharing uses its campaign source code when the worker renders delivery',async()=>{
+  const sent=[],subscription_code='11111111-2222-3333-4444-555555555555';
+  const h=helpers({pool:{query:async(sql)=>{
+    if(sql.startsWith('SELECT * FROM email_campaigns'))return{rows:[{status:'sending',subject:'Share',body:'Knowledge',subscription_code,settings:{designVersion:3,shareEnabled:true}}]};
+    if(sql.startsWith('SELECT id,email'))return{rows:[{id:'new',email:'recipient@example.com',unsubscribe_token:'own-token'}]};
+    if(sql.startsWith('SELECT count'))return{rows:[{sent:1,failed:0}]};return{rows:[]};
+  }},getEmailPreference:async()=>({marketing_opt_out:false}),sendEmail:async mail=>{sent.push(mail);return{id:'stub'}}});
+  await h.deliverMessageCampaign('campaign');assert.equal(sent.length,1);assert.match(sent[0].html,new RegExp('source='+subscription_code));assert.doesNotMatch(sent[0].html,/recipient@example.com/);assert.match(sent[0].headers['List-Unsubscribe'],/own-token/);
 });

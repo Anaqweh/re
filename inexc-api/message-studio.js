@@ -110,7 +110,7 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     }
     return { ...recipients, issues, scheduledAt };
   }
-  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:5,suppressionShared:!!process.env.MESSAGE_SUPPRESSION_REMOTE_URL,ocr:'local-tesseract'}));
+  route('get','/settings', async (_req,res)=>res.json({settings:await getSettings(),from:emailFrom,mailEnabled,webhookEnabled,timezone:'Asia/Dubai',aiAvailable:false,version:5,subscriptions:1,suppressionShared:!!process.env.MESSAGE_SUPPRESSION_REMOTE_URL,ocr:'local-tesseract'}));
   route('put','/settings', async (req,res)=>{
     const settings = mailSettings(req.body);
     await pool.query("INSERT INTO message_studio_settings(id,value) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET value=EXCLUDED.value",[settings]);
@@ -323,7 +323,7 @@ export function installMessageStudio({ app, pool, auth, importUpload, resolveRec
     }); selections.delete(req.body.token); res.json({affected:result});
   });
   route('get','/contacts-export', async (req,res)=>{
-    const w = contactWhere(req.query); let rows = (await pool.query('SELECT full_name,email,language,tags,source FROM message_contacts c WHERE '+w.sql+" AND NOT c.suppressed AND NOT EXISTS(SELECT 1 FROM message_suppressions s WHERE s.email=c.email) ORDER BY created_at,id",w.params)).rows;
+    const w = contactWhere(req.query); let rows = (await pool.query('SELECT full_name,email,language,tags,source FROM message_contacts c WHERE '+w.sql+" AND c.email<>'' AND NOT c.suppressed AND NOT EXISTS(SELECT 1 FROM message_suppressions s WHERE s.email=c.email) AND NOT EXISTS(SELECT 1 FROM email_preferences p WHERE p.email=c.email AND p.marketing_opt_out) ORDER BY created_at,id",w.params)).rows;
     const blocked=await blockedEmails(pool,rows.map(r=>r.email)); rows=rows.filter(r=>!blocked.has(r.email));
     res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-contacts.csv"'}).send(csv([['الاسم','البريد الإلكتروني','اللغة','التصنيفات','المصدر'],...rows.map(r=>[r.full_name,r.email,r.language,r.tags.join('، '),r.source])]));
   });
