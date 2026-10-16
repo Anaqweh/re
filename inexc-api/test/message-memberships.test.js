@@ -48,6 +48,14 @@ test('existing API saves and renders selected cards and templates without sendin
     const preview=await h.request('/preview','POST',{payload:saved.data.payload});assert.equal(preview.status,200);
     for(const plan of plans)assert.equal(preview.data.html.includes(plan.name),ids.includes(plan.id));
     assert.match(preview.data.html,/إلغاء الاشتراك/);assert.match(preview.data.html,/inexctraining.com\/cards\//);
+    const rendered=new JSDOM(preview.data.html),links=[...rendered.window.document.querySelectorAll('a[href]')];
+    for(const plan of plans){
+      const details=links.filter(a=>a.getAttribute('href')==='https://www.inexctraining.com/cards/?plan='+plan.id);
+      const book=links.filter(a=>a.getAttribute('href')==='https://www.inexctraining.com/cards/?book='+plan.id);
+      assert.equal(details.length,ids.includes(plan.id)?1:0);assert.equal(book.length,ids.includes(plan.id)&&plan.remaining>0?1:0);
+      if(details.length)assert.equal(details[0].textContent,'استعرض البطاقة ومزاياها');
+    }
+    rendered.window.close();
     const template=await h.request('/templates/'+crypto.randomUUID(),'PUT',{name:'بطاقات مختارة',payload:saved.data.payload});assert.equal(template.status,200);
     assert.equal(template.data.body,saved.data.payload.message);
     const review=await h.request('/review','POST',{payload:saved.data.payload});assert.equal(review.status,200);assert.deepEqual(review.data.issues,[]);

@@ -90,7 +90,16 @@ async function loadPaymentOptions(){
  const unique=[...new Map(banks.map(b=>[JSON.stringify(b),b])).values()],bank=unique.length===1?unique[0]:{};
  return {version:0,electronicEnabled:false,bankConfigured:!!(bank.account||bank.iban),bank};
 }
+function followPlanLink(){
+ const params=new URLSearchParams(location.search),booking=params.get('book'),id=booking||params.get('plan');if(!id)return;
+ const button=[...document.querySelectorAll('#plans [data-plan]')].find(node=>node.dataset.plan===id);
+ if(!button){const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='البطاقة المطلوبة غير متاحة حاليًا. يمكنك استعراض البطاقات المتوفرة أدناه.';el('plans').before(notice);return;}
+ const card=button.closest('.plan');card.tabIndex=-1;card.focus({preventScroll:true});card.scrollIntoView({block:'center',behavior:'auto'});
+ // A link only opens the existing purchase form. Stock, pricing, payment
+ // availability and order creation remain in their existing verified flow.
+ if(booking&&!button.disabled)openPlan(id);
+}
 Promise.all([fetch(API+'/memberships/plans').then(r=>r.ok?r.json():Promise.reject()),loadPaymentOptions()])
  .then(([data,options])=>{plans=data;paymentOptions=options;const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' بطاقة';render();
-  if(new URLSearchParams(location.search).get('resume')==='1'){try{const draft=JSON.parse(sessionStorage.getItem('inexc_membership_purchase_draft'));if(draft&&Date.now()-draft.createdAt<3600000&&plans.some(p=>p.id===draft.plan_id)){openPlan(draft.plan_id);for(const id of ['name','email','phone'])el(id).value=draft[id]||''}}catch{}}
+  if(new URLSearchParams(location.search).get('resume')==='1'){try{const draft=JSON.parse(sessionStorage.getItem('inexc_membership_purchase_draft'));if(draft&&Date.now()-draft.createdAt<3600000&&plans.some(p=>p.id===draft.plan_id)){openPlan(draft.plan_id);for(const id of ['name','email','phone'])el(id).value=draft[id]||''}}catch{}}else followPlanLink();
  }).catch(()=>el('plans').innerHTML='<p>تعذّر تحميل البطاقات ووسائل الدفع الآن. أعد تحميل الصفحة لاحقًا.</p>');

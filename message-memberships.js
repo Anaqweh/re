@@ -38,6 +38,9 @@ export function membershipEmailPayload(plans,selectedIds,options={}){
     if(Number(plan.validMonths)>0)blocks.push(paragraph('مدة الصلاحية: '+months(plan.validMonths),{color:'#52647a',size:14}));
     for(const feature of membershipFeatures(plan))blocks.push({type:'bullet',direction:'rtl',runs:[{text:feature}]});
     if(plan.remaining!==undefined&&Number(plan.remaining)<=0)blocks.push(paragraph('هذه البطاقة غير متاحة للشراء حاليًا.',{color:'#52647a',size:14}));
+    const detailsUrl=cardsUrl+'?plan='+encodeURIComponent(plan.id),bookingUrl=cardsUrl+'?book='+encodeURIComponent(plan.id);
+    blocks.push({type:'button',direction:'rtl',align:'right',href:detailsUrl,button:{kind:'url',label:'استعرض البطاقة ومزاياها',target:detailsUrl,variant:'solid',color:'#1559d6',align:'right',radius:12,fullWidth:true,size:16},runs:[{text:'استعرض البطاقة ومزاياها'}]});
+    if(plan.remaining===undefined||Number(plan.remaining)>0)blocks.push({type:'paragraph',direction:'rtl',align:'center',runs:[{text:'احجز هذه البطاقة مباشرة',href:bookingUrl,color:'#1559d6',size:14}]});
   }
   blocks.push({type:'divider',runs:[]},paragraph('للاطّلاع على التفاصيل والتوافر الحالي واختيار بطاقتك، تفضّل بزيارة صفحة البطاقات التدريبية.',{color:'#52647a',size:14}));
   return {

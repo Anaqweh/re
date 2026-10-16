@@ -1,4 +1,4 @@
-import {mountMembershipEmail} from './message-memberships.js?v=20261016-mail1';
+import {mountMembershipEmail} from './message-memberships.js?v=20261016-card-links1';
 import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberNoticeRevision,updateSubscriberNotice} from './message-subscriptions-ui.js?v=20261016-notice1';
 import {emailFonts,fontStack,fontCSS} from './inexc-api/message-design.js?v=20261015-studio5';
 import {createButtonDesigner} from './message-button-editor.js?v=20261015-studio5';
