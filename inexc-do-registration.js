@@ -42,7 +42,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!Array.isArray(courses) || !courses.length) throw new Error('لا توجد دورات متاحة الآن.');
     COURSES.splice(0, COURSES.length, ...courses);
     renderCourses();
+    applyRequestType();
+    window.dispatchEvent(new Event('inexc:courses-ready'));
   } catch (error) {
+    COURSES.splice(0);
+    renderCourses();
+    courseSelect.options[0].textContent = 'تعذّر تحميل الدورات — أعد تحميل الصفحة';
     console.warn('INEXC courses unavailable', error);
   }
 
@@ -53,7 +58,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     const institutional = document.getElementById('requestType')?.value === 'institution';
     if (!institutional && !selectedCourse) return alert('يرجى اختيار الدورة.');
     const file = !institutional && selectedPayment === 'bank' ? document.getElementById('receipt').files[0] : null;
-    if (file && file.size > 5 * 1024 * 1024) return alert('حجم الوصل يجب ألا يتجاوز 5MB.');
+    if (!institutional && selectedPayment === 'bank') {
+      const receiptError = window.INEXCReceiptError(file, true);
+      if (receiptError) return alert(receiptError);
+    }
     const total = institutional ? 0 : selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
     if (!institutional && total > 0 && !['bank','link'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم بطاقتك التدريبية.');
     registrationPending = true;
@@ -113,23 +121,38 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 });
 
-/* إظهار بيانات التحويل التي أدخلتها الإدارة، وإخفاء الحقول الفارغة. */
+/* Keep the exact saved beneficiary details readable in an Arabic form. */
+window.INEXCReceiptError = (file, required = false) => {
+  if (!file) return required ? 'يرجى إرفاق وصل التحويل البنكي.' : '';
+  if (file.size > 5 * 1024 * 1024) return 'حجم الوصل يجب ألا يتجاوز 5MB.';
+  if (!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type)) return 'ارفع وصلًا بصيغة PDF أو JPG أو PNG أو WEBP.';
+  return '';
+};
+function renderBankDetails() {
+  const data = selectedCourse?.bank || {}, box = document.getElementById('bankBox');
+  let title = document.getElementById('bankTitleLine');
+  if (!title) { title = document.createElement('p'); title.id = 'bankTitleLine'; box.querySelector('h3').after(title); }
+  const set = (id, label, value, copy = false) => {
+    const element = document.getElementById(id);
+    element.replaceChildren(); element.style.display = value ? '' : 'none';
+    if (!value) return;
+    const caption = document.createElement('span'); caption.textContent = label;
+    const text = document.createElement('bdi'); text.dir = 'ltr'; text.textContent = value;
+    element.append(caption, text);
+    if (copy) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'bank-copy'; button.textContent = 'نسخ'; button.setAttribute('aria-label', 'نسخ '+label);
+      button.onclick = async () => { try { await navigator.clipboard.writeText(String(value)); button.textContent = 'تم النسخ'; } catch { const selection = window.getSelection(), range = document.createRange(); range.selectNodeContents(text); selection.removeAllRanges(); selection.addRange(range); button.textContent = 'حددنا الرقم للنسخ'; } };
+      element.append(button);
+    }
+  };
+  set('bankTitleLine', 'اسم البنك', data.title);
+  set('bankName', 'اسم صاحب الحساب', data.name);
+  set('bankAccount', 'رقم الحساب', data.account, true);
+  set('bankIban', 'IBAN', data.iban, true);
+}
 function toggleBank() {
   const bank = selectedPayment === 'bank';
   document.getElementById('bankBox').classList.toggle('show', bank);
   document.getElementById('receipt').required = bank;
-  if (!bank) return;
-  const data = selectedCourse.bank || {};
-  const box = document.getElementById('bankBox');
-  let bankTitle = document.getElementById('bankTitleLine');
-  if (!bankTitle) { bankTitle = document.createElement('p'); bankTitle.id = 'bankTitleLine'; box.querySelector('h3').after(bankTitle); }
-  const set = (id, label, value) => {
-    const element = document.getElementById(id);
-    element.textContent = value ? `${label}: ${value}` : '';
-    element.style.display = value ? 'block' : 'none';
-  };
-  set('bankTitleLine', 'اسم البنك', data.title);
-  set('bankName', 'اسم صاحب الحساب', data.name);
-  set('bankAccount', 'رقم الحساب', data.account);
-  set('bankIban', 'IBAN', data.iban);
+  renderBankDetails();
 }

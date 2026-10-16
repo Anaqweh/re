@@ -1,0 +1,16 @@
+/* Payment details and controls retain the site's blue identity. */
+[hidden]{display:none!important}
+.bank-box p:not(.hint){display:grid;grid-template-columns:1fr auto;gap:5px 10px;margin:14px 0;color:#294e70;font-size:14px}
+.bank-box p>span{grid-column:1/-1;font-size:13px;color:#526c85}
+.bank-box bdi{min-width:0;overflow-wrap:anywhere;line-height:1.8;text-align:start;font-weight:600;user-select:all}
+.bank-copy,#verifyMembership{font:inherit;font-size:13px;color:#0759a9;background:#fff;border:1px solid #a9cdec;border-radius:8px;padding:7px 12px;cursor:pointer;min-height:40px}
+.bank-copy{align-self:start}
+#verifyMembership{margin:10px 0;font-size:14px;min-height:44px;padding:8px 16px}
+#verifyMembership:disabled{opacity:.6;cursor:wait}
+.choice:focus-within,.bank-copy:focus-visible,#verifyMembership:focus-visible,#membershipPayment:focus-within>label{outline:3px solid #75b5ee;outline-offset:3px}
+#membershipPayment>label{font-size:14px;cursor:pointer}
+#membershipCode{margin-top:8px;font-size:16px}
+#membershipInfo{font-size:14px;line-height:1.9}
+.bank-box .hint,#membershipFields>.hint{font-size:12px;line-height:1.8}
+.bank-box h3,.upload label{font-size:14px}
+@media(max-width:560px){.bank-box p:not(.hint){font-size:13px}.bank-copy{padding:7px 9px}.bank-box bdi{word-break:break-word}}
