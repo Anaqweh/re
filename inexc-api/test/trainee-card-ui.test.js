@@ -80,3 +80,31 @@ test('existing public record loader renders the record, and missing records offe
   dom.window.close();
  }
 });
+
+function previewClock(w){
+ const timers=new Map();let id=0;w.setTimeout=(fn,delay)=>{timers.set(++id,{fn,delay});return id};w.clearTimeout=id=>timers.delete(id);
+ Object.defineProperty(w.document,'visibilityState',{configurable:true,value:'visible'});
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
+ return {timers,fire(){const timer=[...timers.values()].find(t=>t.delay===3000);assert.ok(timer);timer.fn()}};
+}
+test('landing page shows the original sample card after 3000ms and can return to lookup',()=>{
+ const {dom,w}=setup();const clock=previewClock(w);w.eval(source('js/trainee-card-page.js'));assert.equal(w.document.querySelector('.tc-promo'),null);assert.equal([...clock.timers.values()].filter(t=>t.delay===3000).length,1);
+ clock.fire();const dialog=w.document.querySelector('.tc-promo');assert.equal(dialog.open,true);assert.equal(dialog.querySelectorAll('.tc-card').length,1);assert.match(dialog.textContent,/INEXC-DEMO-001/);assert.match(dialog.textContent,/غير صادرة/);assert.equal(dialog.querySelector('.tc-promo-actions a').getAttribute('href'),'/cards/');assert.equal(w.document.querySelector('script[src*=supabase]'),null);
+ dialog.querySelector('[data-have-card]').click();assert.equal(w.document.querySelector('.tc-promo'),null);assert.equal(w.document.activeElement,w.document.getElementById('cardReference'));clock.fire();assert.equal(w.document.querySelector('.tc-promo'),null);dom.window.close();
+});
+test('typing or focused lookup prevents the timed card preview',()=>{
+ for(const action of ['input','focus']){
+  const {dom,w}=setup();const clock=previewClock(w);w.eval(source('js/trainee-card-page.js'));const input=w.document.getElementById('cardReference');
+  if(action==='input'){input.value='record';input.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(clock.timers.size,0)}else{input.focus();clock.fire()}
+  assert.equal(w.document.querySelector('.tc-promo'),null);dom.window.close();
+ }
+});
+test('hidden page defers sample until visible and close button removes it',()=>{
+ const {dom,w}=setup();const clock=previewClock(w);Object.defineProperty(w.document,'visibilityState',{configurable:true,value:'hidden'});w.eval(source('js/trainee-card-page.js'));clock.fire();assert.equal(w.document.querySelector('.tc-promo'),null);
+ Object.defineProperty(w.document,'visibilityState',{configurable:true,value:'visible'});w.document.dispatchEvent(new w.Event('visibilitychange'));assert.equal(w.document.querySelector('.tc-promo').open,true);w.document.querySelector('.tc-promo-close').click();assert.equal(w.document.querySelector('.tc-promo'),null);dom.window.close();
+});
+test('explicit preview and real or malformed card links never schedule promotional dialog',()=>{
+ for(const query of ['?preview=1','?id=12345678-1234-1234-1234-123456789abc','?id=invalid']){
+  const {dom,w}=setup(query);const clock=previewClock(w);w.eval(source('js/trainee-card-page.js'));assert.equal([...clock.timers.values()].some(t=>t.delay===3000),false);assert.equal(w.document.querySelector('.tc-promo'),null);dom.window.close();
+ }
+});

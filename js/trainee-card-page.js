@@ -4,6 +4,27 @@
  const uuid=/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
  const loadScript=src=>new Promise((resolve,reject)=>{const node=document.createElement('script');const finish=error=>{clearTimeout(timer);node.onload=node.onerror=null;if(error){node.remove();reject(error)}else resolve()};const timer=setTimeout(()=>finish(Error('انتهت مهلة الاتصال بخدمة بيانات المتدربين. أعد المحاولة.')),12000);node.src=src;node.onload=()=>finish();node.onerror=()=>finish(Error('تعذر الاتصال بخدمة بيانات المتدربين.'));document.head.append(node)});
  const demo={profile:{id:'preview',full_name:'سارة محمد عبدالله',specialty:'التعليم وتطبيقات الذكاء الاصطناعي'},digitalId:{idNumber:'INEXC-DEMO-001',tierKey:'silver',trainingHours:40},professionalValue:{overallReadiness:100},certificates:[{course_name:'الذكاء الاصطناعي في التعليم',certificate_number:'DEMO-CERT-001'},{course_name:'تصميم تجارب تعلّم رقمية',certificate_number:'DEMO-CERT-002'}]};
+ function scheduleCardPreview(){
+  let cancelled=false,shown=false;
+  const lookup=document.getElementById('cardLookup');
+  const stop=()=>{cancelled=true;clearTimeout(timer);document.removeEventListener('visibilitychange',whenVisible)};
+  function whenVisible(){if(document.visibilityState!=='hidden')show()}
+  function show(){
+   if(cancelled||shown)return;
+   if(document.visibilityState==='hidden'){document.addEventListener('visibilitychange',whenVisible);return;}
+   if(lookup.contains(document.activeElement)||document.getElementById('cardReference').value.trim()||document.querySelector('dialog[open]')){stop();return;}
+   shown=true;document.removeEventListener('visibilitychange',whenVisible);
+   const previous=document.activeElement,dialog=document.createElement('dialog');dialog.className='tc-promo';dialog.setAttribute('aria-labelledby','tcPromoTitle');dialog.setAttribute('aria-describedby','tcPromoIntro');
+   dialog.innerHTML='<div class="tc-promo-head"><span class="tc-eyebrow">INEXC / رحلتك التدريبية</span><button type="button" class="tc-promo-close" aria-label="إغلاق معاينة البطاقة">×</button></div><div class="tc-promo-content"><h2 id="tcPromoTitle">تخيّل رحلتك التدريبية هنا.</h2><p id="tcPromoIntro">بطاقة تجمع هويتك التدريبية وسجل شهاداتك، بتصميم يمكنك حفظه ومشاركته.</p><div class="tc-promo-card"></div><p class="tc-promo-note">نموذج توضيحي للتصميم — الاسم والبيانات للمعاينة، وهذه البطاقة غير صادرة.</p><div class="tc-promo-actions"><a class="tc-btn primary" href="/cards/">استعرض البطاقات التدريبية</a><button class="tc-btn" type="button" data-have-card>لدي بطاقة بالفعل</button></div></div>';
+   const sample=document.createElement('div');sample.innerHTML=TraineeCard.render(demo,{demo:true});dialog.querySelector('.tc-promo-card').append(sample.querySelector('.tc-card'));document.body.append(dialog);
+   dialog.querySelector('.tc-promo-close').onclick=()=>dialog.close();dialog.querySelector('[data-have-card]').onclick=()=>{dialog.close();document.getElementById('cardReference').focus()};
+   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
+   dialog.addEventListener('close',()=>{dialog.remove();if(previous&&previous!==document.body&&previous.isConnected)previous.focus()},{once:true});
+   dialog.showModal();
+  }
+  const timer=setTimeout(show,3000);
+  lookup.addEventListener('input',stop,{once:true});lookup.addEventListener('submit',stop,{once:true});window.addEventListener('pagehide',stop,{once:true});
+ }
  function error(message){root.innerHTML='<section class="tc-panel tc-page-error"><div class="tc-status-icon" style="margin-inline:auto">!</div><h2>تعذّر عرض البطاقة</h2><p></p><a class="tc-btn primary" href="digital-id.html">التحقق من رابط آخر</a><button class="tc-btn" id="retryCard" type="button">إعادة المحاولة</button></section>';root.querySelector('p').textContent=message;document.getElementById('retryCard').onclick=()=>location.reload();}
  if(params.get('preview')==='1'){
   document.getElementById('previewNotice').hidden=false;
@@ -13,6 +34,7 @@
  }
  const profileId=params.get('id');
  if(!profileId){
+  scheduleCardPreview();
   document.getElementById('cardLookup').onsubmit=event=>{event.preventDefault();const value=document.getElementById('cardReference').value.trim();let id=value;
    try{if(value.includes('://'))id=new URL(value).searchParams.get('id')||'';}catch{id='';}
    if(!uuid.test(id)){document.getElementById('lookupError').textContent='أدخل رابط البطاقة الكامل أو رمز السجل الصحيح.';document.getElementById('cardReference').setAttribute('aria-invalid','true');return;}
