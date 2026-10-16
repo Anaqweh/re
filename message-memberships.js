@@ -43,6 +43,7 @@ export function membershipEmailPayload(plans,selectedIds,options={}){
     if(plan.remaining===undefined||Number(plan.remaining)>0)blocks.push({type:'paragraph',direction:'rtl',align:'center',runs:[{text:'احجز هذه البطاقة مباشرة',href:bookingUrl,color:'#1559d6',size:14}]});
   }
   blocks.push({type:'divider',runs:[]},paragraph('للاطّلاع على التفاصيل والتوافر الحالي واختيار بطاقتك، تفضّل بزيارة صفحة البطاقات التدريبية.',{color:'#52647a',size:14}));
+  blocks.push({type:'button',direction:'rtl',align:'center',href:cardsUrl,button:{kind:'url',label:'استعراض البطاقات والتسجيل',target:cardsUrl,variant:'solid',color:'#1559d6',align:'center',radius:0,fullWidth:false,size:16},runs:[{text:'استعراض البطاقات والتسجيل'}]});
   return {
     ...mailIdentityDefaults(false),designVersion:3,layout:'signature',plain:false,
     fontFamily:'ibm',headingFont:'ibm',bodySize:16,headingSize:30,lineHeight:1.9,
@@ -52,7 +53,7 @@ export function membershipEmailPayload(plans,selectedIds,options={}){
     subject:options.subject??(selected.length===1?selected[0].name+' | INEXC Training':'بطاقات INEXC التدريبية | اختر ما يناسبك'),
     preheader:selected.map(p=>p.name).join(' · ').slice(0,180),
     message:normaliseMessageBody(richTextPrefix+JSON.stringify({direction:'rtl',blocks})),
-    ctaLabel:'استعراض البطاقات والتسجيل',ctaUrl:cardsUrl,
+    ctaLabel:'',ctaUrl:'',
     audience:'custom',extraRecipients:'',scheduledAt:'',attachmentPath:'',shareEnabled:false
   };
 }

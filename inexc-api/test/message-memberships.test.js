@@ -23,7 +23,8 @@ test('one, two and all selections preserve current plan data without changing it
     const payload=membershipEmailPayload(plans,ids),text=messageText(payload.message);
     for(const plan of plans)assert.equal(text.includes(plan.name),ids.includes(plan.id)&&plan.active);
     assert.equal(payload.audience,'custom');assert.equal(payload.extraRecipients,'');assert.equal(payload.scheduledAt,'');
-    assert.equal(payload.ctaUrl,'https://www.inexctraining.com/cards/');
+    assert.equal(payload.ctaUrl,'');
+    const footer=JSON.parse(payload.message.slice(richTextPrefix.length)).blocks.at(-1);assert.equal(footer.href,'https://www.inexctraining.com/cards/');assert.equal(footer.button.align,'center');
   }
   assert.deepEqual(plans,before);
   assert.match(messageText(membershipEmailPayload(plans,['launch']).message),/39.50 USD/);
