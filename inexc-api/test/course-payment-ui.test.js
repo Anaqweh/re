@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+const read=file=>fs.readFile(new URL('../../'+file,import.meta.url),'utf8'),tick=()=>new Promise(r=>setTimeout(r,0));
+for(const page of ['register/index.html','register.html'])test(page+': configured link checkout needs no receipt and bank-only checkout keeps its receipt',async()=>{
+ const dom=new JSDOM(await read(page),{url:'https://local.invalid/'+page,runScripts:'outside-only'}),w=dom.window;
+ if(w.document.readyState!=='complete')await new Promise(r=>w.addEventListener('load',r,{once:true}));
+ const el=id=>w.document.getElementById(id),requests=[],alerts=[];let finish;
+ w.INEXC_REGISTRATION_ENDPOINT='https://local.invalid/api';w.alert=message=>alerts.push(message);
+ const courses=[{id:'both',name:'LOCAL LINK',price:249,certificate:{mode:'optional',name:'LOCAL CERT',price:50},payments:['link','bank'],paymentLink:'https://payments.example.invalid/checkout',bank:{name:'LOCAL',account:'0000'}},{id:'bank',name:'LOCAL BANK',price:199,certificate:{mode:'none'},payments:['bank'],paymentLink:'https://payments.example.invalid/disabled',bank:{name:'LOCAL',account:'0000'}},{id:'missing',name:'LOCAL MISSING LINK',price:199,certificate:{mode:'none'},payments:['link'],paymentLink:'#'}];
+ w.fetch=async(url,opt={})=>{requests.push({url,opt});if(url.endsWith('/courses'))return {ok:true,json:async()=>courses};if(url.endsWith('/registrations'))return new Promise(resolve=>finish=resolve);throw Error('Unexpected request')};
+ w.eval([...w.document.querySelectorAll('script:not([src])')].map(s=>s.textContent).join('\n')+'\n'+await read(page.startsWith('register/')?'register/inexc-do-registration.js':'inexc-do-registration.js'));
+ w.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();el('course').value='both';el('course').dispatchEvent(new w.Event('change'));assert.equal(el('receipt').required,true);
+ const link=w.document.querySelector('[name=payment][value=link]');assert.ok(link);link.checked=true;link.dispatchEvent(new w.Event('change'));assert.equal(el('receipt').required,false);assert.equal(el('bankBox').classList.contains('show'),false);assert.equal(el('submitButton').textContent,'المتابعة إلى الدفع');
+ el('name').value='LOCAL';el('email').value='local@example.invalid';el('phone').value='000000';Object.defineProperty(el('receipt'),'files',{value:[new w.File(['old receipt'],'old.pdf',{type:'application/pdf'})]});
+ for(let i=0;i<2;i++)el('registrationForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+ const submitted=requests.filter(r=>r.url.endsWith('/registrations'));assert.equal(submitted.length,1);assert.equal(submitted[0].opt.body.get('payment_method'),'link');assert.equal(submitted[0].opt.body.get('receipt'),null);
+ finish({ok:false,json:async()=>({error:'LOCAL NETWORK ERROR'})});await tick();assert.equal(el('submitButton').disabled,false);assert.equal(alerts.at(-1),'LOCAL NETWORK ERROR');
+ el('course').value='bank';el('course').dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelector('[name=payment][value=link]'),null);assert.equal(el('receipt').required,true);
+ el('course').value='missing';el('course').dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelectorAll('[name=payment]').length,0);assert.equal(el('receipt').required,false);assert.match(el('paymentChoices').textContent,/يُجهّز رابط الدفع/);dom.window.close();
+});

@@ -88,7 +88,7 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
   req.learnerEmail=session.email;req.learnerTokenHash=hash(token);next();
  });
  app.use('/api/admin/learner-records',(_req,res,next)=>{res.set('Cache-Control','no-store');next()});
- app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:2,certificates:true,cardRecovery:true}));
+ app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:2,certificates:true,cardRecovery:true,coursePaymentLinks:true}));
  app.post('/api/learner/card-recovery',asyncRoute(async(req,res)=>{
   res.set('Cache-Control','no-store');
   const raw=req.body?.email,address=typeof raw==='string'?raw.trim().toLowerCase():'';

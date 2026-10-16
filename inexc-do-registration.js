@@ -46,13 +46,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('INEXC courses unavailable', error);
   }
 
+  let registrationPending = false;
   form.onsubmit = async event => {
     event.preventDefault();
+    if (registrationPending) return;
     const institutional = document.getElementById('requestType')?.value === 'institution';
     if (!institutional && !selectedCourse) return alert('يرجى اختيار الدورة.');
-    const file = document.getElementById('receipt').files[0];
+    const file = !institutional && selectedPayment === 'bank' ? document.getElementById('receipt').files[0] : null;
     if (file && file.size > 5 * 1024 * 1024) return alert('حجم الوصل يجب ألا يتجاوز 5MB.');
-    const total = selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
+    const total = institutional ? 0 : selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
+    if (!institutional && total > 0 && !['bank','link'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم بطاقتك التدريبية.');
+    registrationPending = true;
     const button = document.getElementById('submitButton');
     button.disabled = true;
     button.textContent = 'جارٍ إرسال الطلب...';
@@ -101,6 +105,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         ? 'تم استلام طلب التسجيل ووصل التحويل. سنراجع العملية ونؤكد التسجيل عبر البريد الإلكتروني.'
         : 'تم استلام طلب التسجيل. سنرسل لك تفاصيل التأكيد عبر البريد الإلكتروني.';
     } catch (error) {
+      registrationPending = false;
       alert(error.message || 'حدث خطأ أثناء إرسال الطلب.');
       button.disabled = false;
       institutional ? applyRequestType() : updateSummary();

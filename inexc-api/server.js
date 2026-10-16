@@ -1,4 +1,5 @@
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
+import {validateCoursePayment} from './course-payment.js';
 import {setupMessageSubscriptions, installMessageSubscriptions} from './message-subscriptions.js';
 import {subscriptionUrl} from './message-subscription-links.js';
 import { normalizeEmail, assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
@@ -1126,17 +1127,15 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     const requestedPaymentMethod = clean(req.body.payment_method, 20);
     const paymentMethod = standardTotal === 0 ? 'free' : requestedPaymentMethod;
     if (paymentMethod !== 'membership' && course.public_booking_opens_at && new Date(course.public_booking_opens_at) > new Date()) return res.status(400).json({ error: 'التسجيل العام لهذه الدورة لم يبدأ بعد.' });
-    if (paymentMethod === 'link') return res.status(400).json({ error: 'الدفع عبر الرابط غير مفعّل حاليًا. يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
-    if (paymentMethod !== 'membership' && standardTotal > 0 && paymentMethod !== 'bank') return res.status(400).json({ error: 'يرجى اختيار التحويل البنكي وإرفاق الوصل.' });
-    if (paymentMethod === 'bank' && !req.file) return res.status(400).json({ error: 'يرجى إرفاق وصل التحويل البنكي.' });
+    const checkout = validateCoursePayment(course,{method:paymentMethod,total:standardTotal,hasReceipt:!!req.file});
     const registrationReference = reference();
     const total = standardTotal;
-    const status = paymentMethod === 'bank' ? 'بانتظار مراجعة الوصل' : total > 0 ? 'بانتظار الدفع' : 'مسجل';
+    const status = checkout.status;
     const receiptPath = req.file ? `/uploads/${req.file.filename}` : '';
     const inserted = await pool.query(`INSERT INTO registrations (reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,membership_redemption_id)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, [registrationReference,name,email,phone,course.id,course.name,certificate,total,paymentMethod,status,receiptPath,null,null]);
     sendRegistrationEmails({ reference: registrationReference, name, email, phone, courseName: course.name, total, status });
-    res.status(201).json({ ok: true, reference: registrationReference, paymentLink: paymentMethod === 'link' ? course.payment_link : '' });
+    res.status(201).json({ ok: true, reference: registrationReference, paymentLink: checkout.paymentLink });
   } catch (error) { next(error); }
 });
 app.post('/api/institution-requests', async (req, res, next) => {
