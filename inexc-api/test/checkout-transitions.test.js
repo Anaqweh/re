@@ -6,7 +6,7 @@ import {JSDOM} from 'jsdom';
 const read=file=>fs.readFile(new URL('../../'+file,import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 const course={id:'11111111-1111-4111-8111-111111111111',name:'LOCAL COURSE',price:199,certificate:{mode:'optional',name:'LOCAL CERT',price:100},payments:['bank','link'],paymentLink:'https://payment.example.invalid/pay',membershipEnabled:true,bank:{name:'LOCAL BENEFICIARY',account:'123456',iban:'LOCAL-IBAN'}};
-async function harness(page,{unavailable=false}={}){
+async function harness(page,{unavailable=false,stripeEnabled=false}={}){
  const dom=new JSDOM(await read(page),{url:'https://local.invalid/'+page,runScripts:'outside-only'}),w=dom.window;
  if(w.document.readyState!=='complete')await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
  const requests=[],alerts=[],copied=[];w.INEXC_REGISTRATION_ENDPOINT='https://local.invalid/api';w.alert=message=>alerts.push(message);w.console.warn=()=>{};
@@ -14,7 +14,7 @@ async function harness(page,{unavailable=false}={}){
  w.fetch=async(url,opt={})=>{
   requests.push({url,opt});let data;
   if(url.endsWith('/courses')){if(unavailable)throw Error('OFFLINE');data=[course,{...course,id:'other',membershipEnabled:false,bank:{...course.bank,account:'654321'}}]}
-  else if(url.endsWith('/capabilities'))data={cardCheckout:2};
+  else if(url.endsWith('/capabilities'))data={cardCheckout:2,enabled:stripeEnabled};
   else if(url.endsWith('/verify'))data={cost:2,remainingBefore:6,remainingAfter:4,certificateFee:90};
   else if(url.endsWith('/registrations'))data={reference:'LOCAL-REFERENCE'};
   else throw Error('Unexpected request '+url);
@@ -26,6 +26,23 @@ async function harness(page,{unavailable=false}={}){
  return {dom,w,el,change,requests,alerts,copied};
 }
 for(const page of ['register.html','register/index.html']){
+ test(page+': explicit return from INEXC card restores each payment method and keeps registration details',async t=>{
+  const h=await harness(page,{stripeEnabled:true});t.after(()=>h.dom.window.close());const {w,el,change,requests}=h;
+  el('course').value=course.id;change('course');el('name').value='LOCAL';el('email').value='local@example.invalid';el('phone').value='000000';el('membershipCode').value='INX-LOCAL';
+  const certificate=w.document.querySelector('[name=certificate][value=yes]');certificate.checked=true;certificate.dispatchEvent(new w.Event('change',{bubbles:true}));
+  for(const method of ['bank','stripe','link']){
+   const choice=w.document.querySelector('[name=payment][value='+method+']');choice.checked=true;choice.dispatchEvent(new w.Event('change',{bubbles:true}));
+   el('useMembershipCard').checked=true;change('useMembershipCard');assert.equal(el('membershipFields').hidden,false);assert.equal(el('useMembershipCard').getAttribute('aria-expanded'),'true');
+   if(method!=='bank'){el('verifyMembership').click();await tick();await tick();assert.equal(el('receipt').required,true)}
+   w.sessionStorage.setItem('inexc_membership_checkout',JSON.stringify({code:'INX-LOCAL'}));const before=requests.filter(r=>r.opt.method==='POST').length;
+   el('changePaymentMethod').click();
+   assert.equal(el('useMembershipCard').checked,false);assert.equal(el('membershipFields').hidden,true);assert.equal(el('paymentChoices').hidden,false);assert.notEqual(el('paymentArea').style.display,'none');assert.equal(el('useMembershipCard').getAttribute('aria-expanded'),'false');
+   assert.equal(w.document.querySelector('[name=payment]:checked').value,method);assert.equal(w.document.activeElement.value,method);assert.equal(el('receipt').required,method==='bank');assert.equal(el('bankBox').classList.contains('show'),method==='bank');assert.equal(w.sessionStorage.getItem('inexc_membership_checkout'),null);
+   assert.equal(el('name').value,'LOCAL');assert.equal(el('email').value,'local@example.invalid');assert.equal(el('phone').value,'000000');assert.equal(el('course').value,course.id);assert.equal(w.document.querySelector('[name=certificate][value=yes]').checked,true);assert.equal(el('membershipCode').value,'INX-LOCAL');assert.doesNotMatch(el('total').textContent,/وحدة|تحقق/);assert.equal(requests.filter(r=>r.opt.method==='POST').length,before);
+   if(method==='stripe'){assert.equal(el('submitButton').textContent,'المتابعة إلى الدفع الآمن');assert.match(w.document.querySelector('[name=payment][value=stripe]').parentElement.textContent,/الدفع الإلكتروني/)}
+  }
+  assert.equal(requests.some(r=>r.url.endsWith('/registrations')||r.url.endsWith('/checkout')),false);
+ });
  test(page+': bank receipt, exact copy values and card-to-institution transitions',async t=>{
   const h=await harness(page);t.after(()=>h.dom.window.close());const {w,el,change,requests}=h;
   el('course').value=course.id;change('course');

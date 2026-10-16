@@ -24,7 +24,7 @@ for(const page of ['register/index.html','register.html'])test(page+': Stripe ca
  w.eval([...w.document.querySelectorAll('script:not([src])')].map(s=>s.textContent).join('\n')+'\n'+await read(page.startsWith('register/')?'register/inexc-do-registration.js':'inexc-do-registration.js'));
  w.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
  assert.equal(el('name').value,'LOCAL');assert.equal(w.document.querySelector('[name=certificate][value=yes]').checked,true);
- const choice=w.document.querySelector('[name=payment][value=stripe]');assert.ok(choice);choice.checked=true;choice.dispatchEvent(new w.Event('change'));assert.equal(el('receipt').required,false);assert.equal(el('bankBox').classList.contains('show'),false);assert.equal(el('submitButton').textContent,'المتابعة إلى Stripe');
+ const choice=w.document.querySelector('[name=payment][value=stripe]');assert.ok(choice);choice.checked=true;choice.dispatchEvent(new w.Event('change'));assert.equal(el('receipt').required,false);assert.equal(el('bankBox').classList.contains('show'),false);assert.equal(el('submitButton').textContent,'المتابعة إلى الدفع الآمن');
  for(let i=0;i<2;i++)el('registrationForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
  let posted=requests.filter(r=>r.url.endsWith('/checkout'));assert.equal(posted.length,1);const input=JSON.parse(posted[0].opt.body);assert.equal(input.certificate,'yes');assert.equal(input.course_id,course.id);assert.equal(input.amount,undefined);assert.equal(input.receipt,undefined);assert.match(input.request_key,/^[a-f\d-]{36}$/);
  finish({ok:false,status:503,json:async()=>({error:'LOCAL RETRY'})});await tick();assert.equal(el('submitButton').disabled,false);assert.equal(alerts.at(-1),'LOCAL RETRY');

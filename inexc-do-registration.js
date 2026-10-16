@@ -112,7 +112,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         try{sessionStorage.setItem('inexc_stripe_attempt',JSON.stringify(stripeAttempt));sessionStorage.setItem('inexc_stripe_draft',JSON.stringify(input));}catch{}
         const response=await fetch(`${endpoint}/payments/stripe/checkout`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...input,request_key:stripeAttempt.requestKey})});
         const result=await response.json();
-        if(!response.ok){if([409,410].includes(response.status)){stripeAttempt=null;try{sessionStorage.removeItem('inexc_stripe_attempt')}catch{}}throw new Error(result.error||'تعذّر تجهيز الدفع عبر Stripe.');}
+        if(!response.ok){if([409,410].includes(response.status)){stripeAttempt=null;try{sessionStorage.removeItem('inexc_stripe_attempt')}catch{}}throw new Error(result.error||'تعذّر تجهيز الدفع الإلكتروني.');}
         window.location.href=result.paymentLink;
         return;
       }

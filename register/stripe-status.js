@@ -23,7 +23,7 @@
     try{sessionStorage.removeItem('inexc_stripe_attempt')}catch{}
    }else{
     el('paymentTitle').textContent=credentials.cancelled?'لم يكتمل الدفع بعد':'بانتظار تأكيد الدفع';
-    el('paymentMessage').textContent=credentials.cancelled?'يمكنك العودة إلى صفحة Stripe لإكمال الدفع، أو الرجوع إلى التسجيل لاختيار طريقة أخرى.':'لم يصل تأكيد نهائي للعملية بعد. نحدّث الحالة تلقائيًا؛ لا تبدأ عملية دفع أخرى إذا كان المبلغ قد خُصم.';
+    el('paymentMessage').textContent=credentials.cancelled?'يمكنك العودة إلى صفحة الدفع الآمنة لإكمال العملية، أو الرجوع إلى التسجيل لاختيار طريقة أخرى.':'لم يصل تأكيد نهائي للعملية بعد. نحدّث الحالة تلقائيًا؛ لا تبدأ عملية دفع أخرى إذا كان المبلغ قد خُصم.';
     if(/^https:\/\/checkout\.stripe\.com\//.test(data.paymentLink||'')){el('resumePayment').href=data.paymentLink;el('resumePayment').hidden=false;}
     if(!credentials.cancelled&&polls++<8)timer=setTimeout(refresh,3000);
    }

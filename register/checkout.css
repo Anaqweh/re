@@ -14,3 +14,4 @@
 .bank-box .hint,#membershipFields>.hint{font-size:12px;line-height:1.8}
 .bank-box h3,.upload label{font-size:14px}
 @media(max-width:560px){.bank-box p:not(.hint){font-size:13px}.bank-copy{padding:7px 9px}.bank-box bdi{word-break:break-word}}
+.membership-fields-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.membership-fields-head strong{font-size:15px;color:var(--dark)}.payment-back{min-height:44px;padding:10px 14px;border:1px solid #98bde2;border-radius:10px;background:#fff;color:#075cac;font:600 14px Alexandria,Arial,sans-serif;cursor:pointer;white-space:normal}.payment-back:hover{background:#eaf4ff}.payment-back:disabled{opacity:.6;cursor:wait}.payment-back:focus-visible,.choice:has(input:focus-visible){outline:3px solid #075cac;outline-offset:3px}

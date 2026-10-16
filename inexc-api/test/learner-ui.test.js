@@ -25,3 +25,10 @@ test('forgot card flow uses only email on explicit submission and preserves logi
 test('recovery errors allow retry and reopening never resubmits automatically',async()=>{
  const dom=await domFor('account.html'),w=dom.window,el=id=>w.document.getElementById(id);let calls=0;w.fetch=async()=>{calls++;return{ok:false,status:429,json:async()=>({error:'انتظر 15 دقيقة ثم أعد المحاولة.'})}};w.eval(await read('js/learner-workspace.js'));el('forgotCard').click();el('recoveryEmail').value='learner@example.invalid';el('learnerRecovery').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.match(el('recoveryMessage').textContent,/15/);assert.equal(el('learnerRecovery').querySelector('button').disabled,false);el('backToLogin').click();el('forgotCard').click();assert.equal(calls,1);dom.window.close();
 });
+test('returning to other methods invalidates an in-flight card quote and reselecting requires fresh verification',async()=>{
+ const h=await registration(),{w,el,pending,requests}=h;try{
+  el('verifyMembership').click();await tick();el('changePaymentMethod').click();assert.equal(el('paymentChoices').hidden,false);
+  pending.shift()({cost:2,remainingBefore:8,remainingAfter:6,certificateFee:90});await tick();assert.equal(el('membershipFields').hidden,true);assert.doesNotMatch(el('total').textContent,/وحدة|رسوم الشهادة/);
+  el('useMembershipCard').checked=true;h.change('useMembershipCard');el('registrationForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(requests.filter(r=>r.url.endsWith('/registrations')).length,0);assert.match(el('membershipInfo').textContent,/تحقّق/);
+ }finally{h.dom.window.close()}
+});
