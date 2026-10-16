@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js learner-service.js course-payment.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
+inexc_files=(server.js learner-service.js course-payment.js stripe-payments.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
@@ -60,11 +60,16 @@ inexc_healthy=0
 for inexc_attempt in {1..20}; do
   if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if (lambda h: h.get("learnerVersion")==1)(json.load(sys.stdin)) else 1)' 2>/dev/null; then
     inexc_route_status="$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/learner/dashboard)"
-    if [[ "$inexc_route_status" == 401 ]] && curl --fail --silent http://127.0.0.1:3000/api/learner/capabilities | python3 -c 'import json,sys; sys.exit(0 if (lambda c: c.get("cardRecovery") is True and c.get("coursePaymentLinks") is True)(json.load(sys.stdin)) else 1)' 2>/dev/null; then inexc_healthy=1; break; fi
+    if [[ "$inexc_route_status" == 401 ]] && curl --fail --silent http://127.0.0.1:3000/api/learner/capabilities | python3 -c 'import json,sys; sys.exit(0 if (lambda c: c.get("cardRecovery") is True and c.get("coursePaymentLinks") is True)(json.load(sys.stdin)) else 1)' 2>/dev/null; then
+      if [[ "${INEXC_REQUIRE_STRIPE:-0}" == 1 ]]; then
+        if ! curl --fail --silent http://127.0.0.1:3000/api/payments/stripe/capabilities | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("enabled") is True else 1)' 2>/dev/null; then sleep 2; continue; fi
+      fi
+      inexc_healthy=1; break
+    fi
   fi
   sleep 2
 done
-(( inexc_healthy == 1 )) || { echo 'API health, private learner route or card recovery capability check failed.' >&2; exit 1; }
+(( inexc_healthy == 1 )) || { echo 'API health or required learner/Stripe capability check failed.' >&2; exit 1; }
 echo 'INEXC learner workspace deployed. No test registrations or emails were created. Existing scheduled workers resume their previously configured schedule.'
 curl --fail --silent http://127.0.0.1:3000/api/learner/capabilities
 echo

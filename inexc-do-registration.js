@@ -35,6 +35,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('requestType').addEventListener('change', applyRequestType);
   applyRequestType();
 
+  // Failure/old API leaves existing bank and INEXC-card payment available.
+  void fetch(`${endpoint}/payments/stripe/capabilities`, {cache:'no-store'}).then(r=>r.ok?r.json():null).then(data=>{
+    window.INEXCStripeEnabled=data?.enabled===true;
+    if(selectedCourse&&document.getElementById('requestType')?.value!=='institution'){renderPayments();updateSummary();}
+  }).catch(()=>{window.INEXCStripeEnabled=false;});
+
   try {
     const response = await fetch(`${endpoint}/courses`);
     if (!response.ok) throw new Error('تعذر تحميل الدورات.');
@@ -43,6 +49,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     COURSES.splice(0, COURSES.length, ...courses);
     renderCourses();
     applyRequestType();
+    try{
+      if(new URLSearchParams(location.search).get('resume')==='stripe'){
+        const draft=JSON.parse(sessionStorage.getItem('inexc_stripe_draft'));
+        if(draft&&draft.course_id===selectedCourse?.id){for(const id of ['name','email','phone'])document.getElementById(id).value=draft[id]||'';const choice=document.querySelector('[name=certificate][value="'+draft.certificate+'"]');if(choice){choice.checked=true;choice.dispatchEvent(new Event('change',{bubbles:true}));}}
+      }
+    }catch{}
     window.dispatchEvent(new Event('inexc:courses-ready'));
   } catch (error) {
     COURSES.splice(0);
@@ -52,6 +64,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   let registrationPending = false;
+  let stripeAttempt = null;
   form.onsubmit = async event => {
     event.preventDefault();
     if (registrationPending) return;
@@ -63,7 +76,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (receiptError) return alert(receiptError);
     }
     const total = institutional ? 0 : selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
-    if (!institutional && total > 0 && !['bank','link'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم بطاقتك التدريبية.');
+    if (!institutional && total > 0 && !['bank','link','stripe'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم بطاقتك التدريبية.');
     registrationPending = true;
     const button = document.getElementById('submitButton');
     button.disabled = true;
@@ -89,6 +102,18 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('success').classList.add('show');
         document.getElementById('reference').textContent = `رقم طلبكم: ${result.reference}`;
         document.getElementById('successText').textContent = 'تم استلام طلب مؤسستكم بنجاح. سيتواصل فريق INEXC معكم قريبًا لمناقشة البرنامج المناسب.';
+        return;
+      }
+      if (selectedPayment === 'stripe') {
+        const input = {name:document.getElementById('name').value.trim(),email:document.getElementById('email').value.trim(),phone:document.getElementById('phone').value.trim(),course_id:selectedCourse.id,certificate:selectedCertificate?'yes':'no'};
+        const fingerprint=JSON.stringify(input);
+        if(!stripeAttempt){try{stripeAttempt=JSON.parse(sessionStorage.getItem('inexc_stripe_attempt'))}catch{}}
+        if(!stripeAttempt||stripeAttempt.fingerprint!==fingerprint)stripeAttempt={fingerprint,requestKey:crypto.randomUUID()};
+        try{sessionStorage.setItem('inexc_stripe_attempt',JSON.stringify(stripeAttempt));sessionStorage.setItem('inexc_stripe_draft',JSON.stringify(input));}catch{}
+        const response=await fetch(`${endpoint}/payments/stripe/checkout`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...input,request_key:stripeAttempt.requestKey})});
+        const result=await response.json();
+        if(!response.ok){if([409,410].includes(response.status)){stripeAttempt=null;try{sessionStorage.removeItem('inexc_stripe_attempt')}catch{}}throw new Error(result.error||'تعذّر تجهيز الدفع عبر Stripe.');}
+        window.location.href=result.paymentLink;
         return;
       }
       const data = new FormData();

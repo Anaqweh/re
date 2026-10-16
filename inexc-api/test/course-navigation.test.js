@@ -38,6 +38,6 @@ for(const page of ['register/index.html','register.html'])test(page+': explicit 
   w.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
   assert.equal(w.document.getElementById('course').value,expected);
   assert.equal(w.document.getElementById('summaryCourse').textContent,expected?selected.name:'—');
-  assert.equal(requests.length,1);dom.window.close();
+  assert.equal(requests.filter(r=>r.url.endsWith('/courses')).length,1);assert.equal(requests.filter(r=>r.url.endsWith('/payments/stripe/capabilities')).length,1);dom.window.close();
  }
 });

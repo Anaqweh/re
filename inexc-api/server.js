@@ -1,3 +1,4 @@
+import {setupStripePayments, createStripePayments} from './stripe-payments.js';
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
 import {validateCoursePayment} from './course-payment.js';
 import {setupMessageSubscriptions, installMessageSubscriptions} from './message-subscriptions.js';
@@ -49,6 +50,8 @@ app.use(cors({ origin(origin, callback) {
   if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin not allowed'));
 }}));
+const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails});
+stripePayments.installWebhook(app);
 app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
   try {
     const secret = String(process.env.RESEND_WEBHOOK_SECRET || '').trim();
@@ -90,6 +93,7 @@ async function applyMessageEvent(emailId, type) {
   }
 }
 app.use(express.json({ limit: '1mb' }));
+stripePayments.installRoutes(app);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
 app.use('/uploads', express.static(uploadDir, { maxAge: '1h', index: false, dotfiles: 'deny' }));
 
@@ -314,11 +318,14 @@ function sendRegistrationEmails(registration) {
   const referenceNumber = escapeHtml(registration.reference);
   const status = escapeHtml(registration.status);
   const amount = Number(registration.total).toLocaleString('ar-AE');
+  const stripePaid = registration.paymentMethod === 'stripe';
+  const confirmationTitle = stripePaid ? 'تم تأكيد دفعك وتسجيلك' : 'تم استلام طلب تسجيلك';
+  const confirmationCopy = stripePaid ? 'شكرًا لثقتك بـ INEXC Training. تم استلام الدفع عبر Stripe وتأكيد تسجيلك في الدورة.' : 'شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.';
   const details = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dceafb;border-radius:12px;overflow:hidden;margin:22px 0;font-size:13px"><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;width:38%">رقم الطلب</td><td style="padding:11px 14px;font-weight:800;color:#0866c6;direction:ltr;text-align:right">${referenceNumber}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الدورة</td><td style="padding:11px 14px;font-weight:700;border-top:1px solid #dceafb">${course}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الحالة</td><td style="padding:11px 14px;border-top:1px solid #dceafb"><span style="display:inline-block;background:#fff4d9;color:#9b6500;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700">${status}</span></td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">المبلغ</td><td style="padding:11px 14px;font-weight:800;border-top:1px solid #dceafb">${amount} د.إ</td></tr></table>`;
-  const userHtml = emailShell({ title: 'تم استلام طلب تسجيلك', preview: `تم استلام طلبك في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">تم استلام طلب تسجيلك ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.</p>${details}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
+  const userHtml = emailShell({ title: confirmationTitle, preview: `${confirmationTitle} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">${confirmationTitle} ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">${confirmationCopy}</p>${details}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
   const adminHtml = emailShell({ title: 'طلب تسجيل جديد', preview: `طلب جديد من ${name} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">طلب تسجيل جديد</div><p style="margin:10px 0 0;color:#526c84;font-size:14px">تم استلام طلب جديد عبر الموقع. هذه تفاصيله:</p>${details}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px"><tr><td style="padding:8px 0;color:#6a8096;width:30%">الاسم</td><td style="padding:8px 0;font-weight:700">${name}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">البريد</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.email)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموبايل</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.phone)}</td></tr></table><div style="margin-top:22px;text-align:center"><a href="https://www.inexctraining.com/admin-portal.html" style="display:inline-block;background:#0866c6;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700">فتح لوحة الإدارة</a></div>` });
   void (async () => {
-    try { await sendEmailWithRetry({ to: registration.email, subject: `تم استلام طلبك – ${registration.reference}`, html: userHtml }); }
+    try { await sendEmailWithRetry({ to: registration.email, subject: `${confirmationTitle} – ${registration.reference}`, html: userHtml }); }
     catch (error) { console.error('Registration confirmation email error:', error); }
     if (!adminNotificationEmail) return console.error('ADMIN_NOTIFICATION_EMAIL غير مضبوط؛ لم يتم إرسال إشعار الإدارة.');
     try {
@@ -1714,4 +1721,4 @@ app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const 
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
-setupDatabase().then(() => setupLearnerService(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });

@@ -6,3 +6,14 @@ test-*.json
 # Local test dependency links and screenshots
 node_modules
 inexc-api/test/artifacts/
+
+# Server-only credentials and local activation backups
+.env
+.env.*
+!.env.example
+compose.override.yaml
+compose.override.yml
+docker-compose.override.yml
+docker-compose.override.yaml
+stripe-activation-backup-*/
+__pycache__/
