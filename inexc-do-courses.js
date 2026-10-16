@@ -12,14 +12,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     const price = value => Number(value) === 0 ? 'مجاني' : `${Number(value).toLocaleString('ar-AE')} <small>د.إ</small>`;
     const apiOrigin = endpoint.replace(/\/api\/?$/, '');
     const courseDetailsUrl = course => `/course/?id=${encodeURIComponent(course.id)}`;
+    const overview = course => String(course.description || '').split(/\r?\n/).find(line => line.trim() && !line.startsWith('## ')) || '';
+    const previewAxes = course => {
+      const axes = course.axes || [], headings = axes.filter(line => /^(المحور\s+.+[:：]|##\s)/.test(line));
+      return (headings.length ? headings : axes).slice(0,3).map(line => line.replace(/^(?:المحور\s+[^:：]+[:：]\s*|##\s*)/,''));
+    };
     const courseMedia = course => course.imageUrl
       ? `<div class="course-media"><img src="${esc(`${apiOrigin}${course.imageUrl}`)}" alt="${esc(course.name)}" loading="lazy"></div>`
       : '<div class="course-media fallback"><img src="assets/inexc-logo-official-source.png" alt="INEXC Training" loading="lazy"></div>';
     grid.innerHTML = courses.map(course => `<article class="course">
       ${courseMedia(course)}
       <span class="course-label">${esc(course.category || 'دورة تدريبية')}</span>
-      <h3>${esc(course.name)}</h3><p>${esc(course.description)}</p>
-      ${(course.axes || []).length ? `<div class="course-axes"><b>محاور الدورة</b><ul>${course.axes.slice(0,3).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
+      <h3>${esc(course.name)}</h3><p>${esc(overview(course))}</p>
+      ${(course.axes || []).length ? `<div class="course-axes"><b>من محاور البرنامج</b><ul>${previewAxes(course).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
       <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
       <div class="course-bottom"><div class="course-quick-info">${Number(course.hours) > 0 ? `<span class="course-hours">⏱ ${Number(course.hours).toLocaleString('ar-AE')} ساعة</span>` : ''}<div class="price">${price(course.price)}</div></div>
       <a class="course-link" href="${esc(courseDetailsUrl(course))}">تفاصيل وتسجيل</a></div>

@@ -1,0 +1,61 @@
+{
+  "created": "2026-10-16",
+  "method": "built-in image_gen; WebP encoding for delivery without changing artwork or dimensions",
+  "artworks": [
+    {
+      "slug": "prompt-engineering-teachers",
+      "file": "assets/courses/prompt-engineering-teachers-20261016.webp",
+      "prompt": "Create a premium editorial course-cover illustration for an Arabic professional teacher-training website. Subject: prompt engineering for teachers — a carefully arranged physical desk with a cobalt blue translucent speech bubble at center, three warm ivory instruction cards leading into it, and a beautifully finished lesson sheet emerging from it. Tactile paper, frosted glass and brushed aluminum, thoughtful visual metaphor for turning a precise question into a useful lesson. Sophisticated studio photography blended with crafted 3D editorial illustration, believable soft shadows, restrained blue and ivory with one apricot accent. Wide landscape 16:9 composition, main objects in central safe area, rich detail but calm uncluttered framing, excellent at a small course-card size. No words, no letters, no logos, no company name, no watermarks, no generic robot or brain. Not a screenshot, not a UI mockup. It must clearly feel specific to prompt crafting."
+    },
+    {
+      "slug": "notebooklm-learning-resources",
+      "file": "assets/courses/notebooklm-learning-resources-20261016.webp",
+      "prompt": "Create a premium editorial course-cover artwork for an Arabic professional teacher-training website. Sophisticated studio photography blended with crafted 3D editorial illustration, tactile paper, frosted glass, believable soft shadows. Wide landscape 16:9 composition with a central crop-safe subject and no excessive empty space; polished and readable at small course-card sizes. No text, no letters, no numbers, no logos, no company name, no watermark. Not a UI screenshot. Subject: research and study resources grounded in source books. An open blue linen-bound book on a light wooden desk, elegant loose manuscript pages rising into three translucent linked glass tabs, a small audio waveform sculpted in matte blue, and several neatly organized note cards. Deep blue, ivory, sage green; soft daylight from left. Visually convey going from a book to connected notes and audio, avoid generic AI robot."
+    },
+    {
+      "slug": "ai-assessment-rubrics",
+      "file": "assets/courses/ai-assessment-rubrics-20261016.webp",
+      "prompt": "Create a premium editorial course-cover artwork for an Arabic professional teacher-training website. Sophisticated studio photography blended with crafted 3D editorial illustration, tactile paper, frosted glass, believable soft shadows. Wide landscape 16:9 composition with a central crop-safe subject and no excessive empty space; polished and readable at small course-card sizes. No text, no letters, no numbers, no logos, no company name, no watermark. Not a UI screenshot. Subject: thoughtful educational assessment. A refined close-up still life of an ivory assessment sheet with simple blank answer circles, a cobalt pen, a translucent scoring grid with three amber tiles, and a miniature stepped progress sculpture. Cobalt and ivory with amber accents. Spacious bright studio, subtle diagonal framing. No readable test questions or labels."
+    },
+    {
+      "slug": "canva-ai-presentations",
+      "file": "assets/courses/canva-ai-presentations-20261016.webp",
+      "prompt": "Create a premium editorial course-cover artwork for an Arabic professional teacher-training website. Sophisticated studio photography blended with crafted 3D editorial illustration, tactile paper, frosted glass, believable soft shadows. Wide landscape 16:9 composition with a central crop-safe subject and no excessive empty space; polished and readable at small course-card sizes. No text, no letters, no numbers, no logos, no company name, no watermark. Not a UI screenshot. Subject: creative educational presentation design. A designer's vibrant tabletop arranged with overlapping elegant slide-sized panels, a large abstract paper-cut sun and mountain illustration, cobalt and turquoise swatches, a slim stylus, a circular color wheel, paper textures. Visually sophisticated editorial design workshop, joyful but professional, blue turquoise and warm coral, warm side light."
+    },
+    {
+      "slug": "claude-interactive-tools",
+      "file": "assets/courses/claude-interactive-tools-20261016.webp",
+      "prompt": "Create a premium editorial course-cover artwork for an Arabic professional teacher-training website. Sophisticated studio photography blended with crafted 3D editorial illustration, tactile paper, frosted glass, believable soft shadows. Wide landscape 16:9 composition with a central crop-safe subject and no excessive empty space; polished and readable at small course-card sizes. No text, no letters, no numbers, no logos, no company name, no watermark. Not a UI screenshot. Subject: building playful but professional interactive educational tools. A thin silver laptop with a beautifully designed abstract flashcard activity, alongside three floating solid frosted glass tiles showing matching-shape puzzles, an amber cursor sculptural arrow, and a paper prototype notebook. Cobalt blue with terracotta accents, soft minimal studio environment. Only simple geometric shapes on screens, no fake text."
+    },
+    {
+      "slug": "diploma-ai-teaching",
+      "file": "assets/courses/diploma-ai-teaching-20261016.webp",
+      "prompt": "Create a premium editorial course-cover artwork for an Arabic professional teacher-training website. Sophisticated studio photography blended with crafted 3D editorial illustration, tactile paper, frosted glass, believable soft shadows. Wide landscape 16:9 composition with a central crop-safe subject and no excessive empty space; polished and readable at small course-card sizes. No text, no letters, no numbers, no logos, no company name, no watermark. Not a UI screenshot. Subject: an integrated AI-assisted teaching journey. A sculptural open book at center on a spacious blue teacher desk, a globe, a minimal lesson-planning folder, small geometry teaching materials and an assessment card arranged in an elegant semicircle. Fine translucent blue lines subtly connect the educational resources. Blue and ivory with pale gold. Editorial photography, no human figures, sophisticated academic atmosphere."
+    },
+    {
+      "slug": "diploma-instructional-design",
+      "file": "assets/courses/diploma-instructional-design-20261016.webp",
+      "prompt": "Create a premium editorial landscape 16:9 course-cover artwork for an Arabic professional training website. Sophisticated photography blended with crafted dimensional objects, tactile paper, frosted glass, natural textures, convincing soft studio light. Strong central crop-safe composition, elegant and richly detailed but not cluttered, readable at a small card size. No text, no letters, no numbers, no brand logos, no watermark. No generic robot or floating brain. Subject: instructional design and training kit creation. A professional design studio tabletop with a beautiful accordion-fold storyboard, arranged ivory lesson cards connected by a fine blue ribbon, a refined binder with blue fabric cover, pencils and blank workshop activity sheets. Overhead three-quarter photographic view, cobalt blue and ivory with warm mustard accents. The sequence from planning to a finished training kit must feel clear."
+    },
+    {
+      "slug": "diploma-assessment-analytics",
+      "file": "assets/courses/diploma-assessment-analytics-20261016.webp",
+      "prompt": "Create a premium editorial landscape 16:9 course-cover artwork for an Arabic professional training website. Sophisticated photography blended with crafted dimensional objects, tactile paper, frosted glass, natural textures, convincing soft studio light. Strong central crop-safe composition, elegant and richly detailed but not cluttered, readable at a small card size. No text, no letters, no numbers, no brand logos, no watermark. No generic robot or floating brain. Subject: educational assessment and learning data analysis. A blue-tinted glass bar-chart sculpture beside a thin laptop displaying clean unlabeled abstract charts, a magnifying lens resting over an anonymous grid of dots, a few carefully arranged assessment sheets. Elegant data analyst desk, navy, ice blue and mint with amber accents, precise architectural composition, calm professional atmosphere. No real values or personal data."
+    },
+    {
+      "slug": "diploma-ai-agents",
+      "file": "assets/courses/diploma-ai-agents-20261016.webp",
+      "prompt": "Create a premium editorial landscape 16:9 course-cover artwork for an Arabic professional training website. Sophisticated photography blended with crafted dimensional objects, tactile paper, frosted glass, natural textures, convincing soft studio light. Strong central crop-safe composition, elegant and richly detailed but not cluttered, readable at a small card size. No text, no letters, no numbers, no brand logos, no watermark. No generic robot or floating brain. Subject: building AI agents and automating educational workflows. A carefully engineered physical network sculpture on a dark navy desk: frosted glass cubes connected by thin glowing cobalt paths, each cube carrying a simple embossed pictogram such as a book, gear, checkmark or document, one larger central decision hub in warm amber. Editorial technology still life, sophisticated realistic materials, dramatic soft side lighting. Symbolic artwork, not a precise explanatory diagram."
+    },
+    {
+      "slug": "diploma-educational-websites",
+      "file": "assets/courses/diploma-educational-websites-20261016.webp",
+      "prompt": "Create a premium editorial landscape 16:9 course-cover artwork for an Arabic professional training website. Sophisticated photography blended with crafted dimensional objects, tactile paper, frosted glass, natural textures, convincing soft studio light. Strong central crop-safe composition, elegant and richly detailed but not cluttered, readable at a small card size. No text, no letters, no numbers, no brand logos, no watermark. No generic robot or floating brain. Subject: building educational websites and platforms with AI. A beautiful small architectural composition made of floating browser-like panels behind a sleek silver laptop and a mobile phone, all with abstract blue blocks and a simple educational card layout. A paper wireframe notebook and small blue modular blocks in foreground convey building a website. Bright ivory and sky blue with deep cobalt and a little terracotta. Believable desk photography; screen forms intentionally have no text."
+    },
+    {
+      "slug": "diploma-claude-applied",
+      "file": "assets/courses/diploma-claude-applied-20261016.webp",
+      "prompt": "Create a premium editorial landscape 16:9 course-cover artwork for an Arabic professional training website. Sophisticated photography blended with crafted dimensional objects, tactile paper, frosted glass, natural textures, convincing soft studio light. Strong central crop-safe composition, elegant and richly detailed but not cluttered, readable at a small card size. No text, no letters, no numbers, no brand logos, no watermark. No generic robot or floating brain. Subject: a comprehensive applied Claude diploma spanning prompting, research, AI agents and web creation. A panoramic creative technology workbench with a central silver laptop, a terracotta glass speech bubble, an open research notebook, an elegant constellation of small connected cobalt cubes, and a refined miniature browser window sculpture. Editorial cinematic photography, mature warm ivory, cobalt and terracotta palette, polished coherent composition, unlike a generic technology ad. Screen with simple abstract panels only; no words or Claude logo."
+    }
+  ]
+}
