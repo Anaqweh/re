@@ -4,14 +4,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   const endpoint = window.INEXC_REGISTRATION_ENDPOINT || '';
   if (!grid || !endpoint) return;
   try {
-    const response = await fetch(`${endpoint}/courses`);
+    const response = await fetch(`${endpoint}/courses`, {cache:'no-store'});
     if (!response.ok) throw new Error('Courses are unavailable');
     const courses = await response.json();
     if (!courses.length) return;
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
     const price = value => Number(value) === 0 ? 'مجاني' : `${Number(value).toLocaleString('ar-AE')} <small>د.إ</small>`;
     const apiOrigin = endpoint.replace(/\/api\/?$/, '');
-    const courseShareUrl = course => course.shareUrl || `/course/?id=${encodeURIComponent(course.id)}`;
+    const courseDetailsUrl = course => `/course/?id=${encodeURIComponent(course.id)}`;
     const courseMedia = course => course.imageUrl
       ? `<div class="course-media"><img src="${esc(`${apiOrigin}${course.imageUrl}`)}" alt="${esc(course.name)}" loading="lazy"></div>`
       : '<div class="course-media fallback"><img src="assets/inexc-logo-official-source.png" alt="INEXC Training" loading="lazy"></div>';
@@ -22,7 +22,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       ${(course.axes || []).length ? `<div class="course-axes"><b>محاور الدورة</b><ul>${course.axes.slice(0,3).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
       <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
       <div class="course-bottom"><div class="course-quick-info">${Number(course.hours) > 0 ? `<span class="course-hours">⏱ ${Number(course.hours).toLocaleString('ar-AE')} ساعة</span>` : ''}<div class="price">${price(course.price)}</div></div>
-      <a class="course-link" href="${esc(courseShareUrl(course))}">تفاصيل وتسجيل</a></div>
+      <a class="course-link" href="${esc(courseDetailsUrl(course))}">تفاصيل وتسجيل</a></div>
     </article>`).join('');
   } catch (error) { console.warn('INEXC course cards unavailable', error); }
 });
