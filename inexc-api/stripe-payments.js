@@ -61,7 +61,8 @@ export function stripeClient(secret,fetcher=fetch){
 }
 
 // Creates and immediately expires an internal diagnostic session. No customer, registration, charge or email.
-export async function probeStripeCheckout({env=process.env,client,now=()=>Date.now()}={}){
+export async function probeStripeCheckout({env=process.env,client,now=()=>Date.now(),currency='aed'}={}){
+ if(!['aed','usd'].includes(currency))throw fail('عملة الفحص غير صالحة.');
  const key=String(env.STRIPE_SECRET_KEY||'').trim(),stripe=client||stripeClient(key);
  if(env.STRIPE_CHECKOUT_ENABLED!=='1'||!/^(sk|rk)_live_/.test(key)||!String(env.STRIPE_WEBHOOK_SECRET||'').startsWith('whsec_'))return {ready:false,checkedAt:new Date(now()).toISOString(),message:'إعدادات Stripe الحية غير مكتملة على الخادم.'};
  let stage='account';
@@ -70,7 +71,7 @@ export async function probeStripeCheckout({env=process.env,client,now=()=>Date.n
   const label='inexc-probe-'+Array.from(crypto.randomBytes(8),x=>String.fromCharCode(97+x%26)).join('');
   stage='create_session';
   const session=await stripe.create({mode:'payment',integration_identifier:label,'adaptive_pricing[enabled]':'false',success_url:SITE+'/payment-status.html',cancel_url:SITE+'/register/',
-   'metadata[source]':'inexc-readiness-probe','line_items[0][quantity]':'1','line_items[0][price_data][currency]':'aed','line_items[0][price_data][unit_amount]':'1000',
+   'metadata[source]':'inexc-readiness-probe','line_items[0][quantity]':'1','line_items[0][price_data][currency]':currency,'line_items[0][price_data][unit_amount]':'1000',
    'line_items[0][price_data][product_data][name]':'فحص جاهزية INEXC — لا تسدد',expires_at:String(Math.floor(now()/1000)+3600)},'inexc-probe-'+crypto.randomUUID());
   if(!/^cs_live_/.test(session.id||'')||session.livemode!==true)throw fail('تعذّر مطابقة بيئة Stripe.',503);
   stage='expire_session';const expired=await stripe.expire(session.id);
@@ -82,7 +83,7 @@ export async function probeStripeCheckout({env=process.env,client,now=()=>Date.n
  }
 }
 
-export function createStripePayments({pool,env=process.env,client,notify=()=>{},now=()=>Date.now()}){
+export function createStripePayments({pool,env=process.env,client,notify=()=>{},now=()=>Date.now(),handleOtherCheckout=async()=>{}}){
  const secret=text(env.STRIPE_SECRET_KEY,300),webhookSecret=text(env.STRIPE_WEBHOOK_SECRET,300);
  const live=/^(sk|rk)_live_/.test(secret);
  const enabled=()=>env.STRIPE_CHECKOUT_ENABLED==='1'&&live&&webhookSecret.startsWith('whsec_');
@@ -197,6 +198,7 @@ export function createStripePayments({pool,env=process.env,client,notify=()=>{},
     const existing=await pool.query('SELECT id FROM stripe_checkout_events WHERE id=$1',[event.id]);
     if(!existing.rows.length)await reconcile(await stripe.retrieve(event.data.object.id),event.id);
    }
+   if(accepted.includes(event.type)&&event.data?.object?.metadata?.source!==SOURCE)await handleOtherCheckout(event);
    res.json({received:true});
   }));
  }

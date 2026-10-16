@@ -11,115 +11,35 @@
 <style>
 .availability{margin:17px 0 18px;padding:15px 16px;border-radius:16px;background:linear-gradient(125deg,#eaf4ff,#f8fbff);border:1px solid #cce3ff;position:relative;overflow:hidden}.availability:before{content:'';position:absolute;width:100px;height:100px;border:18px solid #d9ebff;border-radius:50%;left:-48px;top:-58px;opacity:.6}.availability-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}.availability-copy{font-size:11px;font-weight:700;color:#416786}.availability-number{font-size:25px;font-weight:800;line-height:1;color:var(--blue);font-variant-numeric:tabular-nums}.availability-number small{font-size:10px;color:#60788f}.availability-track{height:6px;background:#d9e8f6;border-radius:999px;overflow:hidden;margin-top:12px}.availability-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4da9ff,#0866c6)}.availability.urgent{background:linear-gradient(125deg,#fff2e2,#fffaf3);border-color:#f6d4a7}.availability.urgent .availability-number,.availability.urgent .availability-copy{color:#a7590b}.availability.urgent .availability-track i{background:linear-gradient(90deg,#f5b14d,#db7515)}.availability.quiet{background:#f5f9ff}.availability.quiet .availability-copy{font-size:12px}.availability.sold-out{background:#f3f5f7;border-color:#e0e6ed}.availability.sold-out .availability-number{color:#68798b}
 </style>
+<link rel="stylesheet" href="/cards/checkout.css?v=20261016-card-payments1">
 </head>
 <body>
 <header class="top"><div class="wrap"><a class="brand" href="/">التميز الابتكاري<small>INEXC TRAINING</small></a><a class="back" href="/">العودة إلى الموقع ←</a></div></header>
 <main class="wrap">
 <section class="hero"><span class="tag">إصدار عضوية محدود — 300 بطاقة</span><h1>اختر بطاقتك التدريبية</h1><p>بطاقات تمنحك مقاعد في الدورات والدبلومات المباشرة أونلاين، مع مزايا حصرية وأولوية حجز لحاملي العضوية.</p></section>
 <section class="plans" id="plans"><p>جارٍ تحميل البطاقات…</p></section>
-<section class="note"><b>كيف تعمل البطاقة؟</b><br>اختر بطاقتك وادفع عبر التحويل البنكي أو رابط الدفع عند تفعيله. بعد اعتماد العملية تصلك بطاقة رقمية برقم خاص، ثم تستخدمها عند حجز أي دورة مؤهلة. البطاقة شخصية، والحجز مرهون بالمقاعد المتاحة ومدة الصلاحية.</section>
+<section class="note"><b>كيف تعمل البطاقة؟</b><br>اختر بطاقتك وادفع إلكترونيًا أو عبر التحويل البنكي. بعد اعتماد العملية تصلك بطاقة رقمية برقم خاص، ثم تستخدمها عند حجز أي دورة مؤهلة. البطاقة شخصية، والحجز مرهون بالمقاعد المتاحة ومدة الصلاحية.</section>
 <div class="mycard">لديك بطاقة بالفعل؟ <a href="/my-card/">افتح بطاقتي التدريبية ←</a></div>
 <div class="mycard">بطاقة المتدرب الرقمية وسجل الشهادات · <a href="/digital-id.html?preview=1">استكشف البطاقة</a> · <a href="/digital-id.html">عرض سجلّي</a></div>
 </main>
-<dialog id="dialog"><div class="modal" id="formView"><button class="close" id="close">×</button><h2 id="modalTitle">طلب بطاقة</h2><p id="modalInfo"></p><form class="form" id="orderForm"><input type="hidden" id="planId"><div><label>الاسم الكامل<input id="name" required></label></div><div><label>البريد الإلكتروني<input id="email" type="email" required></label></div><div><label>رقم الموبايل<input id="phone" required placeholder="+971 …"></label></div><div><label>طريقة الدفع</label><div class="pay"><label><input type="radio" name="method" value="bank" checked>تحويل بنكي</label><label><input type="radio" name="method" value="link">رابط دفع</label></div></div><div class="receipt" id="receiptWrap"><label>وصل التحويل<input id="receipt" type="file" accept=".pdf,image/png,image/jpeg,image/webp"></label></div><button class="buy" id="submit">إرسال طلب البطاقة</button><div class="message" id="message"></div></form></div><div class="success" id="success"><div class="tick">✓</div><h2>تم استلام طلبك</h2><p id="successText"></p><p><a class="link" href="/">العودة إلى الموقع</a></p></div></dialog>
+<dialog id="dialog" aria-labelledby="modalTitle"><div class="modal" id="formView"><button class="close" id="close" type="button" aria-label="إغلاق طلب البطاقة">×</button><h2 id="modalTitle">طلب بطاقة</h2><p id="modalInfo"></p>
+<form class="form" id="orderForm"><input type="hidden" id="planId">
+<div><label for="name">الاسم الكامل</label><input id="name" required autocomplete="name"></div>
+<div><label for="email">البريد الإلكتروني</label><input id="email" type="email" required autocomplete="email" dir="ltr"></div>
+<div><label for="phone">رقم الموبايل</label><input id="phone" type="tel" required autocomplete="tel" dir="ltr" placeholder="+971 …"></div>
+<fieldset class="payment-methods"><legend>طريقة الدفع</legend><div class="pay">
+<label><input type="radio" name="method" value="stripe"><span><b>الدفع الإلكتروني</b><small>بالبطاقة البنكية عبر صفحة دفع آمنة.</small></span></label>
+<label><input type="radio" name="method" value="bank"><span><b>التحويل البنكي</b><small>حوّل المبلغ وأرفق الإيصال للمراجعة.</small></span></label>
+</div></fieldset>
+<section id="bankDetails" class="membership-bank" hidden aria-labelledby="bankHeading"><h3 id="bankHeading">بيانات التحويل البنكي</h3><p id="bankAmount"></p><dl>
+<div id="bankTitleRow"><dt>اسم البنك</dt><dd id="bankTitle"></dd></div>
+<div><dt>اسم صاحب الحساب</dt><dd id="bankName"></dd></div>
+<div><dt>رقم الحساب</dt><dd><bdi id="bankAccount" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankAccount">نسخ رقم الحساب</button></dd></div>
+<div><dt>IBAN</dt><dd><bdi id="bankIban" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankIban">نسخ IBAN</button></dd></div>
+</dl><p id="copyStatus" role="status"></p><p class="currency-note">السعر بالدولار الأمريكي. للتحويل بعملة أخرى، تواصل معنا لتأكيد قيمة التحويل قبل السداد.</p>
+<div id="receiptWrap"><label for="receipt">إيصال التحويل البنكي</label><input id="receipt" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp"><p>PDF أو صورة JPG أو PNG أو WEBP، بحد أقصى 5 MB.</p></div></section>
+<button class="buy" id="submit" type="submit">المتابعة إلى الدفع الآمن</button><div class="message" id="message" role="status"></div></form></div>
+<div class="success" id="success"><div class="tick">✓</div><h2>تم استلام طلبك</h2><p id="successText"></p><p><a class="link" href="/">العودة إلى الموقع</a></p></div></dialog>
 <script src="../inexc-registration-config.js"></script>
-<script>
-const API = window.INEXC_REGISTRATION_ENDPOINT;
-let plans = [];
-const esc = v => String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function description(p) {
-  if (p.featureLines) return p.featureLines.split('\n').map(x => x.trim()).filter(Boolean);
-  const list = [];
-  if (p.slug === 'launch') list.push('حجز دورتين أو دبلومين مباشرين أونلاين');
-  if (p.slug === 'mastery') list.push('3 حجوزات تدريبية مباشرة أونلاين');
-  if (p.slug === 'leadership') list.push('6 دورات أو حتى 5 دبلومات مباشرة أونلاين');
-  list.push('صلاحية ' + p.validMonths + (p.validMonths === 12 ? ' شهرًا' : ' أشهر'));
-  if (p.certificateDiscount) list.push('خصم ' + p.certificateDiscount + '% على رسوم الشهادات');
-  if (p.earlyAccessHours) list.push('حجز مبكر قبل العامة بـ' + p.earlyAccessHours + ' ساعة');
-  if (p.perks) list.push(p.perks);
-  return [...new Set(list)];
-}
-function availability(p) {
-  const remaining=Math.max(0,Number(p.remaining)||0),maximum=Math.max(1,Number(p.maxCards)||1);
-  const mode=p.stockMode||'count',urgent=remaining>0&&remaining<=Number(p.lowStockThreshold??15);
-  const message=remaining===0?'اكتمل إصدار هذه البطاقة':urgent?p.lowStockLabel||'اقترب اكتمال الإصدار':p.stockLabel||'فرصتك ما زالت متاحة';
-  if(mode==='hidden'&&remaining>0)return '';
-  const number=mode==='limited'&&remaining>0?'<span class="availability-copy">'+esc(urgent?'عدد محدود جدًا من البطاقات':'إصدار محدود — احجز بطاقتك')+'</span>':'<span class="availability-number">'+remaining+' <small>بطاقة متاحة</small></span>';
-  return '<div class="availability '+(remaining===0?'sold-out':urgent?'urgent':mode==='limited'?'quiet':'')+'" role="status"><div class="availability-top"><span class="availability-copy">'+esc(message)+'</span>'+number+'</div>'+(mode==='count'&&remaining>0?'<div class="availability-track" aria-hidden="true"><i style="width:'+Math.min(100,Math.round(remaining/maximum*100))+'%"></i></div>':'')+'</div>';
-}
-function render() {
-  const host = document.getElementById('plans');
-  host.innerHTML = plans.map(p => {
-    const soldOut = p.remaining <= 0;
-    const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
-    return '<article class="plan ' + ((p.featured ?? (p.slug === 'mastery')) ? 'featured' : '') + '">' +
-      ((p.badgeText ?? (p.slug === 'mastery' ? 'الأكثر توازنًا' : '')) ? '<span class="ribbon">'+esc(p.badgeText ?? 'الأكثر توازنًا')+'</span>' : '') +
-      '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
-      availability(p) +
-      '<ul class="features">' + items + '</ul>' +
-      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت البطاقات' : 'احصل على البطاقة') + '</button></article>';
-  }).join('');
-  host.querySelectorAll('[data-plan]').forEach(button => button.onclick = () => openPlan(button.dataset.plan));
-}
-function openPlan(id) {
-  const p = plans.find(x => x.id === id);
-  document.getElementById('planId').value = id;
-  document.getElementById('modalTitle').textContent = p.name;
-  document.getElementById('modalInfo').textContent = 'قيمة البطاقة: $' + p.priceUsd + ' — بعد اعتماد الدفع تصدر بطاقتك الرقمية مباشرة.';
-  const enabled = p.paymentMethods || ['bank'];
-  document.querySelectorAll('[name=method]').forEach(input => {
-    const available = enabled.includes(input.value) && (input.value !== 'link' || !!p.paymentLink);
-    input.disabled = !available;
-    input.checked = false;
-    input.closest('label').hidden = !available;
-  });
-  const first = document.querySelector('[name=method]:not(:disabled)');
-  if (first) { first.checked = true; first.dispatchEvent(new Event('change')); }
-  document.getElementById('message').textContent = '';
-  document.getElementById('formView').style.display = 'block';
-  document.getElementById('success').classList.remove('show');
-  document.getElementById('dialog').showModal();
-}
-document.getElementById('close').onclick = () => document.getElementById('dialog').close();
-document.querySelectorAll('[name=method]').forEach(x => x.onchange = () => {
-  document.getElementById('receiptWrap').style.display = document.querySelector('[name=method]:checked').value === 'bank' ? 'block' : 'none';
-});
-document.querySelector('[name=method]').dispatchEvent(new Event('change'));
-document.getElementById('orderForm').onsubmit = async event => {
-  event.preventDefault();
-  const button = document.getElementById('submit');
-  const message = document.getElementById('message');
-  const method = document.querySelector('[name=method]:checked')?.value;
-  if (!method) { message.textContent = 'لا توجد طريقة دفع مفعّلة لهذه البطاقة.'; return; }
-  const file = document.getElementById('receipt').files[0];
-  if (method === 'bank' && !file) { message.textContent = 'يرجى إرفاق وصل التحويل البنكي.'; return; }
-  button.disabled = true; button.textContent = 'جارٍ الإرسال…'; message.textContent = '';
-  try {
-    const data = new FormData();
-    data.append('plan_id', document.getElementById('planId').value);
-    data.append('name', document.getElementById('name').value.trim());
-    data.append('email', document.getElementById('email').value.trim());
-    data.append('phone', document.getElementById('phone').value.trim());
-    data.append('payment_method', method);
-    if (file) data.append('receipt', file);
-    const response = await fetch(API + '/memberships/orders', { method:'POST', body:data });
-    const result = await response.json();
-    if (!response.ok) throw Error(result.error || 'تعذر إرسال الطلب.');
-    if (method === 'link' && result.paymentLink) { location.href = result.paymentLink; return; }
-    document.getElementById('formView').style.display = 'none';
-    document.getElementById('success').classList.add('show');
-    document.getElementById('successText').textContent = method === 'bank'
-      ? 'تم استلام وصل التحويل. بعد اعتماده ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: ' + result.reference
-      : 'تم إنشاء طلب الدفع. بعد تأكيد العملية ستصدر بطاقتك الرقمية. رقم الطلب: ' + result.reference;
-  } catch (error) {
-    message.textContent = error.message;
-  } finally {
-    button.disabled = false; button.textContent = 'إرسال طلب البطاقة';
-  }
-};
-fetch(API + '/memberships/plans')
-  .then(response => response.ok ? response.json() : Promise.reject())
-  .then(data => { plans = data; const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' بطاقة'; render(); })
-  .catch(() => document.getElementById('plans').innerHTML = '<p>تعذر تحميل البطاقات الآن. حاول لاحقًا.</p>');
-</script>
+<script src="/cards/checkout.js?v=20261016-card-payments1"></script>
 </body></html>

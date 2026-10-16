@@ -1,3 +1,4 @@
+import {setupMembershipPayments, createMembershipPayments} from './membership-payments.js';
 import {setupStripePayments, createStripePayments} from './stripe-payments.js';
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
 import {validateCoursePayment, setupCoursePaymentControls, coursePaymentInput, createCoursePaymentControls} from './course-payment.js';
@@ -50,7 +51,8 @@ app.use(cors({ origin(origin, callback) {
   if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin not allowed'));
 }}));
-const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails});
+const membershipPayments=createMembershipPayments({pool,notify:sendMembershipActivationEmail});
+const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails,handleOtherCheckout:membershipPayments.handleWebhook});
 stripePayments.installWebhook(app);
 app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
   try {
@@ -94,6 +96,7 @@ async function applyMessageEvent(emailId, type) {
 }
 app.use(express.json({ limit: '1mb' }));
 stripePayments.installRoutes(app);
+membershipPayments.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
 app.use('/uploads', express.static(uploadDir, { maxAge: '1h', index: false, dotfiles: 'deny' }));
 
@@ -900,29 +903,15 @@ async function membershipPlans(includeInactive=false) {
     ${includeInactive?'':'WHERE p.active=true'} GROUP BY p.id ORDER BY p.sort_order ASC, p.price_usd ASC`);
   return result.rows.map(row=>membershipPlanPublic(row,row.sold));
 }
-function membershipCardNumber(plan) {
-  const prefix = plan.slug === 'leadership' ? 'RD' : plan.slug === 'mastery' ? 'TM' : 'IN';
-  return `INX-${prefix}-${crypto.randomBytes(3).toString('hex').toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-}
 function cardSnapshot(row, redemptions = []) {
   const plan = membershipPlanPublic({...row,id:row.plan_id||row.id}, row.sold||0);
   return { cardNumber:row.card_number, holderName:row.holder_name, holderEmail:row.holder_email,
     status:row.status, activatedAt:row.activated_at, expiresAt:row.expires_at, unitsTotal:Number(row.units_total),unitsRemaining:Number(row.units_remaining),
     plan, redemptions };
 }
-async function createMembershipCard(orderId) {
-  const existing = await pool.query('SELECT card_id FROM membership_orders WHERE id=$1',[orderId]);
-  if(!existing.rowCount) throw new Error('طلب البطاقة غير موجود.');
-  if(existing.rows[0].card_id) return existing.rows[0].card_id;
-  const result=await pool.query(`SELECT o.id AS order_id,o.plan_id,o.name AS holder_name,o.email AS holder_email,o.phone AS holder_phone,p.slug,p.booking_units,p.valid_months FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id WHERE o.id=$1 FOR UPDATE`,[orderId]);
-  const order=result.rows[0]; if(!order) throw new Error('طلب البطاقة غير موجود.');
-  let cardNumber; for(let i=0;i<5;i++){ cardNumber=membershipCardNumber(order); const check=await pool.query('SELECT 1 FROM membership_cards WHERE card_number=$1',[cardNumber]); if(!check.rowCount)break; }
-  const accessToken=crypto.randomBytes(24).toString('hex');
-  const card=await pool.query(`INSERT INTO membership_cards (card_number,access_token,plan_id,order_id,holder_name,holder_email,holder_phone,units_total,units_remaining,expires_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,now() + ($9::text || ' months')::interval) RETURNING id`,
-    [cardNumber,accessToken,order.plan_id,order.order_id,order.holder_name,order.holder_email,order.holder_phone,order.booking_units,order.valid_months]);
-  await pool.query(`UPDATE membership_orders SET card_id=$1,status='مفعلة',updated_at=now() WHERE id=$2`,[card.rows[0].id,orderId]);
-  return card.rows[0].id;
+async function sendMembershipActivationEmail(card){
+ const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار بطاقة INEXC التدريبية. يمكنك استخدامها لحجز الدورات المتاحة للبطاقة.</p><p><b>رقم البطاقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض بطاقتي التدريبية</a></p>';
+ await sendEmail({to:card.holder_email,subject:'تم تفعيل بطاقتك التدريبية | INEXC',html:emailShell({title:'بطاقتك التدريبية جاهزة',preview:'تم تأكيد الدفع وإصدار بطاقتك التدريبية.',content})});
 }
 async function getMembershipCard(code,email,accessToken='') {
   const byToken=clean(accessToken,100);
@@ -935,24 +924,13 @@ async function getMembershipCard(code,email,accessToken='') {
   return { row, snapshot:cardSnapshot(row,red.rows.map(x=>({courseName:x.course_name,unitsUsed:Number(x.units_used),kind:x.course_kind,status:x.status,createdAt:x.created_at}))) };
 }
 app.get('/api/memberships/plans', async (_req,res,next)=>{try{res.json(await membershipPlans(false));}catch(error){next(error);}});
-app.post('/api/memberships/orders', upload.single('receipt'), async (req,res,next)=>{
-  try {
-    const planId=clean(req.body?.plan_id,80),name=clean(req.body?.name,150),email=clean(String(req.body?.email||'').toLowerCase(),190),phone=clean(req.body?.phone,50),method=clean(req.body?.payment_method,20);
-    if(!name||!email||!phone) return res.status(400).json({error:'يرجى إدخال الاسم والبريد الإلكتروني ورقم الهاتف.'});
-    if(!['bank','link'].includes(method)) return res.status(400).json({error:'اختر طريقة دفع صالحة.'});
-    const planResult=await pool.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true',[planId]);
-    if(!planResult.rowCount) return res.status(400).json({error:'هذه البطاقة غير متاحة حاليًا.'});
-    const plan=planResult.rows[0];
-    if(!(plan.payment_methods||['bank']).includes(method)) return res.status(400).json({error:'طريقة الدفع هذه غير متاحة لهذه البطاقة.'});
-    if(method==='link'&&!plan.payment_link) return res.status(400).json({error:'رابط الدفع غير مفعّل لهذه البطاقة.'});
-    const sold=await pool.query(`SELECT COUNT(*) FROM membership_orders WHERE plan_id=$1 AND status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')`,[plan.id]);
-    if(Number(sold.rows[0].count)>=Number(plan.max_cards)) return res.status(400).json({error:'نفدت هذه الفئة من البطاقات.'});
-    if(method==='bank'&&!req.file) return res.status(400).json({error:'يرجى رفع وصل التحويل البنكي.'});
-    const ref='CARD-'+Date.now().toString().slice(-8)+'-'+crypto.randomBytes(2).toString('hex').toUpperCase();
-    const status=method==='bank'?'بانتظار مراجعة الدفع':'بانتظار الدفع';
-    const order=await pool.query(`INSERT INTO membership_orders (reference,plan_id,name,email,phone,total,payment_method,status,receipt_path) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[ref,plan.id,name,email,phone,plan.price_usd,method,status,req.file?`/uploads/${req.file.filename}`:'']);
-    res.status(201).json({ok:true,reference:ref,status,paymentLink:method==='link'?clean(plan.payment_link,500):'',orderId:order.rows[0].id});
-  } catch(error){next(error);}
+function membershipPaymentError(res,error){
+ if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'});
+ const safe=[400,404,409,410,429,503].includes(error.status);
+ return res.status(safe?error.status:500).json({error:safe?error.message:'تعذّر إتمام طلب البطاقة. أعد المحاولة.'});
+}
+app.post('/api/memberships/orders', upload.single('receipt'), async (req,res)=>{
+  try {res.status(201).json(await membershipPayments.offlineOrder(req.body||{},req.file?`/uploads/${req.file.filename}`:''));}catch(error){membershipPaymentError(res,error);}
 });
 app.get('/api/memberships/card',async(req,res,next)=>{try{
   const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190),clean(req.query.token,100));
@@ -974,8 +952,8 @@ function membershipPlanInput(body) {
   if(!clean(body.name,100)||Object.values(numbers).some(v=>v===null)||!Number.isFinite(price)||price<0||price>100000||!Number.isFinite(discount)||discount<0||discount>100) throw Object.assign(new Error('تحقق من الاسم والسعر والأعداد ونسبة الخصم.'),{status:400});
   const link=clean(body.paymentLink,500);
   if(link && (!/^https:\/\//i.test(link)||!URL.canParse(link))) throw Object.assign(new Error('رابط الدفع يجب أن يبدأ بـ https://'),{status:400});
-  const paymentMethods=['bank','link'].filter(method=>Array.isArray(body.paymentMethods)&&body.paymentMethods.includes(method));
-  if(!paymentMethods.length) throw Object.assign(new Error('فعّل طريقة دفع واحدة على الأقل.'),{status:400});
+  const paymentMethods=['stripe','bank','link'].filter(method=>Array.isArray(body.paymentMethods)&&body.paymentMethods.includes(method));
+  if(!Array.isArray(body.paymentMethods)||body.paymentMethods.some(method=>!['stripe','bank','link'].includes(method)))throw Object.assign(new Error('طرق الدفع غير صالحة.'),{status:400});
   if(paymentMethods.includes('link')&&!link) throw Object.assign(new Error('أدخل رابط الدفع قبل تفعيله.'),{status:400});
   const mode=['count','limited','hidden'].includes(body.stockMode)?body.stockMode:'count';
   return [clean(body.name,100),price,numbers.maxCards,numbers.validMonths,numbers.bookingUnits,numbers.courseUnitCost,numbers.diplomaUnitCost,discount,numbers.earlyAccessHours,clean(body.perks,1000),link,body.active!==false,clean(body.featureLines,2000),clean(body.badgeText,80),body.featured===true,mode,clean(body.stockLabel,100),numbers.lowStockThreshold,numbers.sortOrder,clean(body.lowStockLabel,100),paymentMethods];
@@ -997,12 +975,7 @@ app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
   if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json({ok:true});
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,total:Number(r.total)})));}catch(error){next(error);}});
-app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res,next)=>{const client=await pool.connect();try{await client.query('BEGIN');const order=await client.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[req.params.id]);if(!order.rowCount){await client.query('ROLLBACK');return res.status(404).json({error:'الطلب غير موجود.'});}if(order.rows[0].card_id){await client.query('COMMIT');return res.json({ok:true,alreadyActive:true});}
-  if(order.rows[0].status==='مرفوض'){await client.query('ROLLBACK');return res.status(400).json({error:'لا يمكن اعتماد طلب مرفوض.'});}
-  const reference=clean(req.body?.verifiedReference,120),amount=Number(req.body?.verifiedAmount),currency=clean(req.body?.verifiedCurrency,3).toUpperCase();
-  if(req.body?.confirmedFromBank!==true||reference.length<4||!Number.isFinite(amount)||amount<=0||!['USD','AED'].includes(currency)||(currency==='USD'&&amount!==Number(order.rows[0].total))){await client.query('ROLLBACK');return res.status(400).json({error:'طابق العملية في كشف البنك أو مزود الدفع، ثم أدخل رقم العملية والمبلغ الصحيح وأكّد المطابقة.'});}
-  await client.query('UPDATE membership_orders SET verified_reference=$1,verified_amount=$2,verified_currency=$3,verified_at=now(),updated_at=now() WHERE id=$4',[reference,amount,currency,req.params.id]);
-  await client.query('COMMIT');const cardId=await createMembershipCard(req.params.id);const card=await pool.query('SELECT card_number,holder_name,holder_email,access_token FROM membership_cards WHERE id=$1',[cardId]);const issued=card.rows[0];void sendEmail({to:issued.holder_email,subject:'تم تفعيل بطاقتك التدريبية | INEXC',html:`<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:600px;margin:auto;text-align:center;color:#17324d"><div style="background:#0755a5;color:#fff;padding:28px;border-radius:18px 18px 0 0"><b style="font-size:18px">INEXC TRAINING</b><h1 style="font-size:22px;margin:14px 0 0">تم تفعيل بطاقتك التدريبية</h1></div><div style="border:1px solid #dcecff;border-top:0;padding:30px;border-radius:0 0 18px 18px"><p>مرحبًا ${escapeHtml(issued.holder_name)}،</p><p>أصبحت بطاقتك جاهزة للاستخدام في حجز الدورات المباشرة أونلاين.</p><p style="font-family:monospace;font-size:18px;font-weight:bold;color:#0866c6;direction:ltr">${issued.card_number}</p><a href="https://www.inexctraining.com/my-card/?token=${issued.access_token}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;padding:12px 20px;border-radius:9px;font-weight:bold">عرض بطاقتي</a><p style="font-size:11px;color:#60788f;margin-top:22px">استخدم رقم البطاقة مع البريد الإلكتروني المرتبط بها عند حجز الدورة.</p></div></div>`}).catch(error=>console.error('Membership activation email error:',error));res.json({ok:true,cardNumber:issued.card_number,email:issued.holder_email});}catch(error){try{await client.query('ROLLBACK');}catch{}next(error);}finally{client.release();}});
+app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res)=>{try{res.json(await membershipPayments.approveOffline(req.params.id,req.body||{}));}catch(error){membershipPaymentError(res,error);}});
 app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل بطاقته.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
 app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
@@ -1722,4 +1695,4 @@ app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const 
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
-setupDatabase().then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
