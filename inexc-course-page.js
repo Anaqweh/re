@@ -29,9 +29,22 @@
   };
   window.addEventListener('DOMContentLoaded', async () => {
     const id = new URLSearchParams(location.search).get('id'), root = document.getElementById('course'), endpoint = window.INEXC_REGISTRATION_ENDPOINT;
-    if (!id || !endpoint) { root.innerHTML = '<p class="error">تعذر العثور على الدورة.</p>'; return; }
+    const unavailable = () => {
+      const robots = document.querySelector('meta[name="robots"]') || document.createElement('meta');
+      robots.name = 'robots'; robots.content = 'noindex,follow';
+      if (!robots.isConnected) document.head.appendChild(robots);
+      document.title = 'الدورة غير متاحة | INEXC Training';
+      root.innerHTML = '<p class="error" style="padding:25px">هذه الدورة غير متاحة حاليًا. <a href="/">استعرض الدورات المتاحة</a></p>';
+    };
+    if (!id) { unavailable(); return; }
+    if (!endpoint) { root.innerHTML = '<p class="error">تعذر تحميل تفاصيل الدورة حاليًا.</p>'; return; }
     try {
-      const response = await fetch(`${endpoint}/courses`, {cache:'no-store'}), course = (await response.json()).find(item => item.id === id); if (!course) throw new Error('not found');
+      const response = await fetch(`${endpoint}/courses`, {cache:'no-store'});
+      if (!response.ok) throw new Error('Course service unavailable');
+      const courses = await response.json();
+      if (!Array.isArray(courses)) throw new Error('Invalid course response');
+      const course = courses.find(item => item.id === id);
+      if (!course) { unavailable(); return; }
       document.title = `${course.name} | INEXC Training`; document.querySelector('meta[name="description"]').content = (course.description || '').split(/\r?\n/)[0] || `تفاصيل دورة ${course.name} من INEXC Training`;
       // Both course entry points describe the same course. Keep its ID and drop tracking parameters.
       const canonical = document.querySelector('link[rel="canonical"]') || document.createElement('link');
@@ -76,3 +89,4 @@
     } catch (_) { root.innerHTML = '<p class="error" style="padding:25px">تعذر تحميل تفاصيل هذه الدورة حاليًا.</p>'; }
   });
 })();
+
