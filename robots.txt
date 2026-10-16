@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
+Sitemap: https://www.inexctraining.com/sitemap.xml
 Sitemap: https://api.inexctraining.com/api/sitemap.xml

@@ -33,6 +33,11 @@
     try {
       const response = await fetch(`${endpoint}/courses`, {cache:'no-store'}), course = (await response.json()).find(item => item.id === id); if (!course) throw new Error('not found');
       document.title = `${course.name} | INEXC Training`; document.querySelector('meta[name="description"]').content = (course.description || '').split(/\r?\n/)[0] || `تفاصيل دورة ${course.name} من INEXC Training`;
+      // Both course entry points describe the same course. Keep its ID and drop tracking parameters.
+      const canonical = document.querySelector('link[rel="canonical"]') || document.createElement('link');
+      canonical.rel = 'canonical';
+      canonical.href = `https://www.inexctraining.com/course.html?id=${encodeURIComponent(course.id)}`;
+      if (!canonical.isConnected) document.head.appendChild(canonical);
       const apiOrigin = endpoint.replace(/\/api\/?$/, ''), image = course.imageUrl ? `${apiOrigin}${course.imageUrl}` : '/assets/inexc-logo-official-source.png', axes = groupAxes(course.axes), outcomes = course.outcomes || [];
       const certificateNote = course.certificate?.mode === 'included' ? `شهادة ${course.certificate.name || 'إتمام'} مشمولة في سعر الدورة.` : course.certificate?.mode === 'optional' ? `شهادة ${course.certificate.name || 'إتمام'} اختيارية بسعر ${Number(course.certificate.price || 0).toLocaleString('ar-AE')} د.إ.` : 'لا توجد شهادة ضمن هذه الدورة.';
       const panels = [
