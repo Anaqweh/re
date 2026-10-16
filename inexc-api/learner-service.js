@@ -36,6 +36,7 @@ export function cardQuote(card,course,certificateRequested=false,now=new Date())
  if(Number(card.units_remaining)<cost)throw fail('الرصيد المتبقي في البطاقة لا يكفي لحجز هذه الدورة.');
  const discount=Math.max(0,Math.min(100,Number(card.certificate_discount)||0));
  const certificateFee=course.certificate_mode==='optional'&&certificateRequested?Math.round(positive(course.certificate_price)*(100-discount))/100:0;
+ if(certificateFee>0&&!course.payment_methods?.includes('bank'))throw fail('رسوم الشهادة الاختيارية مع بطاقة INEXC تحتاج تحويلًا بنكيًا، وهو غير مفعّل لهذه الدورة. اختر التسجيل دون الشهادة أو استخدم طريقة دفع أخرى متاحة.');
  return {cost,kind,remainingBefore:Number(card.units_remaining),remainingAfter:Number(card.units_remaining)-cost,certificateFee,certificateDiscount:discount};
 }
 

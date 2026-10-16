@@ -18,5 +18,5 @@ for(const page of ['register/index.html','register.html'])test(page+': configure
  const submitted=requests.filter(r=>r.url.endsWith('/registrations'));assert.equal(submitted.length,1);assert.equal(submitted[0].opt.body.get('payment_method'),'link');assert.equal(submitted[0].opt.body.get('receipt'),null);
  finish({ok:false,json:async()=>({error:'LOCAL NETWORK ERROR'})});await tick();assert.equal(el('submitButton').disabled,false);assert.equal(alerts.at(-1),'LOCAL NETWORK ERROR');
  el('course').value='bank';el('course').dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelector('[name=payment][value=link]'),null);assert.equal(el('receipt').required,true);
- el('course').value='missing';el('course').dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelectorAll('[name=payment]').length,0);assert.equal(el('receipt').required,false);assert.match(el('paymentChoices').textContent,/يُجهّز رابط الدفع/);dom.window.close();
+ el('course').value='missing';el('course').dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelectorAll('[name=payment]').length,0);assert.equal(el('receipt').required,false);assert.match(el('paymentChoices').textContent,/لا توجد طريقة دفع/);dom.window.close();
 });

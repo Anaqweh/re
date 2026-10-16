@@ -5,6 +5,7 @@ import express from 'express';
 
 const SITE='https://www.inexctraining.com';
 const SOURCE='inexc-courses-v1';
+export const STRIPE_API_VERSION='2026-08-26.dahlia';
 const uuid=value=>/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(String(value||''));
 const text=(value,max=200)=>String(value??'').trim().slice(0,max);
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -45,14 +46,40 @@ export function stripeClient(secret,fetcher=fetch){
  async function request(route,{params,key}={}){
   const response=await fetcher('https://api.stripe.com/v1/'+route,{
    method:params?'POST':'GET',signal:AbortSignal.timeout(20000),
-   headers:{Authorization:'Bearer '+secret,'Stripe-Version':'2023-10-16',...(params?{'Content-Type':'application/x-www-form-urlencoded'}:{}),...(key?{'Idempotency-Key':key}:{})},
+   headers:{Authorization:'Bearer '+secret,'Stripe-Version':STRIPE_API_VERSION,...(params?{'Content-Type':'application/x-www-form-urlencoded'}:{}),...(key?{'Idempotency-Key':key}:{})},
    ...(params?{body:new URLSearchParams(params).toString()}:{}),
   }).catch(()=>{throw fail('تعذّر الاتصال بالدفع الآن. حاول مجددًا؛ لن ننشئ عملية دفع مكررة.',503)});
   const data=await response.json().catch(()=>null);
-  if(!response.ok||!data)throw fail('تعذّر تجهيز الدفع عبر Stripe. حاول مجددًا أو استخدم التحويل البنكي.',503);
+  if(!response.ok||!data){
+   const error=fail('تعذّر تجهيز الدفع عبر Stripe. حاول مجددًا أو استخدم طريقة أخرى متاحة.',503);
+   error.stripeDiagnostic={httpStatus:response.status,code:/^[a-z_]+$/.test(data?.error?.code||'')?data.error.code:'stripe_request_failed',permissions:[...new Set(String(data?.error?.message||'').match(/\brak_[a-z_]+\b/g)||[])],...(/^[a-z_][a-z_\d\[\]]{0,100}$/.test(data?.error?.param||'')?{param:data.error.param}:{})};
+   throw error;
+  }
   return data;
  }
- return {create:(params,key)=>request('checkout/sessions',{params,key}),retrieve:id=>request('checkout/sessions/'+encodeURIComponent(id)+'?expand[]=line_items')};
+ return {create:(params,key)=>request('checkout/sessions',{params,key}),retrieve:id=>request('checkout/sessions/'+encodeURIComponent(id)+'?expand[]=line_items'),account:()=>request('account'),expire:id=>request('checkout/sessions/'+encodeURIComponent(id)+'/expire',{params:{}})};
+}
+
+// Creates and immediately expires an internal diagnostic session. No customer, registration, charge or email.
+export async function probeStripeCheckout({env=process.env,client,now=()=>Date.now()}={}){
+ const key=String(env.STRIPE_SECRET_KEY||'').trim(),stripe=client||stripeClient(key);
+ if(env.STRIPE_CHECKOUT_ENABLED!=='1'||!/^(sk|rk)_live_/.test(key)||!String(env.STRIPE_WEBHOOK_SECRET||'').startsWith('whsec_'))return {ready:false,checkedAt:new Date(now()).toISOString(),message:'إعدادات Stripe الحية غير مكتملة على الخادم.'};
+ let stage='account';
+ try{
+  const account=await stripe.account();if(!account.charges_enabled)return {ready:false,checkedAt:new Date(now()).toISOString(),message:'حساب Stripe لا يسمح بتحصيل المدفوعات بعد. أكمل متطلبات الحساب في Stripe.'};
+  const label='inexc-probe-'+Array.from(crypto.randomBytes(8),x=>String.fromCharCode(97+x%26)).join('');
+  stage='create_session';
+  const session=await stripe.create({mode:'payment',integration_identifier:label,'adaptive_pricing[enabled]':'false',success_url:SITE+'/payment-status.html',cancel_url:SITE+'/register/',
+   'metadata[source]':'inexc-readiness-probe','line_items[0][quantity]':'1','line_items[0][price_data][currency]':'aed','line_items[0][price_data][unit_amount]':'1000',
+   'line_items[0][price_data][product_data][name]':'فحص جاهزية INEXC — لا تسدد',expires_at:String(Math.floor(now()/1000)+3600)},'inexc-probe-'+crypto.randomUUID());
+  if(!/^cs_live_/.test(session.id||'')||session.livemode!==true)throw fail('تعذّر مطابقة بيئة Stripe.',503);
+  stage='expire_session';const expired=await stripe.expire(session.id);
+  if(expired.status!=='expired')throw fail('تعذّر إنهاء جلسة الفحص.',503);
+  return {ready:true,checkedAt:new Date(now()).toISOString(),message:'نجح إنشاء صفحة الدفع وإغلاقها. لم ننشئ تسجيلًا ولم نحصّل أي مبلغ.'};
+ }catch(error){
+  const d=error.stripeDiagnostic;
+  return {ready:false,checkedAt:new Date(now()).toISOString(),message:d?.httpStatus===401?'مفتاح Stripe غير صالح أو أُلغي. حدّث مفتاح الخادم.':d?.httpStatus===403?(stage==='account'?'مفتاح Stripe لا يسمح بقراءة الحساب. راجع صلاحية Accounts في صفحة API keys.':'مفتاح Stripe يفتقد صلاحية مطلوبة. راجع صلاحيات Checkout Sessions وProducts وPrices في صفحة API keys.'):'تعذّر إنشاء صفحة الدفع أو إنهاء فحصها. راجع إعدادات Stripe وأعد الفحص.',diagnostic:{stage,...d}};
+ }
 }
 
 export function createStripePayments({pool,env=process.env,client,notify=()=>{},now=()=>Date.now()}){
@@ -60,6 +87,13 @@ export function createStripePayments({pool,env=process.env,client,notify=()=>{},
  const live=/^(sk|rk)_live_/.test(secret);
  const enabled=()=>env.STRIPE_CHECKOUT_ENABLED==='1'&&live&&webhookSecret.startsWith('whsec_');
  const stripe=client||stripeClient(secret);
+ let lastCheck={ready:null,checkedAt:null},checking;
+ const readiness=()=>({...lastCheck});
+ const checkReadiness=()=>{
+  if(checking)return checking;
+  if(lastCheck.checkedAt&&now()-Date.parse(lastCheck.checkedAt)<60000)return Promise.resolve(readiness());
+  checking=probeStripeCheckout({env,client:stripe,now}).then(result=>(lastCheck=result)).finally(()=>{checking=null});return checking;
+ };
  const nextUrl=row=>SITE+'/payment-status.html#checkout='+row.id+'&token='+row.request_key;
  const asyncRoute=fn=>async(req,res)=>{try{await fn(req,res)}catch(error){res.status([400,404,409,410,429,503].includes(error.status)?error.status:500).json({error:error.status?error.message:'تعذّر إتمام عملية الدفع. حاول مجددًا.'})}};
  const limits=new Map();
@@ -82,17 +116,19 @@ export function createStripePayments({pool,env=process.env,client,notify=()=>{},
    row=(await db.query(`INSERT INTO stripe_checkouts(request_key,request_hash) VALUES($1,$2)
     ON CONFLICT(request_key) DO UPDATE SET request_key=EXCLUDED.request_key RETURNING *`,[key,fingerprint])).rows[0];
    if(row.request_hash!==fingerprint)throw fail('تغيّرت بيانات التسجيل. أعد بدء عملية الدفع.',409);
-   if(!row.params){
-    const course=(await db.query('SELECT * FROM courses WHERE id=$1 AND active=true FOR SHARE',[data.courseId])).rows[0];
+   const course=(await db.query('SELECT * FROM courses WHERE id=$1 AND active=true FOR SHARE',[data.courseId])).rows[0];
     if(!course)throw fail('الدورة غير متاحة للتسجيل.');
+    if(!course.payment_methods?.includes('stripe'))throw fail('الدفع عبر Stripe غير متاح لهذه الدورة. اختر طريقة أخرى مفعّلة.');
     if(course.public_booking_opens_at&&new Date(course.public_booking_opens_at).getTime()>now())throw fail('التسجيل العام لهذه الدورة لم يبدأ بعد.');
+   if(!row.params){
     const base=amountInFils(course.price),cert=course.certificate_mode==='optional'&&data.certificate?amountInFils(course.certificate_price):0,total=base+cert;
     if(total<=0||total>99999999)throw fail('استخدم التسجيل المجاني لهذه الدورة أو راجع الإدارة بشأن المبلغ.');
     const reference='INX-'+crypto.randomBytes(9).toString('hex').toUpperCase();
     const certificate=course.certificate_mode==='included'||(course.certificate_mode==='optional'&&data.certificate)?course.certificate_name:'لا';
     const registration=(await db.query(`INSERT INTO registrations(reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'stripe','بانتظار الدفع') RETURNING id`,[reference,data.name,data.email,data.phone,course.id,course.name,certificate,(total/100).toFixed(2)])).rows[0];
-    const params={mode:'payment',customer_email:data.email,client_reference_id:registration.id,'payment_method_types[0]':'card',locale:'auto',
+    const params={mode:'payment',customer_email:data.email,client_reference_id:registration.id,locale:'auto','adaptive_pricing[enabled]':'false',
+     integration_identifier:'inexc-courses-'+Array.from(crypto.randomBytes(8),x=>String.fromCharCode(97+x%26)).join(''),
      success_url:nextUrl(row),cancel_url:nextUrl(row)+'&cancelled=1',expires_at:String(Math.floor(now()/1000)+3600),
      'metadata[source]':SOURCE,'metadata[checkout_id]':row.id,'metadata[registration_id]':registration.id,
      'payment_intent_data[metadata][source]':SOURCE,'payment_intent_data[metadata][registration_id]':registration.id};
@@ -165,9 +201,9 @@ export function createStripePayments({pool,env=process.env,client,notify=()=>{},
   }));
  }
  function installRoutes(app){
-  app.get('/api/payments/stripe/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:1,enabled:enabled(),currency:'AED'}));
+  app.get('/api/payments/stripe/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:2,perCourse:true,enabled:enabled(),currency:'AED'}));
   app.post('/api/payments/stripe/checkout',asyncRoute(async(req,res)=>{rateLimit(req,'checkout',120);res.set('Cache-Control','no-store').status(201).json(await checkout(req.body||{}))}));
   app.post('/api/payments/stripe/status',asyncRoute(async(req,res)=>{rateLimit(req,'status',180);res.set('Cache-Control','no-store').json(await status(req.body||{}))}));
  }
- return {enabled,checkout,status,reconcile,installWebhook,installRoutes};
+ return {enabled,checkout,status,reconcile,installWebhook,installRoutes,readiness,checkReadiness};
 }

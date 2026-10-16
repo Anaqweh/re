@@ -14,7 +14,7 @@ async function harness(){
  const query=async(sql,args)=>{const r=await db.query(sql,args);return {...r,rowCount:r.rows.length||r.affectedRows||0}};
  let tail=Promise.resolve();const pool={query,connect:async()=>{let release;const previous=tail;tail=new Promise(resolve=>release=resolve);await previous;return {query,release}}};
  await setupStripePayments(pool);await setupStripePayments(pool);
- const course=(await query("INSERT INTO courses(name,price,certificate_mode,certificate_name,certificate_price) VALUES('LOCAL COURSE',199.25,'optional','LOCAL CERT',50.50) RETURNING id")).rows[0].id;
+ const course=(await query("INSERT INTO courses(name,price,certificate_mode,certificate_name,certificate_price,payment_methods) VALUES('LOCAL COURSE',199.25,'optional','LOCAL CERT',50.50,ARRAY['stripe','bank']) RETURNING id")).rows[0].id;
  const sessions=new Map(),requests=[],notifications=[];let loseResponse=false,readCount=0;
  const client={create:async(params,key)=>{requests.push({params,key});if(!sessions.has(key)){const index=sessions.size+1;sessions.set(key,{id:'cs_live_LOCAL'+index,url:'https://checkout.stripe.com/c/pay/cs_live_LOCAL'+index,livemode:true,mode:'payment',currency:'aed',amount_total:Object.entries(params).filter(([key])=>key.endsWith('[unit_amount]')).reduce((sum,entry)=>sum+Number(entry[1]),0),client_reference_id:params.client_reference_id,metadata:{source:params['metadata[source]'],checkout_id:params['metadata[checkout_id]'],registration_id:params['metadata[registration_id]']},status:'open',payment_status:'unpaid',payment_intent:'pi_LOCAL'+index})}if(loseResponse){loseResponse=false;throw Error('SIMULATED LOST RESPONSE')}return structuredClone(sessions.get(key))},retrieve:async id=>{readCount++;const session=[...sessions.values()].find(s=>s.id===id);if(!session)throw Error('MISSING SESSION');return structuredClone(session)}};
  const service=createStripePayments({pool,env,client,notify:async value=>notifications.push(value)});
@@ -58,6 +58,7 @@ test('unconfigured/test keys, inactive courses, unopened booking and zero charge
  for(const settings of [{},{...env,STRIPE_SECRET_KEY:'sk_test_LOCAL'},{...env,STRIPE_CHECKOUT_ENABLED:'0'},{...env,STRIPE_WEBHOOK_SECRET:''}]){
   const service=createStripePayments({pool:h.pool,env:settings,client:{create:()=>{throw Error('MUST NOT CALL')}}});assert.equal(service.enabled(),false);await assert.rejects(service.checkout(h.input),e=>e.status===503);
  }
+ await h.query("UPDATE courses SET payment_methods=ARRAY['bank']");await assert.rejects(h.service.checkout(h.input),/غير متاح لهذه الدورة/);await h.query("UPDATE courses SET payment_methods=ARRAY['stripe','bank']");
  await h.query('UPDATE courses SET active=false');await assert.rejects(h.service.checkout(h.input),/غير متاحة/);
  await h.query("UPDATE courses SET active=true,public_booking_opens_at=now()+interval '1 day'");await assert.rejects(h.service.checkout(h.input),/لم يبدأ/);
  await h.query('UPDATE courses SET public_booking_opens_at=NULL,price=0,certificate_price=0');await assert.rejects(h.service.checkout(h.input),/المجاني/);
@@ -72,7 +73,7 @@ test('REST adapter uses fixed Stripe endpoint/version and redacts provider error
  assert.equal(amountInFils('10.01'),1001);assert.equal(amountInFils('0.50'),50);for(const input of [-1,'0.001','NaN'])assert.throws(()=>amountInFils(input));
  const calls=[],client=stripeClient('LOCAL-SECRET',async(...args)=>{calls.push(args);return {ok:false,json:async()=>({error:{message:'SENSITIVE PROVIDER MESSAGE'}})}});
  await assert.rejects(client.create({mode:'payment'},'LOCAL-KEY'),error=>error.status===503&&!error.message.includes('SENSITIVE'));
- assert.equal(calls[0][0],'https://api.stripe.com/v1/checkout/sessions');assert.equal(calls[0][1].headers['Idempotency-Key'],'LOCAL-KEY');assert.equal(calls[0][1].headers['Stripe-Version'],'2023-10-16');
+ assert.equal(calls[0][0],'https://api.stripe.com/v1/checkout/sessions');assert.equal(calls[0][1].headers['Idempotency-Key'],'LOCAL-KEY');assert.equal(calls[0][1].headers['Stripe-Version'],'2026-08-26.dahlia');
  const raw=Buffer.from('{"ok":true}'),timestamp=Math.floor(Date.now()/1000),signature=crypto.createHmac('sha256','LOCAL').update(timestamp+'.').update(raw).digest('hex');
  assert.deepEqual(verifyStripeEvent(raw,'t='+timestamp+',v1='+signature,'LOCAL'),{ok:true});assert.throws(()=>verifyStripeEvent(raw,'t='+timestamp+',v1='+signature,'LOCAL',Date.now()+301000));
 });

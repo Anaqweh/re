@@ -26,7 +26,7 @@ def abort(message):
 
 
 def stripe_request(secret, route, params=None):
-    headers = {'Authorization': 'Bearer ' + secret, 'Stripe-Version': '2023-10-16'}
+    headers = {'Authorization': 'Bearer ' + secret, 'Stripe-Version': '2026-08-26.dahlia'}
     data = None
     if params is not None:
         data = urllib.parse.urlencode(params).encode()
@@ -108,7 +108,7 @@ def webhook_secret(secret, previous):
             abort('The existing webhook is disabled or missing Checkout events. Enable the four events listed in docs/stripe-checkout.md.')
         value = previous or getpass.getpass('Existing endpoint signing secret (whsec_, hidden): ').strip()
     else:
-        params = {'url': ENDPOINT, 'api_version': '2023-10-16',
+        params = {'url': ENDPOINT, 'api_version': '2026-08-26.dahlia',
                   'description': 'INEXC course registration payment confirmation'}
         params.update({'enabled_events[' + str(i) + ']': event for i, event in enumerate(EVENTS)})
         value = stripe_request(secret, 'webhook_endpoints', params).get('secret', '')

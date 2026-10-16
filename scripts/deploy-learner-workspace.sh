@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js learner-service.js course-payment.js stripe-payments.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
+inexc_files=(server.js learner-service.js course-payment.js stripe-payments.js check-stripe-readiness.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
@@ -63,6 +63,9 @@ for inexc_attempt in {1..20}; do
     if [[ "$inexc_route_status" == 401 ]] && curl --fail --silent http://127.0.0.1:3000/api/learner/capabilities | python3 -c 'import json,sys; sys.exit(0 if (lambda c: c.get("cardRecovery") is True and c.get("coursePaymentLinks") is True)(json.load(sys.stdin)) else 1)' 2>/dev/null; then
       if [[ "${INEXC_REQUIRE_STRIPE:-0}" == 1 ]]; then
         if ! curl --fail --silent http://127.0.0.1:3000/api/payments/stripe/capabilities | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("enabled") is True else 1)' 2>/dev/null; then sleep 2; continue; fi
+      fi
+      if [[ "${INEXC_REQUIRE_PAYMENT_CONTROLS:-0}" == 1 ]]; then
+        if ! curl --fail --silent http://127.0.0.1:3000/api/payments/stripe/capabilities | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("perCourse") is True else 1)' 2>/dev/null; then sleep 2; continue; fi
       fi
       inexc_healthy=1; break
     fi

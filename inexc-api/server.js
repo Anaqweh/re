@@ -1,6 +1,6 @@
 import {setupStripePayments, createStripePayments} from './stripe-payments.js';
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
-import {validateCoursePayment} from './course-payment.js';
+import {validateCoursePayment, setupCoursePaymentControls, coursePaymentInput, createCoursePaymentControls} from './course-payment.js';
 import {setupMessageSubscriptions, installMessageSubscriptions} from './message-subscriptions.js';
 import {subscriptionUrl} from './message-subscription-links.js';
 import { normalizeEmail, assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
@@ -533,7 +533,7 @@ function publicCourse(row) {
     id: row.id, name: row.name, description: row.description, axes: courseAxes(row.axes), outcomes: courseOutcomes(row.outcomes), trainer: row.trainer, date: row.course_date,
     location: row.location, category: row.category, price: Number(row.price), hours: Number(row.training_hours || 0),
     certificate: { mode: row.certificate_mode, name: row.certificate_name, price: Number(row.certificate_price) },
-    payments: row.payment_methods, paymentLink: row.payment_link,
+    payments: row.payment_methods, paymentsManaged:true, paymentLink: row.payment_link,
     bank: { title: bankParts?.[1] || '', name: bankParts?.[2] === '—' ? '' : (bankParts?.[2] || savedBankName), account: row.bank_account, iban: row.bank_iban },
     imageUrl: row.image_path || '', certificateSampleUrl: row.certificate_sample_path || '',
     shareSlug: row.share_slug || courseSlug(row.id), shareUrl: `https://courses.inexctraining.com/${row.share_slug || courseSlug(row.id)}`,
@@ -1436,6 +1436,7 @@ app.delete('/api/admin/testimonials/:id', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
+createCoursePaymentControls({pool,stripe:stripePayments,publicCourse}).install(app,auth);
 app.get('/api/admin/courses', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM courses ORDER BY active DESC, created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); } });
 app.post('/api/admin/course-import', auth, courseImportUpload.single('file'), async (req, res, next) => {
   try {
@@ -1478,11 +1479,11 @@ app.post('/api/admin/courses/:id/certificate-sample', auth, courseMediaUpload.si
 });
 app.post('/api/admin/courses', auth, async (req, res, next) => {
   try {
-    const c = req.body || {}; const methods = Array.isArray(c.payments) ? c.payments.filter(v => ['link','bank'].includes(v)) : [];
+    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c);
     if (!clean(c.name, 180)) return res.status(400).json({ error: 'اسم الدورة مطلوب.' });
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false];
-    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled];
+    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active,membership_enabled)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
     const published = publicCourse(saved);
@@ -1492,11 +1493,11 @@ app.post('/api/admin/courses', auth, async (req, res, next) => {
 });
 app.put('/api/admin/courses/:id', auth, async (req, res, next) => {
   try {
-    const before = await pool.query('SELECT active FROM courses WHERE id=$1', [req.params.id]);
+    const before = await pool.query('SELECT * FROM courses WHERE id=$1', [req.params.id]);
     if (!before.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
-    const c = req.body || {}; const methods = Array.isArray(c.payments) ? c.payments.filter(v => ['link','bank'].includes(v)) : [];
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods.length?methods:['bank'],clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false, req.params.id];
-    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,updated_at=now() WHERE id=$20 RETURNING *`, values);
+    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c,before.rows[0]);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled, req.params.id];
+    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,membership_enabled=$20,updated_at=now() WHERE id=$21 RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
     const published = publicCourse(saved);
@@ -1721,4 +1722,4 @@ app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const 
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
-setupDatabase().then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });

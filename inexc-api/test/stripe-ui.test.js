@@ -5,6 +5,15 @@ import fs from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 const read=file=>fs.readFile(new URL('../../'+file,import.meta.url),'utf8'),tick=()=>new Promise(r=>setTimeout(r,0));
 const course={id:'11111111-1111-4111-8111-111111111111',name:'LOCAL COURSE',price:199.25,certificate:{mode:'optional',name:'LOCAL CERT',price:50.50},payments:['bank'],bank:{name:'LOCAL',account:'0000'}};
+for(const page of ['register/index.html','register.html'])test(page+': administrator choices control Stripe, bank and INEXC independently, including all disabled',async t=>{
+ const dom=new JSDOM(await read(page),{url:'https://local.invalid/'+page,runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());if(w.document.readyState!=='complete')await new Promise(r=>w.addEventListener('load',r,{once:true}));
+ const combinations=[[['stripe'],false],[['bank'],false],[[],true],[['stripe','bank'],false],[['stripe','bank'],true],[[],false]],courses=combinations.map(([payments,membershipEnabled],i)=>({...course,id:'11111111-1111-4111-8111-11111111111'+i,payments,membershipEnabled,paymentsManaged:true}));
+ w.INEXC_REGISTRATION_ENDPOINT='https://local.invalid/api';const requests=[];w.fetch=async(url,opt={})=>{requests.push({url,opt});return {ok:true,json:async()=>url.endsWith('/courses')?courses:url.includes('/stripe/')?{enabled:true,perCourse:true}:{cardCheckout:2}}};
+ w.eval([...w.document.querySelectorAll('script:not([src])')].map(s=>s.textContent).join('\n')+'\n'+await read(page.startsWith('register/')?'register/inexc-do-registration.js':'inexc-do-registration.js')+'\n'+await read('register/inexc-membership-registration.js'));w.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
+ const el=id=>w.document.getElementById(id);
+ for(const c of courses){el('course').value=c.id;el('course').dispatchEvent(new w.Event('change',{bubbles:true}));assert.deepEqual([...w.document.querySelectorAll('[name=payment]')].map(n=>n.value).sort(),[...c.payments].sort());assert.equal(el('membershipPayment').hidden,!c.membershipEnabled);assert.equal(el('receipt').required,c.payments.includes('bank'));}
+ assert.equal(requests.some(r=>r.opt.method==='POST'),false);
+});
 for(const page of ['register/index.html','register.html'])test(page+': Stripe capability, retained certificate and retry use one nonce without a receipt',async t=>{
  const dom=new JSDOM(await read(page),{url:'https://local.invalid/'+page+'?course_id='+course.id+'&resume=stripe',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
  if(w.document.readyState!=='complete')await new Promise(r=>w.addEventListener('load',r,{once:true}));
