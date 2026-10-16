@@ -3,7 +3,7 @@
 const API=window.INEXC_REGISTRATION_ENDPOINT||'https://api.inexctraining.com/api',root=document.getElementById('learnerRoot'),loginHTML=root.innerHTML;
 const preview=new URLSearchParams(location.search).get('preview')==='1',key='inexc_learner_session';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const num=v=>Number(v||0).toLocaleString('ar-AE'),date=v=>v?new Date(v).toLocaleDateString('ar-AE',{year:'numeric',month:'short',day:'numeric'}):'—';
+const num=v=>Number(v||0).toLocaleString('ar-AE'),date=v=>v?new Date(v).toLocaleDateString('ar-AE',{year:'numeric',month:'short',day:'numeric',timeZone:'UTC'}):'—';
 if(preview&&new URLSearchParams(location.search).get('mobile')==='1'){root.innerHTML='<section style="padding:24px;text-align:center"><p class="lw-muted">معاينة الصفحة بعرض هاتف · بيانات توضيحية</p><a class="lw-button" href="/account.html?preview=1">العودة إلى عرض الحاسوب</a><iframe title="معاينة صفحة المتدرب على الهاتف" src="/account.html?preview=1&amp;embedded=1" style="display:block;width:390px;max-width:100%;height:844px;margin:24px auto;border:1px solid #c9dbee;border-radius:20px;background:#fff"></iframe></section>';return;}
 let session=null,data=null,view='overview',generation=0;
 try{session=JSON.parse(sessionStorage.getItem(key));if(!session||Date.parse(session.expiresAt)<=Date.now())session=null}catch{}
