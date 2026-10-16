@@ -39,18 +39,21 @@ let paymentOptions={electronicEnabled:false,bankConfigured:false,bank:{}},busy=f
 const el=id=>document.getElementById(id),selectedMethod=()=>document.querySelector('[name=method]:checked')?.value;
 function syncMethod(){
  const bank=selectedMethod()==='bank';el('bankDetails').hidden=!bank;el('receipt').required=bank;
- el('submit').textContent=busy?'جارٍ تجهيز الطلب…':bank?'إرسال الطلب ورفع الإيصال':'المتابعة إلى الدفع الآمن';el('submit').disabled=busy||!selectedMethod();
+ el('submitText').textContent=busy?'جارٍ تجهيز الطلب…':bank?'إرسال الطلب ورفع الإيصال':'المتابعة إلى الدفع الآمن';el('submit').disabled=busy||!selectedMethod();
+ el('paymentAssurance').textContent=bank?'تُراجع بيانات التحويل قبل تفعيل بطاقتك.':'تُستكمل بيانات البطاقة البنكية على صفحة الدفع الآمنة.';
  document.querySelectorAll('[name=method]').forEach(input=>input.disabled=busy||input.closest('label').hidden);el('close').disabled=busy;el('orderForm').setAttribute('aria-busy',String(busy));
 }
 function openPlan(id){
- const p=plans.find(x=>x.id===id);if(!p||busy)return;currentPlan=p;el('planId').value=id;el('modalTitle').textContent=p.name;
- el('modalInfo').textContent='قيمة البطاقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD — تصدر البطاقة بعد تأكيد الدفع.';
+ const p=plans.find(x=>x.id===id);if(!p||busy)return;currentPlan=p;el('planId').value=id;el('modalTitle').textContent='إتمام شراء البطاقة';
+ el('modalInfo').textContent='أكمل بياناتك واختر طريقة الدفع المناسبة لك.';
+ el('summaryPlan').textContent=p.name;el('summaryPrice').textContent=Number(p.priceUsd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+ el('summaryDuration').textContent=Number(p.validMonths)+(Number(p.validMonths)>=3&&Number(p.validMonths)<=10?' أشهر':' شهرًا');el('durationRow').hidden=!Number(p.validMonths);
  const enabled=p.paymentMethods||['bank'];document.querySelectorAll('[name=method]').forEach(input=>{const available=enabled.includes(input.value)&&(input.value==='stripe'?paymentOptions.electronicEnabled:paymentOptions.bankConfigured);input.closest('label').hidden=!available;input.disabled=!available;input.checked=false});
  const first=document.querySelector('[name=method]:not(:disabled)');if(first)first.checked=true;
  const bank=paymentOptions.bank||{};for(const [id,key]of [['bankTitle','title'],['bankName','name'],['bankAccount','account'],['bankIban','iban']])el(id).textContent=bank[key]||'—';el('bankTitleRow').hidden=!bank.title;
  document.querySelectorAll('[data-copy]').forEach(button=>button.disabled=!bank[button.dataset.copy==='bankAccount'?'account':'iban']);
  el('bankAmount').textContent='قيمة البطاقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD';el('copyStatus').textContent='';
- el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه البطاقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').showModal();
+ el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه البطاقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
 }
 el('close').onclick=()=>{if(!busy)el('dialog').close()};el('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault()});document.querySelectorAll('[name=method]').forEach(input=>input.onchange=()=>{el('message').textContent='';syncMethod()});
 document.querySelectorAll('[data-copy]').forEach(button=>button.onclick=async()=>{const value=el(button.dataset.copy).textContent;try{await navigator.clipboard.writeText(value);el('copyStatus').textContent='تم النسخ.'}catch{el('copyStatus').textContent='تعذّر النسخ تلقائيًا. حدّد الرقم وانسخه يدويًا.'}});
@@ -73,7 +76,7 @@ el('orderForm').onsubmit=async event=>{
   if(method==='stripe'){
    const url=new URL(result.paymentLink);if(url.protocol!=='https:'||(url.hostname!=='checkout.stripe.com'&&!(url.origin===location.origin&&url.pathname==='/cards/payment-status.html')))throw Error('تعذّر التحقق من رابط الدفع.');location.href=url.href;return;
   }
-  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent='تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;
+  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent='تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;el('dialog').setAttribute('aria-labelledby','successHeading');el('successHeading').focus();
  }catch(error){el('message').textContent=error.message}finally{busy=false;syncMethod()}
 };
 async function loadPaymentOptions(){

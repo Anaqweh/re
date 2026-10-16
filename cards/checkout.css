@@ -1,1 +1,146 @@
-[hidden]{display:none!important}dialog{max-height:calc(100dvh - 32px);overflow:auto}.modal{padding:28px}.close{min-width:44px;min-height:44px;font-size:22px}.form label,.payment-methods legend{font-size:14px}.form input{font-size:16px;min-height:46px}.form input:focus-visible,.pay:has(input:focus-visible),button:focus-visible{outline:3px solid #075cac;outline-offset:3px}.payment-methods{border:0;padding:0;margin:8px 0}.payment-methods legend{font-weight:700;margin-bottom:10px;color:#103b70}.pay label{display:flex;align-items:flex-start;gap:10px;padding:14px;background:#fff}.pay label:has(input:checked){background:#edf6ff;border-color:#0866c6}.pay input{min-height:20px;width:20px;height:20px;margin:0;accent-color:#0866c6;flex:0 0 auto}.pay b{display:block;font-size:14px}.pay small{display:block;font-size:12px;color:#60788f;font-weight:400;line-height:1.8;margin-top:6px}.membership-bank{background:#f5faff;border:1px solid #cbdff3;border-radius:14px;padding:18px}.membership-bank h3{margin:0 0 8px;font-size:16px;color:#103b70}.membership-bank dl{margin:0}.membership-bank dl>div{padding:12px 0;border-bottom:1px solid #dce8f6}.membership-bank dt{font-size:12px;color:#60788f;margin-bottom:6px}.membership-bank dd{margin:0;font-size:14px;font-weight:600;overflow-wrap:anywhere;line-height:1.8}.membership-bank dd:has(bdi){display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.membership-bank bdi{user-select:all;word-break:break-word}.copy-bank{font:500 12px Alexandria,Arial,sans-serif;min-height:44px;padding:8px 10px;color:#075cac;background:#fff;border:1px solid #9fc4e9;border-radius:8px;cursor:pointer}.copy-bank:disabled{opacity:.5;cursor:default}.membership-bank .currency-note{font-size:12px;line-height:1.9}.membership-bank #bankAmount{font-size:14px;color:#103b70;font-weight:600}.membership-bank #receiptWrap{margin-top:16px}.message{font-size:13px}.buy{font-size:14px;min-height:48px}#copyStatus{min-height:20px;color:#126c4c}.modal>p{font-size:13px}.success{padding:32px 24px}@media(max-width:540px){.modal{padding:20px 16px}.pay{grid-template-columns:1fr}.membership-bank{padding:15px}.membership-bank dd:has(bdi){align-items:start;flex-direction:column}.hero h1{line-height:1.6}.form{gap:16px}}
+/* Original IBM fonts, distributed under the adjacent SIL Open Font License. */
+@font-face{font-family:'INEXC Checkout';src:url('/assets/fonts/ibm-plex-arabic/Regular.woff2') format('woff2');font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:'INEXC Checkout';src:url('/assets/fonts/ibm-plex-arabic/Medium.woff2') format('woff2');font-style:normal;font-weight:500;font-display:swap}
+@font-face{font-family:'INEXC Checkout';src:url('/assets/fonts/ibm-plex-arabic/SemiBold.woff2') format('woff2');font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:'INEXC Checkout';src:url('/assets/fonts/ibm-plex-arabic/Bold.woff2') format('woff2');font-style:normal;font-weight:700;font-display:swap}
+[hidden]{display:none!important}
+.purchase-dialog{
+ --checkout-ink:#192a42;--checkout-muted:#5d6c80;--checkout-blue:#0964c4;--checkout-line:#e1e7ef;
+ width:min(940px,calc(100% - 48px));max-width:940px;max-height:calc(100dvh - 48px);padding:0;
+ border:1px solid #fff;border-radius:22px;background:#fff;color:var(--checkout-ink);
+ font:400 16px/1.6 'INEXC Checkout',Arial,sans-serif;font-synthesis:none;text-align:start;
+ box-shadow:0 30px 100px #0d294b45,0 4px 16px #0d294b12;overflow:auto;overscroll-behavior:contain;
+ scrollbar-width:thin;scrollbar-color:#c4d2e2 transparent;
+}
+.purchase-dialog::backdrop{background:#132d4c73;backdrop-filter:blur(4px)}
+.purchase-dialog svg{width:22px;height:22px;flex-shrink:0}
+.purchase-dialog button,.purchase-dialog input,.purchase-dialog a{font-family:inherit}
+.purchase-dialog button{cursor:pointer}
+.purchase-dialog button:focus-visible,.purchase-dialog a:focus-visible,.purchase-dialog input:focus-visible{outline:3px solid #82b9ed;outline-offset:3px}
+.purchase-dialog button:disabled{cursor:default;opacity:.65}
+.checkout-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 32px;border-bottom:1px solid var(--checkout-line);background:#fff}
+.checkout-brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand-emblem{width:38px;height:38px;border-radius:10px;background:#0964c4;display:flex;align-items:center;justify-content:center;color:white;font:600 24px Arial,sans-serif;gap:1px;flex-shrink:0}
+.brand-emblem>span{font-size:14px;align-self:center}
+.checkout-brand b{display:flex;align-items:baseline;gap:7px;color:#154b81;font:700 18px/1.1 Arial,sans-serif;letter-spacing:.3px}
+.checkout-brand b>span{font-size:10px;font-weight:500;letter-spacing:1px;color:#5a728c}
+.checkout-brand small{display:block;margin-top:4px;font-size:12px;line-height:1.5;color:var(--checkout-muted)}
+.purchase-dialog .close{float:none;display:grid;place-items:center;width:44px;height:44px;min-width:44px;padding:0;border:1px solid var(--checkout-line);border-radius:50%;color:#647387;background:#fff;transition:background .15s,border-color .15s}
+.purchase-dialog .close:hover{background:#f3f6fa;border-color:#c5d2e0}
+.purchase-dialog .close svg{width:18px;height:18px}
+.purchase-dialog .modal{padding:26px 32px 28px}
+.checkout-heading{margin-bottom:26px}
+.purchase-dialog .checkout-eyebrow{font-size:12px;font-weight:500;line-height:1.5;color:var(--checkout-blue);margin:0 0 6px}
+.purchase-dialog .modal h2{font-size:26px;font-weight:600;line-height:1.5;letter-spacing:0;color:var(--checkout-ink);margin:0 0 5px}
+.purchase-dialog #modalInfo{font-size:15px;font-weight:400;color:var(--checkout-muted);margin:0;line-height:1.7}
+.checkout-layout{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:32px;align-items:start}
+.purchase-dialog .checkout-form{margin:0;gap:22px;min-width:0}
+.purchase-dialog .section-title{display:flex;align-items:center;gap:9px;margin:0 0 15px;padding:0;font-size:16px;font-weight:600;line-height:1.5;color:var(--checkout-ink)}
+.step-index{display:grid;place-items:center;background:#edf3fa;color:#44668a;width:24px;height:24px;border-radius:50%;font:500 12px/1 'INEXC Checkout',Arial,sans-serif;flex-shrink:0}
+.buyer-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.field{min-width:0}
+.field-name{grid-column:1/-1}
+.purchase-dialog .field label,.purchase-dialog #receiptWrap>label{display:block;font-size:14px;font-weight:500;line-height:1.6;color:#34465c;margin:0 0 7px}
+.purchase-dialog .form input:not([type=radio]){width:100%;min-width:0;min-height:48px;margin:0;padding:11px 13px;border:1px solid #ccd6e2;border-radius:9px;background:#fff;color:var(--checkout-ink);font-size:16px;font-weight:400;line-height:1.5;transition:border-color .15s,box-shadow .15s}
+.purchase-dialog .form input:not([type=radio]):focus{border-color:#317bc6;box-shadow:0 0 0 3px #0964c40e}
+.purchase-dialog .form input::placeholder{color:#7b8999;font-size:14px;opacity:1}
+.purchase-dialog .form input[dir=ltr]{text-align:left;font-variant-numeric:tabular-nums}
+.purchase-dialog .field-help{margin:9px 0 0;font-size:12px;line-height:1.6;color:var(--checkout-muted)}
+.purchase-dialog .payment-methods{border:0;padding:0;margin:0;min-width:0}
+.purchase-dialog .payment-methods legend{float:none;width:100%;margin-bottom:12px}
+.purchase-dialog .pay{display:grid;grid-template-columns:1fr;gap:10px}
+.purchase-dialog .pay label{position:relative;display:flex;align-items:center;gap:12px;min-height:78px;margin:0;padding:14px;border:1px solid #d9e1eb;border-radius:11px;background:#fff;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.purchase-dialog .pay label:hover{border-color:#91afd0;background:#fafcff}
+.purchase-dialog .pay label:has(input:checked){border-color:var(--checkout-blue);background:#f4f9ff;box-shadow:0 0 0 1px var(--checkout-blue)}
+.purchase-dialog .pay label:has(input:focus-visible){outline:3px solid #82b9ed;outline-offset:3px}
+.purchase-dialog .pay input{position:absolute;width:1px;height:1px;min-height:0;margin:0;padding:0;border:0;opacity:0;clip-path:inset(50%)}
+.method-icon{width:38px;height:38px;display:grid;place-items:center;flex-shrink:0;border:1px solid #dfe7f0;border-radius:9px;color:#53708e;background:#fff}
+.purchase-dialog .pay label:has(input:checked) .method-icon{color:var(--checkout-blue);border-color:#d2e3f5}
+.method-copy{flex:1;min-width:0}
+.purchase-dialog .pay b{display:block;font-size:16px;font-weight:500;line-height:1.5;color:var(--checkout-ink)}
+.purchase-dialog .pay small{display:block;margin-top:3px;font-size:13px;font-weight:400;line-height:1.6;color:var(--checkout-muted)}
+.method-check{display:block;position:relative;width:18px;height:18px;border:1.5px solid #aab8c8;border-radius:50%;background:#fff;flex-shrink:0}
+.purchase-dialog .pay label:has(input:checked) .method-check{border:5px solid var(--checkout-blue)}
+.purchase-dialog .checkout-action{padding-top:0}
+.purchase-dialog .buy{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:13px 18px;margin:0;border:1px solid #075cb7;border-radius:10px;background:var(--checkout-blue);color:#fff;font-size:16px;font-weight:500;line-height:1.5;box-shadow:0 3px 8px #0964c41a;transition:background .15s,transform .15s}
+.purchase-dialog .buy svg{width:18px;height:18px}
+.purchase-dialog .buy:hover:not(:disabled){background:#0756aa}
+.purchase-dialog .buy:active:not(:disabled){transform:translateY(1px)}
+.purchase-dialog .message{font-size:14px;line-height:1.7;color:#ac303d;min-height:0;margin:0 0 12px}
+.purchase-dialog .message:empty{display:none}
+.purchase-dialog .payment-assurance{display:flex;align-items:flex-start;justify-content:center;gap:6px;font-size:12px;font-weight:400;color:var(--checkout-muted);line-height:1.6;text-align:center;margin:11px 0 0}
+.payment-assurance svg{width:15px;height:15px;margin-top:2px}
+.order-summary{min-width:0;background:#f6f8fb;border:1px solid #e5eaf1;border-radius:14px;padding:20px}
+.order-summary h3{margin:0 0 16px;font-size:15px;font-weight:500;line-height:1.5;color:#4b5d73}
+.membership-preview{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:1.6;min-height:150px;padding:18px;border-radius:12px;color:#fff;background:linear-gradient(120deg,#073d7c,#075eae 63%,#1e7ac5);box-shadow:0 8px 18px #1149801a;display:flex;flex-direction:column;justify-content:space-between}
+.membership-preview:before{content:'';z-index:-1;position:absolute;width:230px;height:230px;border:1px solid #ffffff1c;border-radius:50%;inset-inline-end:-140px;top:-48px;box-shadow:0 0 0 25px #ffffff04,0 0 0 50px #ffffff04,0 0 0 75px #ffffff04}
+.preview-top{display:flex;align-items:center;justify-content:space-between;gap:15px}
+.preview-top>span{font:600 16px/1 Arial,sans-serif;letter-spacing:1px}
+.preview-top svg{width:24px;height:24px;opacity:.8}
+.preview-bottom>span{display:block;color:#d7e8fb;font-size:11px;line-height:1.5}
+.preview-bottom strong{display:block;margin:2px 0 9px;font-size:21px;line-height:1.4;font-weight:500;overflow-wrap:anywhere}
+.preview-bottom>small{display:block;color:#d7e8fb;font:400 9px/1.3 Arial,sans-serif;letter-spacing:1.2px;text-align:start}
+.summary-details{padding:18px 0 16px;border-bottom:1px solid #dfe6ef}
+.purchase-dialog .summary-details p{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--checkout-muted);line-height:1.7;margin:0 0 9px}
+.purchase-dialog .summary-details p:last-child{margin-bottom:0}
+.summary-details svg{width:16px;height:16px;color:#687f99}
+.summary-details strong{margin-inline-start:auto;font-size:13px;font-weight:500;color:#2c4058;white-space:nowrap}
+.summary-total{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0 0}
+.summary-total>div>span{display:block;font-size:16px;font-weight:500;color:#203850}
+.summary-total small{display:block;font-size:12px;color:var(--checkout-muted);line-height:1.5;margin-top:3px}
+.purchase-dialog .summary-total p{display:flex;align-items:baseline;gap:5px;margin:0;color:#173f66;white-space:nowrap}
+.summary-total strong{font-size:29px;line-height:1.2;font-weight:600;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.summary-total p>span{font:500 11px/1.4 Arial,sans-serif;color:var(--checkout-muted)}
+.purchase-dialog .summary-note{font-size:13px;font-weight:400;line-height:1.8;color:var(--checkout-muted);margin:18px 0 0}
+.summary-footer{display:flex;align-items:center;justify-content:center;gap:6px;border-top:1px solid #dfe6ef;padding-top:15px;margin-top:18px;color:#536d83;font-size:12px;line-height:1.6}
+.summary-footer svg{width:14px;height:14px}
+.membership-bank{min-width:0;padding:18px;background:#fafbfd;border:1px solid #dfe7f0;border-radius:12px;margin-top:-8px}
+.bank-heading{display:flex;align-items:center;gap:8px}
+.bank-heading-icon{display:flex;color:#51708f}
+.bank-heading-icon svg{width:19px;height:19px}
+.purchase-dialog .membership-bank h3{font-size:16px;line-height:1.5;font-weight:500;margin:0;color:#28435f}
+.purchase-dialog .membership-bank #bankAmount{font-size:13px;line-height:1.6;color:var(--checkout-muted);margin:6px 0 14px}
+.membership-bank dl{margin:0;padding:0}
+.membership-bank dl>div{border-top:1px solid #e4eaf1;padding:11px 0}
+.membership-bank dt{font-size:12px;line-height:1.6;color:var(--checkout-muted);margin-bottom:4px}
+.membership-bank dd{margin:0;font-size:14px;font-weight:500;line-height:1.7;color:#233e58;overflow-wrap:anywhere}
+.membership-bank .account-value{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.membership-bank bdi{user-select:all;overflow-wrap:anywhere;min-width:0;font-variant-numeric:tabular-nums;font-size:15px}
+.purchase-dialog .copy-bank{display:flex;align-items:center;justify-content:center;gap:5px;min-height:44px;min-width:56px;flex-shrink:0;padding:7px 8px;border:1px solid #dae4ee;border-radius:7px;background:#fff;color:#1f609d;font-size:12px;font-weight:500}
+.copy-bank svg{width:15px;height:15px}
+.purchase-dialog #copyStatus{margin:0;font-size:12px;line-height:1.5;color:#216b54}
+.purchase-dialog #copyStatus:not(:empty){padding-top:4px}
+.purchase-dialog .membership-bank .currency-note{font-size:12px;line-height:1.8;color:var(--checkout-muted);margin:12px 0 16px}
+#receiptWrap{padding-top:16px;border-top:1px solid #dfe7f0}
+.purchase-dialog .form input[type=file]{font-size:12px;padding:8px;background:#fff}
+.purchase-dialog .form input[type=file]::file-selector-button{font:500 12px 'INEXC Checkout',Arial,sans-serif;border:0;border-radius:6px;background:#edf3fa;color:#315b82;padding:8px 10px;margin-inline-end:9px;cursor:pointer}
+.purchase-dialog #receiptHelp{font-size:12px;line-height:1.7;color:var(--checkout-muted);margin:7px 0 0}
+.purchase-dialog .success{padding:48px 30px 52px;max-width:560px;margin:auto}
+.purchase-dialog .success .tick{display:grid;place-items:center;width:64px;height:64px;border:1px solid #cce5d9;background:#f0faf5;color:#26845d;border-radius:50%;margin:0 auto 22px}
+.success .tick svg{width:28px;height:28px}
+.purchase-dialog .success h2{font-size:27px;font-weight:600;color:var(--checkout-ink);margin:8px 0 14px}
+.purchase-dialog .success p{font-size:16px;line-height:1.9;color:var(--checkout-muted);margin:0 0 26px;overflow-wrap:anywhere}
+.success-link{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--checkout-blue);font-size:15px;font-weight:500;padding:10px 16px;border:1px solid #cbdff3;border-radius:9px;min-height:44px}
+@media(min-width:761px){.purchase-dialog .order-summary{position:sticky;top:24px}}
+@media(max-width:760px){
+ .purchase-dialog{width:calc(100% - 28px);max-height:calc(100dvh - 28px);border-radius:18px}
+ .checkout-header{padding:15px 22px}.purchase-dialog .modal{padding:23px 22px 24px}
+ .checkout-layout{grid-template-columns:1fr;gap:24px}.checkout-heading{margin-bottom:20px}
+ .order-summary{grid-row:1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;padding:17px 18px;align-items:center}
+ .order-summary h3{grid-column:1/-1;margin:0;font-size:13px}.membership-preview{min-height:0;aspect-ratio:auto;box-shadow:none;background:none;color:var(--checkout-ink);padding:0;border-radius:0;display:block}
+ .membership-preview:before,.preview-top,.preview-bottom>span,.preview-bottom>small,.summary-details,.summary-note,.summary-footer{display:none}
+ .preview-bottom strong{font-size:20px;font-weight:500;line-height:1.5;margin:0}
+ .summary-total{padding:0;gap:8px;flex-direction:column;align-items:flex-end}.summary-total>div{display:none}.summary-total strong{font-size:26px}
+ .purchase-dialog .summary-total p{gap:4px}.checkout-form{grid-row:2}
+}
+@media(max-width:440px){
+ .purchase-dialog{width:calc(100% - 16px);max-height:calc(100dvh - 16px);border-radius:15px}
+ .checkout-header{padding:12px 16px}.checkout-brand small{display:none}.checkout-brand b{font-size:17px}.checkout-brand b>span{font-size:9px}.brand-emblem{width:34px;height:34px}
+ .purchase-dialog .modal{padding:20px 16px 22px}.purchase-dialog .modal h2{font-size:24px}.purchase-dialog #modalInfo{font-size:14px}
+ .checkout-layout{gap:22px}.buyer-fields{grid-template-columns:1fr;gap:14px}.order-summary{padding:14px;gap:8px 12px}
+ .preview-bottom strong{font-size:18px}.summary-total strong{font-size:25px}.summary-total p>span{font-size:10px}
+ .purchase-dialog .pay label{padding:12px;gap:9px}.method-icon{width:34px;height:34px}.purchase-dialog .pay small{font-size:12px}
+ .membership-bank{padding:14px}.membership-bank .account-value{flex-wrap:wrap}.membership-bank bdi{font-size:14px}
+ .purchase-dialog .success{padding:34px 20px}.purchase-dialog .success h2{font-size:24px}
+}
+@media(prefers-reduced-motion:reduce){.purchase-dialog *{transition:none!important;scroll-behavior:auto!important}}

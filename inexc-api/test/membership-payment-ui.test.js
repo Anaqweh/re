@@ -15,7 +15,7 @@ async function purchase({methods=plan.paymentMethods,paymentOptions=options,lega
  return {dom,w,q,requests,copies,choose,fill,submit};
 }
 test('bank choice reveals current account/IBAN, exact copy and receipt; switching methods preserves buyer details',async t=>{
- const h=await purchase();t.after(()=>h.dom.window.close());assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);h.fill();h.choose('bank');
+ const h=await purchase();t.after(()=>h.dom.window.close());assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);assert.equal(h.q('#summaryPlan').textContent,plan.name);assert.equal(h.q('#summaryPrice').textContent,'39.00');assert.equal(h.q('#summaryDuration').textContent,'4 أشهر');h.fill();h.choose('bank');
  assert.equal(h.q('#bankDetails').hidden,false);assert.equal(h.q('#bankAccount').textContent,'00123456');assert.equal(h.q('#bankIban').textContent,'LOCAL-IBAN');assert.equal(h.q('#receipt').required,true);assert.equal(h.q('#bankAccount').dir,'ltr');
  h.q('[data-copy=bankAccount]').click();await flush();assert.deepEqual(h.copies,['00123456']);h.choose('stripe');assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);assert.equal(h.q('#name').value,'LOCAL BUYER');assert.match(h.q('#submit').textContent,/الدفع الآمن/);
 });
@@ -24,7 +24,7 @@ test('electronic request uses its own endpoint and stable retry key, without cli
 });
 test('bank request uploads receipt and confirms review, not card activation',async t=>{
  const h=await purchase();t.after(()=>h.dom.window.close());h.fill();h.choose('bank');await h.submit();assert.match(h.q('#message').textContent,/أرفق/);assert.equal(h.requests.filter(r=>r.url.endsWith('/memberships/orders')).length,0);
- const file=new h.w.File(['LOCAL ONLY'],'local.pdf',{type:'application/pdf'});Object.defineProperty(h.q('#receipt'),'files',{value:[file]});await h.submit();const call=h.requests.find(r=>r.url.endsWith('/memberships/orders'));assert.equal(call.init.body.get('payment_method'),'bank');assert.equal(call.init.body.get('receipt').name,'local.pdf');assert.equal(h.q('#success').classList.contains('show'),true);assert.match(h.q('#successText').textContent,/مراجعته/);assert.equal(h.w.sessionStorage.getItem('inexc_membership_payment_attempt'),null);
+ const file=new h.w.File(['LOCAL ONLY'],'local.pdf',{type:'application/pdf'});Object.defineProperty(h.q('#receipt'),'files',{value:[file]});await h.submit();const call=h.requests.find(r=>r.url.endsWith('/memberships/orders'));assert.equal(call.init.body.get('payment_method'),'bank');assert.equal(call.init.body.get('receipt').name,'local.pdf');assert.equal(h.q('#success').classList.contains('show'),true);assert.match(h.q('#successText').textContent,/مراجعته/);assert.equal(h.w.sessionStorage.getItem('inexc_membership_payment_attempt'),null);assert.equal(h.w.document.activeElement,h.q('#successHeading'));h.q('#close').click();assert.equal(h.q('#dialog').open,false);
 });
 test('saved method controls are honored; missing bank hides transfer; old API retains bank flow',async t=>{
  const h=await purchase({methods:['bank']});t.after(()=>h.dom.window.close());assert.equal(h.q('[value=stripe]').disabled,true);assert.equal(h.q('[value=bank]').checked,true);

@@ -11,7 +11,9 @@
 <style>
 .availability{margin:17px 0 18px;padding:15px 16px;border-radius:16px;background:linear-gradient(125deg,#eaf4ff,#f8fbff);border:1px solid #cce3ff;position:relative;overflow:hidden}.availability:before{content:'';position:absolute;width:100px;height:100px;border:18px solid #d9ebff;border-radius:50%;left:-48px;top:-58px;opacity:.6}.availability-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}.availability-copy{font-size:11px;font-weight:700;color:#416786}.availability-number{font-size:25px;font-weight:800;line-height:1;color:var(--blue);font-variant-numeric:tabular-nums}.availability-number small{font-size:10px;color:#60788f}.availability-track{height:6px;background:#d9e8f6;border-radius:999px;overflow:hidden;margin-top:12px}.availability-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4da9ff,#0866c6)}.availability.urgent{background:linear-gradient(125deg,#fff2e2,#fffaf3);border-color:#f6d4a7}.availability.urgent .availability-number,.availability.urgent .availability-copy{color:#a7590b}.availability.urgent .availability-track i{background:linear-gradient(90deg,#f5b14d,#db7515)}.availability.quiet{background:#f5f9ff}.availability.quiet .availability-copy{font-size:12px}.availability.sold-out{background:#f3f5f7;border-color:#e0e6ed}.availability.sold-out .availability-number{color:#68798b}
 </style>
-<link rel="stylesheet" href="/cards/checkout.css?v=20261016-card-payments1">
+<link rel="preload" href="/assets/fonts/ibm-plex-arabic/Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/ibm-plex-arabic/Medium.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/cards/checkout.css?v=20261016-checkout-design2">
 </head>
 <body>
 <header class="top"><div class="wrap"><a class="brand" href="/">التميز الابتكاري<small>INEXC TRAINING</small></a><a class="back" href="/">العودة إلى الموقع ←</a></div></header>
@@ -22,24 +24,44 @@
 <div class="mycard">لديك بطاقة بالفعل؟ <a href="/my-card/">افتح بطاقتي التدريبية ←</a></div>
 <div class="mycard">بطاقة المتدرب الرقمية وسجل الشهادات · <a href="/digital-id.html?preview=1">استكشف البطاقة</a> · <a href="/digital-id.html">عرض سجلّي</a></div>
 </main>
-<dialog id="dialog" aria-labelledby="modalTitle"><div class="modal" id="formView"><button class="close" id="close" type="button" aria-label="إغلاق طلب البطاقة">×</button><h2 id="modalTitle">طلب بطاقة</h2><p id="modalInfo"></p>
-<form class="form" id="orderForm"><input type="hidden" id="planId">
-<div><label for="name">الاسم الكامل</label><input id="name" required autocomplete="name"></div>
-<div><label for="email">البريد الإلكتروني</label><input id="email" type="email" required autocomplete="email" dir="ltr"></div>
-<div><label for="phone">رقم الموبايل</label><input id="phone" type="tel" required autocomplete="tel" dir="ltr" placeholder="+971 …"></div>
-<fieldset class="payment-methods"><legend>طريقة الدفع</legend><div class="pay">
-<label><input type="radio" name="method" value="stripe"><span><b>الدفع الإلكتروني</b><small>بالبطاقة البنكية عبر صفحة دفع آمنة.</small></span></label>
-<label><input type="radio" name="method" value="bank"><span><b>التحويل البنكي</b><small>حوّل المبلغ وأرفق الإيصال للمراجعة.</small></span></label>
-</div></fieldset>
-<section id="bankDetails" class="membership-bank" hidden aria-labelledby="bankHeading"><h3 id="bankHeading">بيانات التحويل البنكي</h3><p id="bankAmount"></p><dl>
-<div id="bankTitleRow"><dt>اسم البنك</dt><dd id="bankTitle"></dd></div>
-<div><dt>اسم صاحب الحساب</dt><dd id="bankName"></dd></div>
-<div><dt>رقم الحساب</dt><dd><bdi id="bankAccount" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankAccount">نسخ رقم الحساب</button></dd></div>
-<div><dt>IBAN</dt><dd><bdi id="bankIban" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankIban">نسخ IBAN</button></dd></div>
-</dl><p id="copyStatus" role="status"></p><p class="currency-note">السعر بالدولار الأمريكي. للتحويل بعملة أخرى، تواصل معنا لتأكيد قيمة التحويل قبل السداد.</p>
-<div id="receiptWrap"><label for="receipt">إيصال التحويل البنكي</label><input id="receipt" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp"><p>PDF أو صورة JPG أو PNG أو WEBP، بحد أقصى 5 MB.</p></div></section>
-<button class="buy" id="submit" type="submit">المتابعة إلى الدفع الآمن</button><div class="message" id="message" role="status"></div></form></div>
-<div class="success" id="success"><div class="tick">✓</div><h2>تم استلام طلبك</h2><p id="successText"></p><p><a class="link" href="/">العودة إلى الموقع</a></p></div></dialog>
+<dialog id="dialog" class="purchase-dialog" aria-labelledby="modalTitle" aria-describedby="modalInfo">
+  <header class="checkout-header">
+    <div class="checkout-brand"><span class="brand-emblem" aria-hidden="true">I<span>✦</span></span><span><b dir="ltr">INEXC<span>TRAINING</span></b><small>بطاقاتك التدريبية، في مكان واحد</small></span></div>
+    <button class="close" id="close" type="button" aria-label="إغلاق طلب البطاقة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+  </header>
+  <div class="modal" id="formView">
+    <div class="checkout-heading"><p class="checkout-eyebrow">خطوتك القادمة في التعلّم</p><h2 id="modalTitle">إتمام شراء البطاقة</h2><p id="modalInfo">أكمل بياناتك واختر طريقة الدفع المناسبة لك.</p></div>
+    <div class="checkout-layout">
+      <form class="form checkout-form" id="orderForm"><input type="hidden" id="planId">
+        <section class="buyer-section" aria-labelledby="buyerHeading"><h3 class="section-title" id="buyerHeading"><span class="step-index">1</span> بيانات حامل البطاقة</h3><div class="buyer-fields">
+          <div class="field field-name"><label for="name">الاسم الكامل</label><input id="name" required autocomplete="name" placeholder="أدخل اسمك الكامل"></div>
+          <div class="field"><label for="email">البريد الإلكتروني</label><input id="email" type="email" required autocomplete="email" dir="ltr" placeholder="name@example.com"></div>
+          <div class="field"><label for="phone">رقم الموبايل</label><input id="phone" type="tel" required autocomplete="tel" dir="ltr" placeholder="+971 50 000 0000"></div>
+        </div><p class="field-help">ترتبط بطاقتك بهذا البريد الإلكتروني.</p></section>
+        <fieldset class="payment-methods"><legend class="section-title"><span class="step-index">2</span> طريقة الدفع</legend><div class="pay">
+          <label><input type="radio" name="method" value="stripe"><span class="method-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></span><span class="method-copy"><b>الدفع الإلكتروني</b><small>أكمل الدفع ببطاقتك البنكية على صفحة آمنة.</small></span><span class="method-check" aria-hidden="true"></span></label>
+          <label><input type="radio" name="method" value="bank"><span class="method-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-5 9 5M3 9h18M5 10v8m5-8v8m4-8v8m5-8v8M3 21h18M2 18h20"/></svg></span><span class="method-copy"><b>التحويل البنكي</b><small>حوّل إلى حسابنا البنكي وأرفق إيصال التحويل.</small></span><span class="method-check" aria-hidden="true"></span></label>
+        </div></fieldset>
+        <section id="bankDetails" class="membership-bank" hidden aria-labelledby="bankHeading"><div class="bank-heading"><span class="bank-heading-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-5 9 5M3 9h18M5 10v8m5-8v8m4-8v8m5-8v8M3 21h18M2 18h20"/></svg></span><h3 id="bankHeading">بيانات التحويل البنكي</h3></div><p id="bankAmount"></p><dl>
+          <div id="bankTitleRow"><dt>اسم البنك</dt><dd id="bankTitle"></dd></div>
+          <div><dt>اسم صاحب الحساب</dt><dd id="bankName" dir="auto"></dd></div>
+          <div><dt>رقم الحساب</dt><dd class="account-value"><bdi id="bankAccount" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankAccount" aria-label="نسخ رقم الحساب"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="3"/><path d="M16 8V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h2"/></svg><span>نسخ</span></button></dd></div>
+          <div><dt>IBAN</dt><dd class="account-value"><bdi id="bankIban" dir="ltr"></bdi><button type="button" class="copy-bank" data-copy="bankIban" aria-label="نسخ IBAN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="3"/><path d="M16 8V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h2"/></svg><span>نسخ</span></button></dd></div>
+        </dl><p id="copyStatus" role="status"></p><p class="currency-note">السعر بالدولار الأمريكي. للتحويل بعملة أخرى، تواصل معنا لتأكيد قيمة التحويل قبل السداد.</p>
+        <div id="receiptWrap"><label for="receipt">إيصال التحويل</label><input id="receipt" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp" aria-describedby="receiptHelp"><p id="receiptHelp">PDF أو JPG أو PNG أو WEBP · حتى 5 MB</p></div></section>
+        <div class="checkout-action"><div class="message" id="message" role="status"></div><button class="buy" id="submit" type="submit"><span id="submitText">المتابعة إلى الدفع الآمن</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button><p class="payment-assurance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><span id="paymentAssurance">تُستكمل بيانات البطاقة البنكية على صفحة الدفع الآمنة.</span></p></div>
+      </form>
+      <aside class="order-summary" aria-labelledby="summaryHeading"><h3 id="summaryHeading">ملخص طلبك</h3>
+        <div class="membership-preview"><div class="preview-top"><span dir="ltr">INEXC</span><svg viewBox="0 0 30 30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 9 15 2l13 7-13 7L2 9Zm5 4v9l8 6 8-6v-9M15 16v12"/></svg></div><div class="preview-bottom"><span>بطاقة تدريبية</span><strong id="summaryPlan"></strong><small dir="ltr">INEXC TRAINING</small></div></div>
+        <div class="summary-details"><p id="durationRow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>صلاحية البطاقة</span><strong id="summaryDuration"></strong></p><p><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><span>بطاقة شخصية باسمك</span></p></div>
+        <div class="summary-total"><div><span>الإجمالي</span><small>دفعة واحدة</small></div><p dir="ltr"><strong id="summaryPrice"></strong><span>USD</span></p></div>
+        <p class="summary-note">تصدر بطاقتك الرقمية بعد تأكيد الدفع، وتصبح جاهزة لحجز الدورات المتاحة لها.</p>
+        <div class="summary-footer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><span>دفع آمن · بياناتك محمية</span></div>
+      </aside>
+    </div>
+  </div>
+  <section class="success" id="success" aria-labelledby="successHeading"><div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></div><span class="checkout-eyebrow">وصلنا طلبك</span><h2 id="successHeading" tabindex="-1">شكرًا لاختيارك INEXC</h2><p id="successText"></p><a class="success-link" href="/">العودة إلى الموقع <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a></section>
+</dialog>
 <script src="../inexc-registration-config.js"></script>
-<script src="/cards/checkout.js?v=20261016-card-payments1"></script>
+<script src="/cards/checkout.js?v=20261016-checkout-design2"></script>
 </body></html>
