@@ -55,6 +55,7 @@ function openPlan(id){
  el('bankAmount').textContent='قيمة البطاقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD';el('copyStatus').textContent='';
  el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه البطاقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
 }
+el('receipt').addEventListener('change',()=>{el('receiptName').textContent=el('receipt').files[0]?.name||'لم يُرفق ملف بعد'});
 el('close').onclick=()=>{if(!busy)el('dialog').close()};el('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault()});document.querySelectorAll('[name=method]').forEach(input=>input.onchange=()=>{el('message').textContent='';syncMethod()});
 document.querySelectorAll('[data-copy]').forEach(button=>button.onclick=async()=>{const value=el(button.dataset.copy).textContent;try{await navigator.clipboard.writeText(value);el('copyStatus').textContent='تم النسخ.'}catch{el('copyStatus').textContent='تعذّر النسخ تلقائيًا. حدّد الرقم وانسخه يدويًا.'}});
 function requestKey(data,file){
