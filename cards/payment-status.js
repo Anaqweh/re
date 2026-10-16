@@ -10,7 +10,7 @@ const el=id=>document.getElementById(id),fragment=new URLSearchParams(location.h
    const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/payment-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checkout:credentials.checkout,token:credentials.token})}),data=await response.json();if(!response.ok)throw Error(data.error||'تعذّر التحقق. أعد المحاولة.');
    el('paymentDetails').hidden=false;el('paymentPlan').textContent=packageText(data.planName);el('paymentReference').textContent=data.reference;el('paymentAmount').textContent='المبلغ: '+Number(data.amount).toLocaleString('ar-AE')+' USD';el('resumePayment').hidden=true;
    if(data.state==='paid'){
-    el('paymentTitle').textContent=data.cardNumber?'تم الدفع وتفعيل باقتك':'تم الدفع — الطلب قيد المراجعة';el('paymentMessage').textContent=data.cardNumber?'باقتك جاهزة: '+data.cardNumber+'. يمكنك استخدامها مع بريدك الإلكتروني لحجز الدورات المتاحة.':'تم استلام الدفع. تواصل معنا برقم الطلب لمراجعة إصدار الباقة.';
+    el('paymentTitle').textContent=data.cardNumber?'تم الدفع وتفعيل باقتك':'تم الدفع — الطلب قيد المراجعة';el('paymentMessage').textContent=data.cardNumber?'باقتك جاهزة: '+data.cardNumber+'. يمكنك استخدامها مع بريدك الإلكتروني لحجز الدورات المتاحة.':'تم استلام الدفع. تواصل معنا برقم الطلب لمراجعة إصدار البطاقة.';
     el('checkPayment').hidden=!!data.cardNumber;
     if(data.cardUrl){const url=new URL(data.cardUrl);if(url.origin===location.origin&&url.pathname==='/my-card/'){el('backToRegistration').href=url.href;el('backToRegistration').textContent='عرض باقتي التدريبية'}}
     try{sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft')}catch{}

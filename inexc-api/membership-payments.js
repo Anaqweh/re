@@ -35,7 +35,7 @@ export async function issueMembershipCard(db,orderId,snapshot){
  const order=(await db.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[orderId])).rows[0];
  if(!order)throw fail('طلب الباقة غير موجود.',404);
  if(order.card_id)return {created:false,card:(await db.query('SELECT * FROM membership_cards WHERE id=$1',[order.card_id])).rows[0]};
- if(order.status==='مرفوض'||!order.verified_at||!order.verified_reference)throw fail('لا يمكن إصدار الباقة قبل تأكيد الدفع.');
+ if(order.status==='مرفوض'||!order.verified_at||!order.verified_reference)throw fail('لا يمكن إصدار البطاقة قبل تأكيد الدفع.');
  const plan=snapshot||(await db.query('SELECT * FROM membership_plans WHERE id=$1',[order.plan_id])).rows[0];
  const prefix=plan.slug==='leadership'?'RD':plan.slug==='mastery'?'TM':'IN';
  const cardNumber='INX-'+prefix+'-'+crypto.randomBytes(5).toString('hex').toUpperCase();

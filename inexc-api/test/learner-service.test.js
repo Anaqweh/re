@@ -12,7 +12,7 @@ const address='learner@example.invalid';
 async function harness(options={}){
  const db=new PGlite(),source=await fs.readFile(new URL('../server.js',import.meta.url),'utf8');
  for(const name of ['courses','registrations','membership_plans','membership_orders','membership_cards','membership_redemptions']){const start=source.indexOf('CREATE TABLE IF NOT EXISTS '+name+' (');const end=source.indexOf('`);',start);await db.exec(source.slice(start,end))}
- await db.exec("ALTER TABLE registrations ADD COLUMN membership_card_id UUID,ADD COLUMN membership_redemption_id UUID,ADD COLUMN request_kind TEXT DEFAULT 'individual'; ALTER TABLE courses ADD COLUMN membership_enabled BOOLEAN DEFAULT TRUE,ADD COLUMN membership_kind TEXT DEFAULT 'course',ADD COLUMN member_booking_opens_at TIMESTAMPTZ;");
+ await db.exec("ALTER TABLE registrations ADD COLUMN membership_card_id UUID,ADD COLUMN membership_redemption_id UUID,ADD COLUMN request_kind TEXT DEFAULT 'individual'; ALTER TABLE courses ADD COLUMN membership_plan_ids UUID[],ADD COLUMN membership_enabled BOOLEAN DEFAULT TRUE,ADD COLUMN membership_kind TEXT DEFAULT 'course',ADD COLUMN member_booking_opens_at TIMESTAMPTZ;");
  let injectFailure=false;const query=async(sql,args)=>{if(injectFailure&&sql.startsWith('UPDATE membership_cards SET units_remaining')){injectFailure=false;throw Error('SIMULATED_WRITE_FAILURE')}const r=await db.query(sql,args);return{...r,rowCount:r.rows.length||r.affectedRows||0}};
  // PGlite has one connection; serialize transaction clients, as row locks do on PostgreSQL.
  let tail=Promise.resolve();const pool={query,connect:async()=>{let release;const previous=tail;tail=new Promise(r=>release=r);await previous;return{query,release}}};
@@ -112,4 +112,18 @@ test('card recovery validates input and hides mail transport errors and account 
 test('unconfigured recovery fails consistently without looking up or sending cards',async t=>{
  const h=await harness({mailEnabled:false});t.after(()=>h.close());
  const first=await h.request(recoveryRoute,{method:'POST',body:{email:address}}),second=await h.request(recoveryRoute,{method:'POST',body:{email:'absent@example.invalid'}});assert.equal(first.status,503);assert.equal(second.status,503);assert.deepEqual(first.data,second.data);assert.equal(h.emails.length,0);assert.equal((await h.query('SELECT count(*)::int AS n FROM learner_recovery_limits')).rows[0].n,0);
+});
+
+test('named card eligibility rejects an unlisted plan without a registration or balance debit, then accepts the selected plan',async t=>{
+ const h=await harness();t.after(()=>h.close());
+ const other=(await h.query("INSERT INTO membership_plans(slug,name,price_usd,max_cards,valid_months,booking_units) VALUES('another','باقة الريادة',39,100,12,8) RETURNING id")).rows[0].id;
+ await h.query('UPDATE courses SET membership_plan_ids=$1 WHERE id=$2',[[other],h.input.courseId]);
+ await assert.rejects(createCardRegistration(h.pool,h.input),/غير صالحة/);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM registrations')).rows[0].n,0);
+ assert.equal((await h.query('SELECT units_remaining FROM membership_cards WHERE id=$1',[h.card])).rows[0].units_remaining,8);
+ await h.query('UPDATE courses SET membership_plan_ids=$1 WHERE id=$2',[[other,h.plan],h.input.courseId]);
+ const result=await createCardRegistration(h.pool,h.input);assert.equal(result.remaining,6);
+ await h.query('UPDATE courses SET membership_plan_ids=$1 WHERE id=$2',[[other],h.input.courseId]);
+ const retry=await createCardRegistration(h.pool,h.input);assert.equal(retry.alreadyRegistered,true);assert.equal(retry.remaining,6);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM registrations')).rows[0].n,1);
 });

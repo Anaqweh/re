@@ -1,3 +1,4 @@
+import {membershipCardName,courseCardInput,attachCourseCardNames} from './course-card-access.js';
 import {installSeoSitemap} from './seo-sitemap.js';
 function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 import {setupServiceCatalog, installServiceCatalog} from './service-catalog.js';
@@ -422,6 +423,8 @@ async function setupDatabase() {
   await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS membership_card_id UUID');
   await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS membership_redemption_id UUID');
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS membership_enabled BOOLEAN NOT NULL DEFAULT TRUE');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE');
+  await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS membership_plan_ids UUID[] DEFAULT NULL');
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS membership_kind TEXT NOT NULL DEFAULT \'course\'');
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS member_booking_opens_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS public_booking_opens_at TIMESTAMPTZ');
@@ -543,6 +546,7 @@ function publicCourse(row) {
     bank: { title: bankParts?.[1] || '', name: bankParts?.[2] === '—' ? '' : (bankParts?.[2] || savedBankName), account: row.bank_account, iban: row.bank_iban },
     imageUrl: row.image_path || '', certificateSampleUrl: row.certificate_sample_path || '',
     shareSlug: row.share_slug || courseSlug(row.id), shareUrl: `https://courses.inexctraining.com/${row.share_slug || courseSlug(row.id)}`,
+    featured: row.featured === true, membershipPlanIds: row.membership_plan_ids ?? null, membershipCardNames: row.membership_card_names || [],
     membershipEnabled: row.membership_enabled !== false, membershipKind: row.membership_kind || 'course',
     memberBookingOpensAt: row.member_booking_opens_at || null, publicBookingOpensAt: row.public_booking_opens_at || null,
     active: row.active
@@ -882,7 +886,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -910,11 +914,13 @@ function cardSnapshot(row, redemptions = []) {
   const plan = membershipPlanPublic({...row,id:row.plan_id||row.id}, row.sold||0);
   return { cardNumber:row.card_number, holderName:row.holder_name, holderEmail:row.holder_email,
     status:row.status, activatedAt:row.activated_at, expiresAt:row.expires_at, unitsTotal:Number(row.units_total),unitsRemaining:Number(row.units_remaining),
-    plan, redemptions };
+    cardName:membershipCardName(row.name), plan, redemptions };
 }
 async function sendMembershipActivationEmail(card){
- const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار باقة INEXC التدريبية. يمكنك استخدامها لحجز الدورات المتاحة للباقة.</p><p><b>رقم الباقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض باقتي التدريبية</a></p>';
- await sendEmail({to:card.holder_email,subject:'تم تفعيل باقتك التدريبية | INEXC',html:emailShell({title:'باقتك التدريبية جاهزة',preview:'تم تأكيد الدفع وإصدار باقتك التدريبية.',content})});
+ const plan=(await pool.query('SELECT name FROM membership_plans WHERE id=$1',[card.plan_id])).rows[0];
+ const name=membershipCardName(plan?.name);
+ const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار '+escapeHtml(name)+'. يمكنك استخدامها لحجز الدورات المتاحة لها.</p><p><b>رقم البطاقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض '+escapeHtml(name)+'</a></p>';
+ await sendEmail({to:card.holder_email,subject:'تم تفعيل '+name+' | INEXC',html:emailShell({title:name+' جاهزة',preview:'تم تأكيد الدفع وإصدار بطاقتك.',content})});
 }
 async function getMembershipCard(code,email,accessToken='') {
   const byToken=clean(accessToken,100);
@@ -937,12 +943,12 @@ app.post('/api/memberships/orders', upload.single('receipt'), async (req,res)=>{
 });
 app.get('/api/memberships/card',async(req,res,next)=>{try{
   const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190),clean(req.query.token,100));
-  if(!found)return res.status(404).json({error:'لم نجد باقة مطابقة لهذه البيانات.'});
+  if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
   res.json(found.snapshot);
 }catch(error){next(error);}});
 app.post('/api/memberships/verify',async(req,res,next)=>{try{
   const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
-  const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم الباقة أو البريد الإلكتروني غير صحيح.'});
+  const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح.'});
   const course=await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true',[courseId]);if(!course.rowCount)return res.status(400).json({error:'الدورة غير متاحة.'});
   const quote=cardQuote(found.row,course.rows[0],req.body?.certificate===true||req.body?.certificate==='yes');
   res.json({ok:true,card:found.snapshot,...quote});
@@ -974,16 +980,18 @@ app.put('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
 app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
   const used=await pool.query('SELECT 1 FROM membership_orders WHERE plan_id=$1 LIMIT 1',[req.params.id]);
   if(used.rowCount)return res.status(409).json({error:'توجد طلبات لهذه الباقة. أوقف عرضها بدل حذفها للحفاظ على سجلات المشترين.'});
+  const courses=await pool.query('SELECT 1 FROM courses WHERE $1::uuid=ANY(membership_plan_ids) LIMIT 1',[req.params.id]);
+  if(courses.rowCount)return res.status(409).json({error:'هذه البطاقة مختارة ضمن دورات. عدّل البطاقات المقبولة في تلك الدورات، أو أوقف عرض الباقة بدل حذفها.'});
   const result=await pool.query('DELETE FROM membership_plans WHERE id=$1 RETURNING id',[req.params.id]);
   if(!result.rowCount)return res.status(404).json({error:'الباقة غير موجودة.'});res.json({ok:true});
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:trainingPackageText(r.plan_name),total:Number(r.total)})));}catch(error){next(error);}});
 app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res)=>{try{res.json(await membershipPayments.approveOffline(req.params.id,req.body||{}));}catch(error){membershipPaymentError(res,error);}});
 app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل باقته.'});res.json({ok:true});}catch(error){next(error);}});
-app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:trainingPackageText(r.plan_name),units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
+app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:membershipCardName(r.plan_name),units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
 app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/courses', async (_req, res, next) => {
-  try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); }
+  try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json((await attachCourseCardNames(pool,result.rows)).map(publicCourse)); } catch (error) { next(error); }
 });
 app.post('/api/course-alerts', async (req, res, next) => {
   try {
@@ -1407,7 +1415,8 @@ app.delete('/api/admin/testimonials/:id', auth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 createCoursePaymentControls({pool,stripe:stripePayments,publicCourse}).install(app,auth);
-app.get('/api/admin/courses', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM courses ORDER BY active DESC, created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); } });
+app.get('/api/admin/course-card-options', auth, async (_req,res,next)=>{try{const plans=await pool.query('SELECT id,name,active FROM membership_plans ORDER BY sort_order,created_at');res.json({version:1,plans:plans.rows.map(p=>({id:p.id,cardName:membershipCardName(p.name),active:p.active}))});}catch(error){next(error);}});
+app.get('/api/admin/courses', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM courses ORDER BY active DESC, created_at DESC'); res.json((await attachCourseCardNames(pool,result.rows)).map(publicCourse)); } catch (error) { next(error); } });
 app.post('/api/admin/course-import', auth, courseImportUpload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'اختر ملف Word أو TXT أولًا.' });
@@ -1449,14 +1458,14 @@ app.post('/api/admin/courses/:id/certificate-sample', auth, courseMediaUpload.si
 });
 app.post('/api/admin/courses', auth, async (req, res, next) => {
   try {
-    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c);
+    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c); const access=await courseCardInput(pool,c);
     if (!clean(c.name, 180)) return res.status(400).json({ error: 'اسم الدورة مطلوب.' });
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled];
-    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active,membership_enabled)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds];
+    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active,membership_enabled,featured,membership_plan_ids)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
-    const published = publicCourse(saved);
+    const published = publicCourse((await attachCourseCardNames(pool,[saved]))[0]);
     res.status(201).json(published);
     if (published.active) void queueCourseAlertEmails(published);
   } catch (error) { next(error); }
@@ -1465,12 +1474,12 @@ app.put('/api/admin/courses/:id', auth, async (req, res, next) => {
   try {
     const before = await pool.query('SELECT * FROM courses WHERE id=$1', [req.params.id]);
     if (!before.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
-    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c,before.rows[0]);
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled, req.params.id];
-    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,membership_enabled=$20,updated_at=now() WHERE id=$21 RETURNING *`, values);
+    const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c,before.rows[0]); const access=await courseCardInput(pool,c,before.rows[0]);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds, req.params.id];
+    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,membership_enabled=$20,featured=$21,membership_plan_ids=$22,updated_at=now() WHERE id=$23 RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
-    const published = publicCourse(saved);
+    const published = publicCourse((await attachCourseCardNames(pool,[saved]))[0]);
     res.json(published);
     if (before.rows[0].active === false && published.active) void queueCourseAlertEmails(published);
   } catch (error) { next(error); }

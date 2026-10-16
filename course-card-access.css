@@ -1,0 +1,8 @@
+.course-card-settings{border:1px solid #d7e5f5;border-radius:12px;background:#f7faff;padding:16px;margin:18px 0;min-width:0}
+.course-card-settings legend{font-size:14px;font-weight:600;color:#174a7a;padding:0 7px}
+.course-card-settings label{font-size:13px}.course-card-settings .course-featured-choice,.course-card-options label{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.course-card-settings input[type=checkbox]{width:18px;min-height:18px;height:18px;flex:none;margin:0;accent-color:#0866c6}
+.course-card-settings small{color:#60788f;font-size:11px}.course-card-settings select{width:100%;margin:8px 0}
+.course-card-options{display:grid;gap:9px;margin:12px 0}.course-card-options[hidden]{display:none}.course-card-options label{border:1px solid #dce7f3;background:#fff;padding:11px;border-radius:9px}
+.course-featured-badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;background:#fff4d8;border:1px solid #edd9a1;color:#76541c;font-size:12px;font-weight:600;padding:4px 10px;margin:0 0 10px 7px;vertical-align:middle}
+.course.is-featured{border-color:#dfc98d}.course-card-eligibility{color:#245a89;font-size:12px;line-height:1.9;margin:10px 0;overflow-wrap:anywhere}

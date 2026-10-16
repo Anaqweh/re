@@ -1,3 +1,4 @@
+import {courseCardInput,attachCourseCardNames} from '../course-card-access.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -8,7 +9,7 @@ import {probeStripeCheckout,stripeClient} from '../stripe-payments.js';
 const source=await fs.readFile(new URL('../server.js',import.meta.url),'utf8');
 async function fixture(){
  const db=new PGlite();const start=source.indexOf('CREATE TABLE IF NOT EXISTS courses (');await db.exec(source.slice(start,source.indexOf('`);',start)));
- await db.exec('ALTER TABLE courses ADD COLUMN membership_enabled BOOLEAN NOT NULL DEFAULT true');
+ await db.exec('ALTER TABLE courses ADD COLUMN membership_enabled BOOLEAN NOT NULL DEFAULT true, ADD COLUMN membership_plan_ids UUID[], ADD COLUMN featured BOOLEAN NOT NULL DEFAULT false; CREATE TABLE membership_plans(id UUID PRIMARY KEY,name TEXT)');
  const query=async(sql,args)=>{const result=await db.query(sql,args);return {...result,rowCount:result.rows.length||result.affectedRows||0}},pool={query,connect:async()=>({query,release(){}})};
  const a=(await query("INSERT INTO courses(name,price,payment_methods) VALUES('LOCAL A',249,ARRAY['bank']) RETURNING id")).rows[0].id;
  const b=(await query("INSERT INTO courses(name,price,payment_methods,payment_link,active) VALUES('LOCAL B',399,ARRAY['bank','link'],'https://example.invalid/pay',false) RETURNING id")).rows[0].id;
@@ -29,7 +30,7 @@ test('actual course create/update handlers preserve disabled methods and apply n
  await f.control.update({scope:'all',payments:['stripe'],membershipEnabled:false,applyToNew:true});
  const app=express();app.use(express.json());const start=source.indexOf("app.post('/api/admin/courses',"),end=source.indexOf("app.delete('/api/admin/courses/:id',",start);
  const clean=(v,max=400)=>String(v??'').trim().slice(0,max),publicCourse=r=>({id:r.id,name:r.name,payments:r.payment_methods,membershipEnabled:r.membership_enabled,active:r.active});
- new Function('app','auth','pool','coursePaymentInput','clean','courseAxes','courseOutcomes','asNumber','courseSlug','publicCourse','queueCourseAlertEmails',source.slice(start,end))(app,(_q,_s,next)=>next(),f.pool,coursePaymentInput,clean,()=>[],()=>[],v=>Number(v)||0,id=>'local-'+id,publicCourse,()=>{throw Error('NO MAIL FOR HIDDEN FIXTURE')});
+ new Function('app','auth','pool','coursePaymentInput','clean','courseAxes','courseOutcomes','asNumber','courseSlug','publicCourse','queueCourseAlertEmails','courseCardInput','attachCourseCardNames',source.slice(start,end))(app,(_q,_s,next)=>next(),f.pool,coursePaymentInput,clean,()=>[],()=>[],v=>Number(v)||0,id=>'local-'+id,publicCourse,()=>{throw Error('NO MAIL FOR HIDDEN FIXTURE')},courseCardInput,attachCourseCardNames);
  app.use((error,_q,res,_n)=>res.status(error.status||500).json({error:error.message}));const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>new Promise(r=>server.close(r)));
  const request=async(method,suffix,body)=>{const res=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/courses'+suffix,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'LOCAL CRUD',active:false,...body})});return {status:res.status,data:await res.json()}};
  const created=await request('POST','',{});assert.equal(created.status,201,JSON.stringify(created));assert.deepEqual(created.data.payments,['stripe']);assert.equal(created.data.membershipEnabled,false);
@@ -37,6 +38,14 @@ test('actual course create/update handlers preserve disabled methods and apply n
  const unchanged=await request('PUT','/'+created.data.id,{name:'LOCAL RENAMED'});assert.deepEqual(unchanged.data.payments,[]);assert.equal(unchanged.data.membershipEnabled,false);
  const three=await request('PUT','/'+created.data.id,{payments:['stripe','bank'],membershipEnabled:true});assert.deepEqual(three.data.payments,['stripe','bank']);assert.equal(three.data.membershipEnabled,true);
  assert.equal((await request('PUT','/'+created.data.id,{payments:['link'],membershipEnabled:true})).status,400);
+ const plan='11111111-1111-4111-8111-111111111111';await f.query('INSERT INTO membership_plans VALUES($1,$2)',[plan,'باقة الريادة']);
+ const restricted=await request('PUT','/'+created.data.id,{featured:true,membershipPlanIds:[plan]});assert.equal(restricted.status,200,JSON.stringify(restricted));
+ let saved=(await f.query('SELECT * FROM courses WHERE id=$1',[created.data.id])).rows[0];assert.equal(saved.featured,true);assert.deepEqual(saved.membership_plan_ids,[plan]);assert.deepEqual(saved.payment_methods,['stripe','bank']);
+ await request('PUT','/'+created.data.id,{name:'LOCAL WITH OLD CLIENT'});await f.control.update({scope:'all',payments:['stripe'],membershipEnabled:false});
+ saved=(await f.query('SELECT * FROM courses WHERE id=$1',[created.data.id])).rows[0];assert.equal(saved.featured,true);assert.deepEqual(saved.membership_plan_ids,[plan]);
+ assert.equal((await request('PUT','/'+created.data.id,{membershipPlanIds:[]})).status,400);
+ assert.equal((await request('PUT','/'+created.data.id,{membershipPlanIds:null,featured:false})).status,200);
+ saved=(await f.query('SELECT * FROM courses WHERE id=$1',[created.data.id])).rows[0];assert.equal(saved.featured,false);assert.equal(saved.membership_plan_ids,null);
 });
 test('bulk replacement is atomic, saves new-course defaults, and supports 1, 2, 3 or no methods',async t=>{
  const f=await fixture();t.after(()=>f.db.close());

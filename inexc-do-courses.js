@@ -21,12 +21,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     const courseMedia = course => course.imageUrl
       ? `<div class="course-media"><img src="${esc(`${apiOrigin}${course.imageUrl}`)}" alt="${esc(course.name)}" loading="lazy"></div>`
       : '<div class="course-media fallback"><img src="assets/inexc-logo-official-source.png" alt="INEXC Training" loading="lazy"></div>';
-    grid.innerHTML = courses.map(course => `<article class="course">
+    grid.innerHTML = courses.map(course => `<article class="course${course.featured?' is-featured':''}">
       ${courseMedia(course)}
+      ${course.featured?'<span class="course-featured-badge">★ مميّزة</span>':''}
       <span class="course-label">${esc(course.category || 'دورة تدريبية')}</span>
       <h3>${esc(course.name)}</h3><p>${esc(overview(course))}</p>
       ${(course.axes || []).length ? `<div class="course-axes"><b>من محاور البرنامج</b><ul>${previewAxes(course).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
       <div class="course-meta"><span>${dateLabel(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
+      <p class="course-card-eligibility">${esc(window.INEXCCardLabels?.eligibility(course)||'')}</p>
       <div class="course-bottom"><div class="course-quick-info">${Number(course.hours) > 0 ? `<span class="course-hours">⏱ ${Number(course.hours).toLocaleString('ar-AE')} ساعة</span>` : ''}<div class="price">${price(course.price)}</div></div>
       <a class="course-link" href="${esc(courseDetailsUrl(course))}">تفاصيل وتسجيل</a></div>
     </article>`).join('');
