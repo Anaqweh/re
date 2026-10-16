@@ -1,0 +1,23 @@
+/* Scoped to the additive email builder. Existing admin and checkout stay intact. */
+.ms .membership-mail-grid{display:grid;grid-template-columns:minmax(290px,.8fr) minmax(340px,1.2fr);gap:24px;align-items:start}
+.ms .membership-mail-picker{margin:0;padding:0;border:0;min-width:0}
+.ms .membership-mail-picker legend{font-size:17px;font-weight:600;color:#173d68;padding:0;margin-bottom:18px}
+.ms .membership-mail-form{gap:28px}
+.ms .membership-mail-picker input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#1559d6}
+.ms .membership-mail-options{display:grid;gap:12px;margin-top:16px}
+.ms label.membership-mail-option{display:flex;align-items:center;gap:12px;padding:18px 14px;border:1px solid #dce6f2;border-radius:12px;cursor:pointer;background:#fff}
+.ms .membership-mail-option:has(input:checked){background:#f5f9ff;border-color:#8cb3ec}
+.ms .membership-mail-option:focus-within{outline:2px solid #1559d6;outline-offset:3px}
+.ms .membership-mail-option>span{flex:1;min-width:0}
+.ms .membership-mail-option strong{display:block;font-size:16px;font-weight:600;line-height:1.7}
+.ms .membership-mail-option small{display:block;font-size:12px;font-weight:400;color:#52647a;line-height:1.8;margin-top:4px}
+.ms .membership-mail-option>b{font-size:20px;color:#1559d6;font-weight:600;white-space:nowrap}
+.ms .membership-mail-option>b small{display:inline;font-size:11px}
+.ms .membership-mail-envelope{display:grid;gap:6px;padding:18px 0;border-bottom:1px solid #e2eaf5;margin-bottom:18px;font-size:14px}
+.ms .membership-mail-envelope>span{color:#52647a;font-size:12px}
+.ms .membership-mail-preview{min-width:0;padding:20px}
+.ms .membership-mail-preview-surface{background:#edf2f8;overflow:auto;border:1px solid #dce6f2;border-radius:12px;padding:0}
+.ms .membership-mail-preview-surface iframe{display:block;width:100%;height:780px;max-height:78vh;border:0;background:#fff;margin:auto}
+.ms .membership-mail-preview-surface.phone iframe{width:360px;max-width:100%}
+@media(max-width:1100px){.ms .membership-mail-grid{grid-template-columns:1fr}.ms .membership-mail-preview-surface iframe{max-height:700px}}
+@media(max-width:520px){.ms .membership-mail-grid{gap:16px}.ms label.membership-mail-option{padding:14px 10px;gap:10px}.ms .membership-mail-option>b{font-size:18px}.ms .membership-mail-preview{padding:12px}}
