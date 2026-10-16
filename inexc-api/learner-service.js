@@ -1,4 +1,4 @@
-// Learner records and card checkout. No mail imports, workers, or background sends.
+// Learner records, card checkout and explicitly requested card recovery. No mail workers.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import multer from 'multer';
 const text=(v,max=200)=>String(v??'').trim().slice(0,max);
 const email=v=>text(v,190).toLowerCase();
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
+const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uuid=v=>/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(String(v));
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const positive=v=>Number.isFinite(Number(v))?Math.max(0,Number(v)):0;
@@ -15,6 +16,8 @@ const cardQuery=`SELECT p.*,c.*,p.id AS plan_id,p.name AS plan_name FROM members
 export async function setupLearnerService(db){
  await db.query(`CREATE TABLE IF NOT EXISTS learner_access_keys(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),email TEXT NOT NULL,token_hash TEXT UNIQUE NOT NULL,revoked_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
  await db.query(`CREATE TABLE IF NOT EXISTS learner_sessions(token_hash TEXT PRIMARY KEY,email TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+ await db.query(`CREATE TABLE IF NOT EXISTS learner_recovery_limits(key_hash TEXT PRIMARY KEY,window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),last_request_at TIMESTAMPTZ NOT NULL DEFAULT now(),requests INTEGER NOT NULL DEFAULT 1)`);
+ await db.query('CREATE INDEX IF NOT EXISTS learner_recovery_expiry ON learner_recovery_limits(last_request_at)');
  await db.query(`CREATE TABLE IF NOT EXISTS learner_progress(registration_id UUID PRIMARY KEY REFERENCES registrations(id) ON DELETE CASCADE,state TEXT NOT NULL DEFAULT 'not_started' CHECK(state IN ('not_started','in_progress','completed')),progress_percent INTEGER NOT NULL DEFAULT 0 CHECK(progress_percent BETWEEN 0 AND 100),attended_hours NUMERIC(8,2) NOT NULL DEFAULT 0 CHECK(attended_hours>=0),completed_at TIMESTAMPTZ,updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
  await db.query(`CREATE TABLE IF NOT EXISTS learner_certificates(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),registration_id UUID NOT NULL REFERENCES registrations(id) ON DELETE CASCADE,title TEXT NOT NULL,certificate_number TEXT UNIQUE NOT NULL,issued_on DATE NOT NULL,filename TEXT NOT NULL,original_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
  await db.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS certificate_fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0`);
@@ -75,7 +78,7 @@ export async function learnerDashboard(db,address){
  return {profile:{name:cards[0]?.holder_name||registrations[0]?.name||'متدرب INEXC',email:normalized,phone:cards[0]?.holder_phone||''},stats:{registered:active.length,completed:active.filter(r=>r.learning_state==='completed').length,attendedHours:Math.round(active.reduce((sum,r)=>sum+positive(r.attended_hours),0)*100)/100,scheduledHours:active.reduce((sum,r)=>sum+positive(r.training_hours),0),certificates:certificates.length},courses:registrations.map(r=>({...r,training_hours:positive(r.training_hours),attended_hours:positive(r.attended_hours),progress_percent:Number(r.progress_percent),certificate_fee_amount:Number(r.certificate_fee_amount)})),cards:cards.map(cardView),certificates,history};
 }
 
-export function installLearnerService({app,pool,auth,uploadDir}){
+export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled=false,logger=console}){
  const asyncRoute=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
  const attempts=new Map();
  const requireLearner=asyncRoute(async(req,res,next)=>{
@@ -85,7 +88,35 @@ export function installLearnerService({app,pool,auth,uploadDir}){
   req.learnerEmail=session.email;req.learnerTokenHash=hash(token);next();
  });
  app.use('/api/admin/learner-records',(_req,res,next)=>{res.set('Cache-Control','no-store');next()});
- app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:2,certificates:true}));
+ app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:2,certificates:true,cardRecovery:true}));
+ app.post('/api/learner/card-recovery',asyncRoute(async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  const raw=req.body?.email,address=typeof raw==='string'?raw.trim().toLowerCase():'';
+  if(address.length>190||!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(address))throw fail('أدخل بريدًا إلكترونيًا صحيحًا.');
+  if(!mailEnabled||typeof sendEmail!=='function'||typeof emailShell!=='function')return res.status(503).json({error:'استرجاع رقم البطاقة غير متاح مؤقتًا. حاول لاحقًا أو تواصل مع الإدارة.'});
+  await pool.query("DELETE FROM learner_recovery_limits WHERE last_request_at<now()-interval '2 days'");
+  // Atomic limits persist across restarts. No raw email addresses or IPs are stored here.
+  const ipLimit=await pool.query(`INSERT INTO learner_recovery_limits(key_hash) VALUES($1)
+   ON CONFLICT(key_hash) DO UPDATE SET window_started_at=CASE WHEN learner_recovery_limits.window_started_at<=now()-interval '15 minutes' THEN now() ELSE learner_recovery_limits.window_started_at END,
+   requests=CASE WHEN learner_recovery_limits.window_started_at<=now()-interval '15 minutes' THEN 1 ELSE learner_recovery_limits.requests+1 END,last_request_at=now()
+   WHERE learner_recovery_limits.window_started_at<=now()-interval '15 minutes' OR learner_recovery_limits.requests<60 RETURNING key_hash`,[hash('ip:'+String(req.ip||req.socket?.remoteAddress||'unknown'))]);
+  if(!ipLimit.rowCount){res.set('Retry-After','900');throw fail('طلبات كثيرة خلال وقت قصير. انتظر 15 دقيقة ثم أعد المحاولة.',429)}
+  const claimed=await pool.query(`INSERT INTO learner_recovery_limits(key_hash) VALUES($1)
+   ON CONFLICT(key_hash) DO UPDATE SET window_started_at=CASE WHEN learner_recovery_limits.window_started_at<=now()-interval '1 day' THEN now() ELSE learner_recovery_limits.window_started_at END,
+   requests=CASE WHEN learner_recovery_limits.window_started_at<=now()-interval '1 day' THEN 1 ELSE learner_recovery_limits.requests+1 END,last_request_at=now()
+   WHERE learner_recovery_limits.last_request_at<=now()-interval '10 minutes' AND (learner_recovery_limits.window_started_at<=now()-interval '1 day' OR learner_recovery_limits.requests<5) RETURNING key_hash`,[hash('email:'+address)]);
+  // Respond before looking up cards or contacting Resend: neither response nor mail latency reveals membership.
+  res.status(202).json({ok:true,message:'إذا كانت هناك بطاقة مرتبطة بهذا البريد، فستصلك رسالة برقمها. تفقد الوارد والبريد غير المرغوب فيه، وانتظر 10 دقائق قبل إعادة الطلب.'});
+  if(!claimed.rowCount)return;
+  try{
+   const cards=(await pool.query(`SELECT c.card_number,c.holder_name,p.name AS plan_name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE lower(c.holder_email)=$1 ORDER BY c.created_at DESC`,[address])).rows;
+   if(!cards.length)return;
+   const title=cards.length===1?'رقم بطاقتك التدريبية':'أرقام بطاقاتك التدريبية';
+   const content=`<h1 style="font-size:23px;color:#103b70">${title}</h1><p>مرحبًا ${escapeHtml(cards[0].holder_name)}،</p><p>بناءً على طلبك، هذه بيانات البطاقات المرتبطة ببريدك الإلكتروني:</p>${cards.map(card=>`<div style="background:#eef6ff;border:1px solid #d3e5f8;border-radius:10px;padding:16px;margin:14px 0"><strong>${escapeHtml(card.plan_name)}</strong><div dir="ltr" style="direction:ltr;text-align:center;font-family:monospace;font-size:20px;font-weight:bold;color:#0866c6;margin-top:8px">${escapeHtml(card.card_number)}</div></div>`).join('')}<p>استخدم بريدك الإلكتروني ورقم البطاقة للدخول إلى صفحتك التدريبية.</p><p style="text-align:center"><a href="https://www.inexctraining.com/account.html" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:9px;padding:12px 20px;font-weight:bold">الدخول إلى صفحتي</a></p><p style="font-size:12px;color:#64778c">احتفظ برقم بطاقتك لنفسك. إذا لم تطلب هذه الرسالة، يمكنك تجاهلها؛ لم تتغير بيانات بطاقتك أو رصيدها.</p>`;
+   const plain=`${title}\n\n${cards.map(card=>`${card.plan_name}: ${card.card_number}`).join('\n')}\n\nاستخدم بريدك ورقم البطاقة للدخول:\nhttps://www.inexctraining.com/account.html\n\nإذا لم تطلب الرسالة، تجاهلها. لم تتغير بيانات بطاقتك أو رصيدها.`;
+   await sendEmail({to:address,subject:title+' | INEXC',html:emailShell({title,preview:'بيانات بطاقتك بناءً على طلب الاسترجاع.',content}),text:plain,marketing:false,idempotencyKey:'learner-card-recovery/'+crypto.randomUUID()});
+  }catch(error){logger.error('Learner card recovery delivery failed',{status:Number(error.status)||500})}
+ }));
  app.post('/api/learner/session',asyncRoute(async(req,res)=>{
   res.set('Cache-Control','no-store');
   const cardToken=text(req.body?.cardToken,100),code=text(req.body?.code,160),now=Date.now();
