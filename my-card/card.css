@@ -1,0 +1,36 @@
+/* Compact spacing for issued membership cards; retain the approved card artwork. */
+.membership-page main.wrap{width:min(680px,calc(100% - 28px))}
+.membership-page .intro{padding:30px 0 18px}
+.membership-page .card{padding:18px}
+.membership-page #membershipCard .tc-card-top{padding:18px 22px 0;gap:14px}
+.membership-page #membershipCard .tc-logo{width:136px;height:68px;padding:5px 10px}
+.membership-page #membershipCard .tc-card-type{font-size:11px;line-height:1.6}
+.membership-page #membershipCard .tc-card-type strong{font-size:15px;font-weight:500}
+.membership-page #membershipCard .tc-card-body{grid-template-columns:60px minmax(0,1fr);gap:14px;padding:18px 22px 12px}
+.membership-page #membershipCard .tc-avatar{width:60px;height:72px;border-radius:13px;font-size:22px}
+.membership-page #membershipCard .tc-name{font-size:24px;font-weight:500;line-height:1.4;text-align:right;margin:0 0 5px!important}
+.membership-page #membershipCard .tc-specialty{font-size:13px;line-height:1.6;text-align:right;margin:0 0 6px!important}
+.membership-page #membershipCard .tc-tier{padding:2px 9px;font-size:12px;line-height:1.6}
+.membership-page #membershipCard .tc-card-bottom{padding:8px 22px 18px;gap:16px}
+.membership-page #membershipCard .tc-number{font-size:18px;letter-spacing:.45px}
+.membership-page #membershipCard .tc-issuer{font-size:11px;margin-top:7px!important}
+.membership-page #membershipCard .tc-qr{padding:6px;max-width:92px;border-radius:10px}
+.membership-page #membershipCard .tc-qr svg{width:76px;height:76px}
+.membership-page #membershipCard .tc-card-strip{padding:9px 22px;gap:10px;line-height:1.6}
+.membership-page #downloadCard{font:500 14px/1.5 INEXCPlex,Arial,sans-serif;min-height:44px;padding:11px}
+.membership-page #downloadStatus:empty{display:none}
+@media(max-width:540px){
+ .membership-page .card{padding:13px}
+ .membership-page #membershipCard .tc-card-top{padding:16px 16px 0;gap:10px}
+ .membership-page #membershipCard .tc-logo{width:112px;height:56px;padding:4px 8px}
+ .membership-page #membershipCard .tc-card-type{font-size:10px}
+ .membership-page #membershipCard .tc-card-type strong{font-size:14px}
+ .membership-page #membershipCard .tc-card-body{grid-template-columns:50px minmax(0,1fr);padding:16px 16px 10px;gap:12px}
+ .membership-page #membershipCard .tc-avatar{width:50px;height:62px;font-size:20px}
+ .membership-page #membershipCard .tc-name{font-size:20px}
+ .membership-page #membershipCard .tc-card-bottom{padding:8px 16px 16px;gap:12px}
+ .membership-page #membershipCard .tc-number{font-size:16px;letter-spacing:.2px}
+ .membership-page #membershipCard .tc-qr svg{width:64px;height:64px}
+ .membership-page #membershipCard .tc-qr{max-width:78px}
+ .membership-page #membershipCard .tc-card-strip{padding:8px 16px}
+}
