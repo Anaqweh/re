@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>التصميم المعتمد — بطاقة الريادة | INEXC</title>
+<link rel="stylesheet" href="/css/trainee-card.css?v=20261016-promo1">
+<style>html,body{margin:0;background:transparent}body{padding:2px}.tc-root{width:100%}</style>
+<script src="/vendor/inexc-qr.js?v=20261016-card1"></script>
+<script src="/js/trainee-card.js?v=20261016-card1"></script>
+</head>
+<body>
+<main class="tc-root" id="approvedCard" aria-label="نموذج توضيحي — غير صادر"></main>
+<script>
+// Reuse the approved renderer and stylesheet. Only the card title changes.
+const demo={profile:{id:'preview',full_name:'سارة محمد عبدالله',specialty:'التعليم وتطبيقات الذكاء الاصطناعي'},digitalId:{idNumber:'INEXC-DEMO-001',tierKey:'silver',trainingHours:40},professionalValue:{overallReadiness:100},certificates:[{course_name:'الذكاء الاصطناعي في التعليم',certificate_number:'DEMO-CERT-001'},{course_name:'تصميم تجارب تعلّم رقمية',certificate_number:'DEMO-CERT-002'}]};
+const template=document.createElement('div');template.innerHTML=TraineeCard.render(demo,{demo:true});
+const card=template.querySelector('.tc-card');card.querySelector('.tc-card-type strong').textContent='بطاقة الريادة';
+// Keep the same demo QR destination as the original root-level card preview.
+card.querySelector('.tc-qr svg').outerHTML=TraineeCard.qrMarkup(new URL('/digital-id.html?preview=1',location.origin).href);
+document.getElementById('approvedCard').append(card);
+const sendHeight=()=>parent.postMessage({type:'inexc-card-preview-height',height:Math.ceil(document.body.getBoundingClientRect().height)+2},location.origin);
+new ResizeObserver(sendHeight).observe(document.body);document.fonts.ready.then(sendHeight);
+</script>
+</body></html>
