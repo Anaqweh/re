@@ -1,6 +1,6 @@
 # Membership purchase payments
 
-`/cards/` offers electronic payment and bank transfer according to each membership plan's saved methods. The administrator can enable either, both, or neither under **بطاقات INEXC → مواصفات البطاقات → طرق الدفع**. Course payment methods and course registration pages are unchanged.
+`/cards/` offers electronic payment and bank transfer according to each membership plan's saved methods. The administrator can enable either, both, or neither under **الباقات التدريبية → مواصفات الباقات → طرق الدفع**. Course payment methods and course registration pages are unchanged.
 
 The first deployment enables `stripe` and `bank` for existing membership plans only. Original method arrays are retained in `membership_payment_migrations.before_methods`. Later administrator choices, including an empty array, survive restarts. Existing prices, quantities and benefits remain unchanged; membership prices and electronic checkout currency remain **USD**.
 

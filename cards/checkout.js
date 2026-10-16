@@ -1,3 +1,5 @@
+const packageText=value=>String(value??'').replaceAll('بطاق','باق');
+const packagePlan=p=>({...p,...Object.fromEntries(['name','perks','featureLines','badgeText','stockLabel','lowStockLabel'].filter(k=>typeof p[k]==='string').map(k=>[k,packageText(p[k])]))});
 const API = window.INEXC_REGISTRATION_ENDPOINT;
 let plans = [];
 const esc = v => String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,9 +18,9 @@ function description(p) {
 function availability(p) {
   const remaining=Math.max(0,Number(p.remaining)||0),maximum=Math.max(1,Number(p.maxCards)||1);
   const mode=p.stockMode||'count',urgent=remaining>0&&remaining<=Number(p.lowStockThreshold??15);
-  const message=remaining===0?'اكتمل إصدار هذه البطاقة':urgent?p.lowStockLabel||'اقترب اكتمال الإصدار':p.stockLabel||'فرصتك ما زالت متاحة';
+  const message=remaining===0?'اكتمل إصدار هذه الباقة':urgent?p.lowStockLabel||'اقترب اكتمال الإصدار':p.stockLabel||'فرصتك ما زالت متاحة';
   if(mode==='hidden'&&remaining>0)return '';
-  const number=mode==='limited'&&remaining>0?'<span class="availability-copy">'+esc(urgent?'عدد محدود جدًا من البطاقات':'إصدار محدود — احجز بطاقتك')+'</span>':'<span class="availability-number">'+remaining+' <small>بطاقة متاحة</small></span>';
+  const number=mode==='limited'&&remaining>0?'<span class="availability-copy">'+esc(urgent?'عدد محدود جدًا من الباقات':'إصدار محدود — احجز باقتك')+'</span>':'<span class="availability-number">'+remaining+' <small>باقة متاحة</small></span>';
   return '<div class="availability '+(remaining===0?'sold-out':urgent?'urgent':mode==='limited'?'quiet':'')+'" role="status"><div class="availability-top"><span class="availability-copy">'+esc(message)+'</span>'+number+'</div>'+(mode==='count'&&remaining>0?'<div class="availability-track" aria-hidden="true"><i style="width:'+Math.min(100,Math.round(remaining/maximum*100))+'%"></i></div>':'')+'</div>';
 }
 function render() {
@@ -31,7 +33,7 @@ function render() {
       '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
       availability(p) +
       '<ul class="features">' + items + '</ul>' +
-      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت البطاقات' : 'احصل على البطاقة') + '</button></article>';
+      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت الباقات' : 'احصل على الباقة') + '</button></article>';
   }).join('');
   host.querySelectorAll('[data-plan]').forEach(button => button.onclick = () => openPlan(button.dataset.plan));
 }
@@ -40,11 +42,11 @@ const el=id=>document.getElementById(id),selectedMethod=()=>document.querySelect
 function syncMethod(){
  const bank=selectedMethod()==='bank';el('bankDetails').hidden=!bank;el('receipt').required=bank;
  el('submitText').textContent=busy?'جارٍ تجهيز الطلب…':bank?'إرسال الطلب ورفع الإيصال':'المتابعة إلى الدفع الآمن';el('submit').disabled=busy||!selectedMethod();
- el('paymentAssurance').textContent=bank?'تُراجع بيانات التحويل قبل تفعيل بطاقتك.':'تُستكمل بيانات البطاقة البنكية على صفحة الدفع الآمنة.';
+ el('paymentAssurance').textContent=bank?'تُراجع بيانات التحويل قبل تفعيل باقتك.':'تُستكمل بيانات البطاقة البنكية على صفحة الدفع الآمنة.';
  document.querySelectorAll('[name=method]').forEach(input=>input.disabled=busy||input.closest('label').hidden);el('close').disabled=busy;el('orderForm').setAttribute('aria-busy',String(busy));
 }
 function openPlan(id){
- const p=plans.find(x=>x.id===id);if(!p||busy)return;currentPlan=p;el('planId').value=id;el('modalTitle').textContent='إتمام شراء البطاقة';
+ const p=plans.find(x=>x.id===id);if(!p||busy)return;currentPlan=p;el('planId').value=id;el('modalTitle').textContent='إتمام شراء الباقة';
  el('modalInfo').textContent='أكمل بياناتك واختر طريقة الدفع المناسبة لك.';
  el('summaryPlan').textContent=p.name;el('summaryPrice').textContent=Number(p.priceUsd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  el('summaryDuration').textContent=Number(p.validMonths)+(Number(p.validMonths)>=3&&Number(p.validMonths)<=10?' أشهر':' شهرًا');el('durationRow').hidden=!Number(p.validMonths);
@@ -52,8 +54,8 @@ function openPlan(id){
  const first=document.querySelector('[name=method]:not(:disabled)');if(first)first.checked=true;
  const bank=paymentOptions.bank||{};for(const [id,key]of [['bankTitle','title'],['bankName','name'],['bankAccount','account'],['bankIban','iban']])el(id).textContent=bank[key]||'—';el('bankTitleRow').hidden=!bank.title;
  document.querySelectorAll('[data-copy]').forEach(button=>button.disabled=!bank[button.dataset.copy==='bankAccount'?'account':'iban']);
- el('bankAmount').textContent='قيمة البطاقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD';el('copyStatus').textContent='';
- el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه البطاقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
+ el('bankAmount').textContent='قيمة الباقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD';el('copyStatus').textContent='';
+ el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه الباقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
 }
 el('receipt').addEventListener('change',()=>{el('receiptName').textContent=el('receipt').files[0]?.name||'لم يُرفق ملف بعد'});
 el('close').onclick=()=>{if(!busy)el('dialog').close()};el('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault()});document.querySelectorAll('[name=method]').forEach(input=>input.onchange=()=>{el('message').textContent='';syncMethod()});
@@ -77,7 +79,7 @@ el('orderForm').onsubmit=async event=>{
   if(method==='stripe'){
    const url=new URL(result.paymentLink);if(url.protocol!=='https:'||(url.hostname!=='checkout.stripe.com'&&!(url.origin===location.origin&&url.pathname==='/cards/payment-status.html')))throw Error('تعذّر التحقق من رابط الدفع.');location.href=url.href;return;
   }
-  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent='تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر بطاقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;el('dialog').setAttribute('aria-labelledby','successHeading');el('successHeading').focus();
+  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent='تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر باقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;el('dialog').setAttribute('aria-labelledby','successHeading');el('successHeading').focus();
  }catch(error){el('message').textContent=error.message}finally{busy=false;syncMethod()}
 };
 async function loadPaymentOptions(){
@@ -93,13 +95,13 @@ async function loadPaymentOptions(){
 function followPlanLink(){
  const params=new URLSearchParams(location.search),booking=params.get('book'),id=booking||params.get('plan');if(!id)return;
  const button=[...document.querySelectorAll('#plans [data-plan]')].find(node=>node.dataset.plan===id);
- if(!button){const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='البطاقة المطلوبة غير متاحة حاليًا. يمكنك استعراض البطاقات المتوفرة أدناه.';el('plans').before(notice);return;}
+ if(!button){const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='الباقة المطلوبة غير متاحة حاليًا. يمكنك استعراض الباقات المتوفرة أدناه.';el('plans').before(notice);return;}
  const card=button.closest('.plan');card.tabIndex=-1;card.focus({preventScroll:true});card.scrollIntoView({block:'center',behavior:'auto'});
  // A link only opens the existing purchase form. Stock, pricing, payment
  // availability and order creation remain in their existing verified flow.
  if(booking&&!button.disabled)openPlan(id);
 }
 Promise.all([fetch(API+'/memberships/plans').then(r=>r.ok?r.json():Promise.reject()),loadPaymentOptions()])
- .then(([data,options])=>{plans=data;paymentOptions=options;const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' بطاقة';render();
+ .then(([data,options])=>{plans=data.map(packagePlan);paymentOptions=options;const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' باقة';render();
   if(new URLSearchParams(location.search).get('resume')==='1'){try{const draft=JSON.parse(sessionStorage.getItem('inexc_membership_purchase_draft'));if(draft&&Date.now()-draft.createdAt<3600000&&plans.some(p=>p.id===draft.plan_id)){openPlan(draft.plan_id);for(const id of ['name','email','phone'])el(id).value=draft[id]||''}}catch{}}else followPlanLink();
- }).catch(()=>el('plans').innerHTML='<p>تعذّر تحميل البطاقات ووسائل الدفع الآن. أعد تحميل الصفحة لاحقًا.</p>');
+ }).catch(()=>el('plans').innerHTML='<p>تعذّر تحميل الباقات ووسائل الدفع الآن. أعد تحميل الصفحة لاحقًا.</p>');

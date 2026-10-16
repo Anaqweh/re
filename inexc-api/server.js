@@ -1,3 +1,4 @@
+function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 import {setupServiceCatalog, installServiceCatalog} from './service-catalog.js';
 import {setupMembershipPayments, createMembershipPayments} from './membership-payments.js';
 import {setupStripePayments, createStripePayments} from './stripe-payments.js';
@@ -425,9 +426,9 @@ async function setupDatabase() {
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS public_booking_opens_at TIMESTAMPTZ');
   await pool.query(`INSERT INTO membership_plans (slug,name,price_usd,max_cards,valid_months,booking_units,course_unit_cost,diploma_unit_cost,certificate_discount,early_access_hours,perks)
     VALUES
-    ('launch','بطاقة الانطلاقة',39,100,4,2,1,1,0,0,'حجز دورتين أو دبلومين مباشرين أونلاين خلال مدة البطاقة.'),
-    ('mastery','بطاقة التمكّن',79,100,6,3,1,1,10,24,'3 حجوزات تدريبية مباشرة أونلاين + خصم 10% على رسوم الشهادات.'),
-    ('leadership','بطاقة الريادة',179,100,12,30,5,6,10,72,'6 دورات أو حتى 5 دبلومات + أولوية الحجز + جلسة إرشادية جماعية أو ورشة حصرية.')
+    ('launch','باقة الانطلاقة',39,100,4,2,1,1,0,0,'حجز دورتين أو دبلومين مباشرين أونلاين خلال مدة الباقة.'),
+    ('mastery','باقة التمكّن',79,100,6,3,1,1,10,24,'3 حجوزات تدريبية مباشرة أونلاين + خصم 10% على رسوم الشهادات.'),
+    ('leadership','باقة الريادة',179,100,12,30,5,6,10,72,'6 دورات أو حتى 5 دبلومات + أولوية الحجز + جلسة إرشادية جماعية أو ورشة حصرية.')
     ON CONFLICT (slug) DO NOTHING`);
   await pool.query(`UPDATE membership_plans SET badge_text=CASE WHEN slug='mastery' THEN 'الأكثر توازنًا' ELSE '' END,
     featured=(slug='mastery'), sort_order=CASE slug WHEN 'launch' THEN 1 WHEN 'mastery' THEN 2 WHEN 'leadership' THEN 3 ELSE sort_order END
@@ -880,7 +881,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
@@ -890,7 +891,7 @@ app.get('/api/settings', async (_req, res, next) => {
 });
 
 function membershipPlanPublic(row, sold = 0) {
-  return { id:row.id,slug:row.slug,name:row.name,priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),paidCount:Number(row.paid_count||0),pendingCount:Number(row.pending_count||0),expectedRevenueUsd:Number(row.expected_revenue_usd||0),issuedValueUsd:Number(row.issued_value_usd||0),verifiedRevenueUsd:Number(row.verified_revenue_usd||0),verifiedRevenueAed:Number(row.verified_revenue_aed||0),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:row.perks||'',paymentLink:row.payment_link||'',paymentMethods:row.payment_methods||['bank'],active:row.active===true,featureLines:row.feature_lines||'',badgeText:row.badge_text||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:row.stock_label||'',lowStockLabel:row.low_stock_label||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
+  return { id:row.id,slug:row.slug,name:trainingPackageText(row.name),priceUsd:Number(row.price_usd),maxCards:Number(row.max_cards),sold:Number(sold),remaining:Math.max(0,Number(row.max_cards)-Number(sold)),paidCount:Number(row.paid_count||0),pendingCount:Number(row.pending_count||0),expectedRevenueUsd:Number(row.expected_revenue_usd||0),issuedValueUsd:Number(row.issued_value_usd||0),verifiedRevenueUsd:Number(row.verified_revenue_usd||0),verifiedRevenueAed:Number(row.verified_revenue_aed||0),validMonths:Number(row.valid_months),bookingUnits:Number(row.booking_units),courseUnitCost:Number(row.course_unit_cost),diplomaUnitCost:Number(row.diploma_unit_cost),certificateDiscount:Number(row.certificate_discount),earlyAccessHours:Number(row.early_access_hours),perks:trainingPackageText(row.perks)||'',paymentLink:row.payment_link||'',paymentMethods:row.payment_methods||['bank'],active:row.active===true,featureLines:trainingPackageText(row.feature_lines)||'',badgeText:trainingPackageText(row.badge_text)||'',featured:row.featured===true,stockMode:row.stock_mode||'count',stockLabel:trainingPackageText(row.stock_label)||'',lowStockLabel:trainingPackageText(row.low_stock_label)||'',lowStockThreshold:Number(row.low_stock_threshold??15),sortOrder:Number(row.sort_order||0) };
 }
 async function membershipPlans(includeInactive=false) {
   const result = await pool.query(`SELECT p.*,COUNT(o.id) FILTER (WHERE o.status IN ('مفعلة','بانتظار مراجعة الدفع','بانتظار الدفع')) AS sold,
@@ -911,8 +912,8 @@ function cardSnapshot(row, redemptions = []) {
     plan, redemptions };
 }
 async function sendMembershipActivationEmail(card){
- const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار بطاقة INEXC التدريبية. يمكنك استخدامها لحجز الدورات المتاحة للبطاقة.</p><p><b>رقم البطاقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض بطاقتي التدريبية</a></p>';
- await sendEmail({to:card.holder_email,subject:'تم تفعيل بطاقتك التدريبية | INEXC',html:emailShell({title:'بطاقتك التدريبية جاهزة',preview:'تم تأكيد الدفع وإصدار بطاقتك التدريبية.',content})});
+ const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار باقة INEXC التدريبية. يمكنك استخدامها لحجز الدورات المتاحة للباقة.</p><p><b>رقم الباقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض باقتي التدريبية</a></p>';
+ await sendEmail({to:card.holder_email,subject:'تم تفعيل باقتك التدريبية | INEXC',html:emailShell({title:'باقتك التدريبية جاهزة',preview:'تم تأكيد الدفع وإصدار باقتك التدريبية.',content})});
 }
 async function getMembershipCard(code,email,accessToken='') {
   const byToken=clean(accessToken,100);
@@ -926,21 +927,21 @@ async function getMembershipCard(code,email,accessToken='') {
 }
 app.get('/api/memberships/plans', async (_req,res,next)=>{try{res.json(await membershipPlans(false));}catch(error){next(error);}});
 function membershipPaymentError(res,error){
- if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'});
+ if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'});
  const safe=[400,404,409,410,429,503].includes(error.status);
- return res.status(safe?error.status:500).json({error:safe?error.message:'تعذّر إتمام طلب البطاقة. أعد المحاولة.'});
+ return res.status(safe?error.status:500).json({error:safe?error.message:'تعذّر إتمام طلب الباقة. أعد المحاولة.'});
 }
 app.post('/api/memberships/orders', upload.single('receipt'), async (req,res)=>{
   try {res.status(201).json(await membershipPayments.offlineOrder(req.body||{},req.file?`/uploads/${req.file.filename}`:''));}catch(error){membershipPaymentError(res,error);}
 });
 app.get('/api/memberships/card',async(req,res,next)=>{try{
   const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190),clean(req.query.token,100));
-  if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
+  if(!found)return res.status(404).json({error:'لم نجد باقة مطابقة لهذه البيانات.'});
   res.json(found.snapshot);
 }catch(error){next(error);}});
 app.post('/api/memberships/verify',async(req,res,next)=>{try{
   const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
-  const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح.'});
+  const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم الباقة أو البريد الإلكتروني غير صحيح.'});
   const course=await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true',[courseId]);if(!course.rowCount)return res.status(400).json({error:'الدورة غير متاحة.'});
   const quote=cardQuote(found.row,course.rows[0],req.body?.certificate===true||req.body?.certificate==='yes');
   res.json({ok:true,card:found.snapshot,...quote});
@@ -967,18 +968,18 @@ app.post('/api/admin/memberships/plans',auth,async(req,res,next)=>{try{
 }catch(error){next(error);}});
 app.put('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
   const values=membershipPlanInput(req.body||{});const result=await pool.query(`UPDATE membership_plans SET name=$1,price_usd=$2,max_cards=$3,valid_months=$4,booking_units=$5,course_unit_cost=$6,diploma_unit_cost=$7,certificate_discount=$8,early_access_hours=$9,perks=$10,payment_link=$11,active=$12,feature_lines=$13,badge_text=$14,featured=$15,stock_mode=$16,stock_label=$17,low_stock_threshold=$18,sort_order=$19,low_stock_label=$20,payment_methods=$21,updated_at=now() WHERE id=$22 RETURNING *`,[...values,req.params.id]);
-  if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json(membershipPlanPublic(result.rows[0]));
+  if(!result.rowCount)return res.status(404).json({error:'الباقة غير موجودة.'});res.json(membershipPlanPublic(result.rows[0]));
 }catch(error){next(error);}});
 app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
   const used=await pool.query('SELECT 1 FROM membership_orders WHERE plan_id=$1 LIMIT 1',[req.params.id]);
-  if(used.rowCount)return res.status(409).json({error:'توجد طلبات لهذه البطاقة. أوقف عرضها بدل حذفها للحفاظ على سجلات المشترين.'});
+  if(used.rowCount)return res.status(409).json({error:'توجد طلبات لهذه الباقة. أوقف عرضها بدل حذفها للحفاظ على سجلات المشترين.'});
   const result=await pool.query('DELETE FROM membership_plans WHERE id=$1 RETURNING id',[req.params.id]);
-  if(!result.rowCount)return res.status(404).json({error:'البطاقة غير موجودة.'});res.json({ok:true});
+  if(!result.rowCount)return res.status(404).json({error:'الباقة غير موجودة.'});res.json({ok:true});
 }catch(error){next(error);}});
-app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,total:Number(r.total)})));}catch(error){next(error);}});
+app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:trainingPackageText(r.plan_name),total:Number(r.total)})));}catch(error){next(error);}});
 app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res)=>{try{res.json(await membershipPayments.approveOffline(req.params.id,req.body||{}));}catch(error){membershipPaymentError(res,error);}});
-app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل بطاقته.'});res.json({ok:true});}catch(error){next(error);}});
-app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
+app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل باقته.'});res.json({ok:true});}catch(error){next(error);}});
+app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:trainingPackageText(r.plan_name),units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
 app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/courses', async (_req, res, next) => {
   try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json(result.rows.map(publicCourse)); } catch (error) { next(error); }
@@ -1486,7 +1487,7 @@ app.delete('/api/admin/courses/:id', auth, async (req, res, next) => {
     res.json({ ok: true, name: result.rows[0].name });
   } catch (error) { next(error); }
 });
-app.get('/api/admin/registrations', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC'); res.json(result.rows.map(r => ({...r,total:Number(r.total)}))); } catch (error) { next(error); } });
+app.get('/api/admin/registrations', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC'); res.json(result.rows.map(r => ({...r,plan_name:trainingPackageText(r.plan_name),total:Number(r.total)}))); } catch (error) { next(error); } });
 app.put('/api/admin/registrations/:id/status', auth, async (req, res, next) => { try { const status = clean(req.body?.status,80); const allowed=['بانتظار الدفع','بانتظار مراجعة الوصل','مدفوع','مؤكد','ملغى','مسجل','مسجل بالبطاقة','طلب مؤسسة جديد','قيد التواصل']; if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صالحة.'}); await pool.query('UPDATE registrations SET status=$1,updated_at=now() WHERE id=$2',[status,req.params.id]); res.json({ok:true}); } catch(error){next(error);} });
 app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
   try {
@@ -1692,9 +1693,9 @@ app.post('/api/admin/campaigns/:id/cancel', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
-app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,r.status,r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
+app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,trainingPackageText(r.status),r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 installServiceCatalog({app,pool,auth,uploadDir});
-app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار البطاقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
+app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
 
 setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });

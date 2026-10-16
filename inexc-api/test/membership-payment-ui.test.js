@@ -16,7 +16,7 @@ async function purchase({methods=plan.paymentMethods,paymentOptions=options,lega
  return {dom,w,q,requests,copies,choose,fill,submit};
 }
 test('bank choice reveals current account/IBAN, exact copy and receipt; switching methods preserves buyer details',async t=>{
- const h=await purchase();t.after(()=>h.dom.window.close());assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);assert.equal(h.q('#summaryPlan').textContent,plan.name);assert.equal(h.q('#summaryPrice').textContent,'39.00');assert.equal(h.q('#summaryDuration').textContent,'4 أشهر');h.fill();h.choose('bank');
+ const h=await purchase();t.after(()=>h.dom.window.close());assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);assert.equal(h.q('#summaryPlan').textContent,'باقة الاختبار المحلية');assert.equal(h.q('#summaryPrice').textContent,'39.00');assert.equal(h.q('#summaryDuration').textContent,'4 أشهر');h.fill();h.choose('bank');
  assert.equal(h.q('#bankDetails').hidden,false);assert.equal(h.q('#bankAccount').textContent,'00123456');assert.equal(h.q('#bankIban').textContent,'LOCAL-IBAN');assert.equal(h.q('#receipt').required,true);assert.equal(h.q('#bankAccount').dir,'ltr');
  h.q('[data-copy=bankAccount]').click();await flush();assert.deepEqual(h.copies,['00123456']);h.choose('stripe');assert.equal(h.q('#bankDetails').hidden,true);assert.equal(h.q('#receipt').required,false);assert.equal(h.q('#name').value,'LOCAL BUYER');assert.match(h.q('#submit').textContent,/الدفع الآمن/);
 });
@@ -48,12 +48,12 @@ test('email details link focuses the exact card; direct booking opens only its e
  assert.equal(details.q('#dialog').open,false);assert.equal(details.w.document.activeElement.querySelector('[data-plan]').dataset.plan,second.id);assert.equal(details.w.document.activeElement.dataset.scrolled,'true');
  details.q('[data-plan="'+second.id+'"]').click();assert.equal(details.q('#planId').value,second.id);assert.equal(details.q('#summaryPrice').textContent,'79.00');
  const book=await purchase({catalog,query:'?book='+second.id,autoOpen:false});t.after(()=>book.w.close());
- assert.equal(book.q('#dialog').open,true);assert.equal(book.q('#planId').value,second.id);assert.equal(book.q('#summaryPlan').textContent,second.name);assert.equal(book.q('#name').value,'');
+ assert.equal(book.q('#dialog').open,true);assert.equal(book.q('#planId').value,second.id);assert.equal(book.q('#summaryPlan').textContent,'باقة ثانية محلية');assert.equal(book.q('#name').value,'');
  for(const h of [details,book])assert.equal(h.requests.some(r=>r.init?.method==='POST'),false);
 });
 test('email links cannot book a sold-out or unknown plan, and existing payment resume wins',async t=>{
  const sold=await purchase({catalog:[{...plan,remaining:0}],query:'?book='+plan.id,autoOpen:false});t.after(()=>sold.w.close());assert.equal(sold.q('#dialog').open,false);assert.equal(sold.q('[data-plan]').disabled,true);
- const missing=await purchase({query:'?book=deleted-plan',autoOpen:false});t.after(()=>missing.w.close());assert.equal(missing.q('#dialog').open,false);assert.match(missing.q('[role=status]').textContent,/البطاقة المطلوبة غير متاحة/);assert.ok(missing.q('[data-plan]'));
+ const missing=await purchase({query:'?book=deleted-plan',autoOpen:false});t.after(()=>missing.w.close());assert.equal(missing.q('#dialog').open,false);assert.match(missing.q('[role=status]').textContent,/الباقة المطلوبة غير متاحة/);assert.ok(missing.q('[data-plan]'));
  const resume=await purchase({query:'?resume=1&book=another-plan',autoOpen:false,draft:{plan_id:plan.id,name:'LOCAL SAVED',email:'saved@example.invalid',createdAt:Date.now()}});t.after(()=>resume.w.close());assert.equal(resume.q('#dialog').open,true);assert.equal(resume.q('#planId').value,plan.id);assert.equal(resume.q('#name').value,'LOCAL SAVED');
  for(const h of [sold,missing,resume])assert.equal(h.requests.some(r=>r.init?.method==='POST'),false);
 });

@@ -15,13 +15,14 @@ const plans=[
   {id:'leadership',name:'بطاقة الريادة',priceUsd:179,validMonths:12,featureLines:'ميزة الريادة',active:true,remaining:0},
   {id:'hidden',name:'بطاقة مخفية',priceUsd:1,active:false}
 ];
+const packageNames={launch:'باقة الانطلاقة',mastery:'باقة التمكّن',leadership:'باقة الريادة',hidden:'باقة مخفية'};
 const waitFor=async fn=>{for(let i=0;i<250;i++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Expected email builder state was not reached');};
 
 test('one, two and all selections preserve current plan data without changing it',()=>{
   const before=structuredClone(plans);
   for(const ids of [['mastery'],['launch','leadership'],plans.map(p=>p.id)]){
     const payload=membershipEmailPayload(plans,ids),text=messageText(payload.message);
-    for(const plan of plans)assert.equal(text.includes(plan.name),ids.includes(plan.id)&&plan.active);
+    for(const plan of plans)assert.equal(text.includes(packageNames[plan.id]),ids.includes(plan.id)&&plan.active);
     assert.equal(payload.audience,'custom');assert.equal(payload.extraRecipients,'');assert.equal(payload.scheduledAt,'');
     assert.equal(payload.ctaUrl,'');
     const footer=JSON.parse(payload.message.slice(richTextPrefix.length)).blocks.at(-1);assert.equal(footer.href,'https://www.inexctraining.com/cards/');assert.equal(footer.button.align,'center');
@@ -29,7 +30,7 @@ test('one, two and all selections preserve current plan data without changing it
   assert.deepEqual(plans,before);
   assert.match(messageText(membershipEmailPayload(plans,['launch']).message),/39.50 USD/);
   assert.match(messageText(membershipEmailPayload(plans,['leadership']).message),/غير متاحة للشراء/);
-  assert.throws(()=>membershipEmailPayload(plans,[]),/اختر بطاقة/);
+  assert.throws(()=>membershipEmailPayload(plans,[]),/اختر باقة/);
   assert.throws(()=>membershipEmailPayload([{...plans[0],priceUsd:null}],['launch']),/السعر|سعرها/);
   assert.deepEqual(membershipFeatures({bookingUnits:6,courseUnitCost:2,diplomaUnitCost:3}),['رصيد يتيح حجز حتى 3 من الدورات أو حتى 2 من الدبلومات']);
 });
@@ -47,17 +48,17 @@ test('existing API saves and renders selected cards and templates without sendin
     const payload={...membershipEmailPayload(plans,ids),extraRecipients:'preview@example.com'};
     const saved=await h.request('/drafts/'+crypto.randomUUID(),'PUT',{version:0,payload});assert.equal(saved.status,200);
     const preview=await h.request('/preview','POST',{payload:saved.data.payload});assert.equal(preview.status,200);
-    for(const plan of plans)assert.equal(preview.data.html.includes(plan.name),ids.includes(plan.id));
+    for(const plan of plans)assert.equal(preview.data.html.includes(packageNames[plan.id]),ids.includes(plan.id));
     assert.match(preview.data.html,/إلغاء الاشتراك/);assert.match(preview.data.html,/inexctraining.com\/cards\//);
     const rendered=new JSDOM(preview.data.html),links=[...rendered.window.document.querySelectorAll('a[href]')];
     for(const plan of plans){
       const details=links.filter(a=>a.getAttribute('href')==='https://www.inexctraining.com/cards/?plan='+plan.id);
       const book=links.filter(a=>a.getAttribute('href')==='https://www.inexctraining.com/cards/?book='+plan.id);
       assert.equal(details.length,ids.includes(plan.id)?1:0);assert.equal(book.length,ids.includes(plan.id)&&plan.remaining>0?1:0);
-      if(details.length)assert.equal(details[0].textContent,'استعرض البطاقة ومزاياها');
+      if(details.length)assert.equal(details[0].textContent,'استعرض الباقة ومزاياها');
     }
     rendered.window.close();
-    const template=await h.request('/templates/'+crypto.randomUUID(),'PUT',{name:'بطاقات مختارة',payload:saved.data.payload});assert.equal(template.status,200);
+    const template=await h.request('/templates/'+crypto.randomUUID(),'PUT',{name:'باقات مختارة',payload:saved.data.payload});assert.equal(template.status,200);
     assert.equal(template.data.body,saved.data.payload.message);
     const review=await h.request('/review','POST',{payload:saved.data.payload});assert.equal(review.status,200);assert.deepEqual(review.data.issues,[]);
   }
@@ -80,7 +81,7 @@ test('selector supports one, two, all and zero; preview is read-only and handoff
   assert.equal(w.document.querySelectorAll('[data-membership-id]').length,3);
   select('launch');assert.equal($('[data-membership-all]').indeterminate,true);
   assert.doesNotMatch($('[data-membership-preview]').srcdoc,/ميزة الانطلاقة/);
-  select('leadership');assert.match($('[data-membership-subject]').value,/بطاقة التمكّن/);
+  select('leadership');assert.match($('[data-membership-subject]').value,/باقة التمكّن/);
   select('mastery');assert.equal($('[data-membership-continue]').disabled,true);assert.equal($('[data-membership-preview]').srcdoc,'');
   $('[data-membership-all]').click();assert.equal($('[data-membership-count]').textContent,'3 / 3');
   $('[data-membership-subject]').value='دعوة خاصة';$('[data-membership-subject]').dispatchEvent(new w.Event('input'));select('launch');assert.equal($('[data-membership-subject]').value,'دعوة خاصة');
@@ -93,7 +94,7 @@ test('selector supports one, two, all and zero; preview is read-only and handoff
 test('fetch errors offer retry and empty catalogs cannot create a message',async t=>{
   let attempt=0;const {$}=await mountBuilder(t,{api:async()=>{if(++attempt===1)throw Error('غير متصل');return []}});
   assert.match($('#target').textContent,/غير متصل/);$('[data-membership-retry]').click();
-  await waitFor(()=>$('#target').textContent.includes('لا توجد بطاقات'));assert.equal($('[data-membership-continue]'),null);
+  await waitFor(()=>$('#target').textContent.includes('لا توجد باقات'));assert.equal($('[data-membership-continue]'),null);
 });
 
 test('studio entry preserves an existing draft and opens the selected cards in the existing composer',async t=>{
@@ -113,7 +114,7 @@ test('studio entry preserves an existing draft and opens the selected cards in t
   $('#mc-body').value='نص سابق محفوظ';$('#mc-body').dispatchEvent(new w.Event('input',{bubbles:true}));
   await open('membership-email');await waitFor(()=>$('[data-membership-id="launch"]'));
   $('[data-membership-all]').click();$('[data-membership-id="mastery"]').click();$('[data-membership-continue]').click();
-  await waitFor(()=>$('#ms-subject').value.includes('بطاقة التمكّن'));
+  await waitFor(()=>$('#ms-subject').value.includes('باقة التمكّن'));
   assert.equal($('[data-panel="compose"]').hidden,false);assert.match(messageText($('#mc-body').value),/ميزة التمكّن/);assert.doesNotMatch(messageText($('#mc-body').value),/ميزة الانطلاقة/);
   assert.equal($('#ms-recipients').value,'');assert.equal($('#ms-schedule').value,'');
   const drafts=(await h.request('/drafts')).data;assert.equal(drafts.some(d=>d.payload.subject==='مسودة سابقة'&&d.payload.message==='نص سابق محفوظ'),true);

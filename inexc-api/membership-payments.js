@@ -1,3 +1,4 @@
+function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 // Membership purchases are isolated from course registration and course payment settings.
 import crypto from 'node:crypto';
 import {amountInFils as cents,stripeClient} from './stripe-payments.js';
@@ -32,9 +33,9 @@ export async function membershipBank(db){
 // Caller owns one transaction connection, including payment confirmation and card issuance.
 export async function issueMembershipCard(db,orderId,snapshot){
  const order=(await db.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[orderId])).rows[0];
- if(!order)throw fail('طلب البطاقة غير موجود.',404);
+ if(!order)throw fail('طلب الباقة غير موجود.',404);
  if(order.card_id)return {created:false,card:(await db.query('SELECT * FROM membership_cards WHERE id=$1',[order.card_id])).rows[0]};
- if(order.status==='مرفوض'||!order.verified_at||!order.verified_reference)throw fail('لا يمكن إصدار البطاقة قبل تأكيد الدفع.');
+ if(order.status==='مرفوض'||!order.verified_at||!order.verified_reference)throw fail('لا يمكن إصدار الباقة قبل تأكيد الدفع.');
  const plan=snapshot||(await db.query('SELECT * FROM membership_plans WHERE id=$1',[order.plan_id])).rows[0];
  const prefix=plan.slug==='leadership'?'RD':plan.slug==='mastery'?'TM':'IN';
  const cardNumber='INX-'+prefix+'-'+crypto.randomBytes(5).toString('hex').toUpperCase();
@@ -46,15 +47,15 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
  const secret=text(env.STRIPE_SECRET_KEY,300),live=/^(rk|sk)_live_/.test(secret),stripe=client||stripeClient(secret);
  const enabled=()=>env.STRIPE_CHECKOUT_ENABLED==='1'&&live&&String(env.STRIPE_WEBHOOK_SECRET||'').startsWith('whsec_');
  const nextUrl=row=>SITE+'/cards/payment-status.html#checkout='+row.id+'&token='+row.request_key;
- const identity=input=>{const data={name:text(input.name,150),email:text(input.email,180).toLowerCase(),phone:text(input.phone,50),planId:text(input.plan_id,80)};if(!uuid(data.planId)||!data.name||!data.phone||!/^\S+@\S+\.\S+$/.test(data.email))throw fail('أكمل الاسم والبريد الإلكتروني والهاتف، واختر بطاقة متاحة.');return data};
- async function stock(db,plan,except){const count=(await db.query(`SELECT count(*)::int AS n FROM membership_orders WHERE plan_id=$1 AND status IN ${occupied} AND ($2::uuid IS NULL OR id<>$2)`,[plan.id,except||null])).rows[0].n;if(count>=Number(plan.max_cards))throw fail('نفدت هذه الفئة من البطاقات.',409)}
+ const identity=input=>{const data={name:text(input.name,150),email:text(input.email,180).toLowerCase(),phone:text(input.phone,50),planId:text(input.plan_id,80)};if(!uuid(data.planId)||!data.name||!data.phone||!/^\S+@\S+\.\S+$/.test(data.email))throw fail('أكمل الاسم والبريد الإلكتروني والهاتف، واختر باقة متاحة.');return data};
+ async function stock(db,plan,except){const count=(await db.query(`SELECT count(*)::int AS n FROM membership_orders WHERE plan_id=$1 AND status IN ${occupied} AND ($2::uuid IS NULL OR id<>$2)`,[plan.id,except||null])).rows[0].n;if(count>=Number(plan.max_cards))throw fail('نفدت هذه الفئة من الباقات.',409)}
  const send=async issued=>{if(issued?.created){try{await notify(issued.card)}catch{/* The issued card remains available through the private status page and card recovery. */}}};
  async function options(){const bank=await membershipBank(pool);return {version:1,electronicEnabled:enabled(),currency:'USD',bank,bankConfigured:!!(bank.account||bank.iban)}}
  async function offlineOrder(input,receiptPath){
   const data=identity(input),method=text(input.payment_method,20),key=input.request_key||crypto.randomUUID();if(!uuid(key)||!['bank','link'].includes(method))throw fail('اختر طريقة دفع صالحة.');
   const db=await pool.connect();try{
    await db.query('BEGIN');const plan=(await db.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true FOR UPDATE',[data.planId])).rows[0];
-   if(!plan||!plan.payment_methods?.includes(method))throw fail('طريقة الدفع غير متاحة لهذه البطاقة.');
+   if(!plan||!plan.payment_methods?.includes(method))throw fail('طريقة الدفع غير متاحة لهذه الباقة.');
    const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];
    if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!==method)throw fail('تغيّرت بيانات الطلب. أعد المحاولة.',409);await db.query('COMMIT');return {ok:true,reference:prior.reference,status:prior.status,orderId:prior.id,paymentLink:method==='link'?plan.payment_link:''}}
    if(method==='bank'){const bank=await membershipBank(db);if(!bank.account&&!bank.iban)throw fail('بيانات التحويل البنكي غير جاهزة. اختر الدفع الإلكتروني.',503);if(!receiptPath)throw fail('يرجى رفع وصل التحويل البنكي.');}
@@ -66,23 +67,23 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
  }
  async function checkout(input){
   if(!enabled())throw fail('الدفع الإلكتروني غير متاح حاليًا. اختر التحويل البنكي.',503);
-  const data=identity(input),key=text(input.request_key,80);if(!uuid(key))throw fail('أعد فتح طلب البطاقة ثم حاول مجددًا.');
+  const data=identity(input),key=text(input.request_key,80);if(!uuid(key))throw fail('أعد فتح طلب الباقة ثم حاول مجددًا.');
   const hash=crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');const db=await pool.connect();let row;
   try{
    await db.query('BEGIN');row=(await db.query('INSERT INTO membership_stripe_checkouts(request_key,request_hash) VALUES($1,$2) ON CONFLICT(request_key) DO UPDATE SET request_key=EXCLUDED.request_key RETURNING *',[key,hash])).rows[0];
    if(row.request_hash!==hash)throw fail('تغيّرت بيانات الطلب. أعد بدء الدفع.',409);
    const plan=(await db.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true FOR UPDATE',[data.planId])).rows[0];
-   if(!plan||!plan.payment_methods?.includes('stripe'))throw fail('الدفع الإلكتروني غير متاح لهذه البطاقة.');
+   if(!plan||!plan.payment_methods?.includes('stripe'))throw fail('الدفع الإلكتروني غير متاح لهذه الباقة.');
    if(row.order_id){const order=(await db.query('SELECT * FROM membership_orders WHERE id=$1 FOR UPDATE',[row.order_id])).rows[0];if(order.status==='مرفوض')throw fail('هذا الطلب مرفوض. تواصل مع الإدارة.',409);}
    if(row.state!=='paid'){
     if(row.state==='expired'||(row.params&&Number(row.params.expires_at)*1000<=now()))throw fail('انتهت مهلة الدفع. أعد المحاولة لإنشاء صفحة جديدة.',410);
     await stock(db,plan,row.order_id);
    }
    if(!row.params){
-    const amount=cents(plan.price_usd);if(amount<50||amount>99999999)throw fail('تعذّر تحديد مبلغ الدفع لهذه البطاقة. تواصل مع الإدارة.');
+    const amount=cents(plan.price_usd);if(amount<50||amount>99999999)throw fail('تعذّر تحديد مبلغ الدفع لهذه الباقة. تواصل مع الإدارة.');
     const order=(await db.query("INSERT INTO membership_orders(reference,plan_id,name,email,phone,total,payment_method,status) VALUES($1,$2,$3,$4,$5,$6,'stripe','بانتظار الدفع') RETURNING id",['CARD-'+crypto.randomBytes(9).toString('hex').toUpperCase(),plan.id,data.name,data.email,data.phone,plan.price_usd])).rows[0];
-    const params={mode:'payment',customer_email:data.email,client_reference_id:order.id,locale:'auto','adaptive_pricing[enabled]':'false',integration_identifier:'inexc-membership-'+Array.from(crypto.randomBytes(8),x=>String.fromCharCode(97+x%26)).join(''),success_url:nextUrl(row),cancel_url:nextUrl(row)+'&cancelled=1',expires_at:String(Math.floor(now()/1000)+3600),'metadata[source]':SOURCE,'metadata[checkout_id]':row.id,'metadata[order_id]':order.id,'payment_intent_data[metadata][source]':SOURCE,'payment_intent_data[metadata][order_id]':order.id,'line_items[0][quantity]':'1','line_items[0][price_data][currency]':'usd','line_items[0][price_data][unit_amount]':String(amount),'line_items[0][price_data][product_data][name]':plan.name};
-    const snapshot={name:plan.name,slug:plan.slug,booking_units:plan.booking_units,valid_months:plan.valid_months};
+    const params={mode:'payment',customer_email:data.email,client_reference_id:order.id,locale:'auto','adaptive_pricing[enabled]':'false',integration_identifier:'inexc-membership-'+Array.from(crypto.randomBytes(8),x=>String.fromCharCode(97+x%26)).join(''),success_url:nextUrl(row),cancel_url:nextUrl(row)+'&cancelled=1',expires_at:String(Math.floor(now()/1000)+3600),'metadata[source]':SOURCE,'metadata[checkout_id]':row.id,'metadata[order_id]':order.id,'payment_intent_data[metadata][source]':SOURCE,'payment_intent_data[metadata][order_id]':order.id,'line_items[0][quantity]':'1','line_items[0][price_data][currency]':'usd','line_items[0][price_data][unit_amount]':String(amount),'line_items[0][price_data][product_data][name]':trainingPackageText(plan.name)};
+    const snapshot={name:trainingPackageText(plan.name),slug:plan.slug,booking_units:plan.booking_units,valid_months:plan.valid_months};
     row=(await db.query('UPDATE membership_stripe_checkouts SET order_id=$1,amount=$2,params=$3,plan_snapshot=$4 WHERE id=$5 RETURNING *',[order.id,amount,JSON.stringify(params),JSON.stringify(snapshot),row.id])).rows[0];
    }else if(row.state==='creating'){await db.query("UPDATE membership_orders SET status='بانتظار الدفع',updated_at=now() WHERE id=$1 AND status='تعذّر تجهيز الدفع'",[row.order_id]);}
    await db.query('COMMIT');
@@ -127,7 +128,7 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
   let row=(await pool.query('SELECT * FROM membership_stripe_checkouts WHERE id=$1 AND request_key=$2',[input.checkout,input.token])).rows[0];if(!row)throw fail('لم نجد عملية دفع مطابقة.',404);
   if(row.state!=='paid'&&row.stripe_session_id){await reconcile(await stripe.retrieve(row.stripe_session_id));row=(await pool.query('SELECT * FROM membership_stripe_checkouts WHERE id=$1',[row.id])).rows[0];}
   const order=(await pool.query('SELECT o.*,c.card_number,c.access_token FROM membership_orders o LEFT JOIN membership_cards c ON c.id=o.card_id WHERE o.id=$1',[row.order_id])).rows[0];
-  return {state:row.state,amount:row.amount/100,currency:'USD',reference:order.reference,planName:row.plan_snapshot.name,orderStatus:order.status,paymentLink:row.state==='open'&&Number(row.params.expires_at)*1000>now()?row.checkout_url:'',cardNumber:order.card_number||'',cardUrl:order.access_token?SITE+'/my-card/?token='+order.access_token:''};
+  return {state:row.state,amount:row.amount/100,currency:'USD',reference:order.reference,planName:trainingPackageText(row.plan_snapshot.name),orderStatus:order.status,paymentLink:row.state==='open'&&Number(row.params.expires_at)*1000>now()?row.checkout_url:'',cardNumber:order.card_number||'',cardUrl:order.access_token?SITE+'/my-card/?token='+order.access_token:''};
  }
  async function review(orderId){
   if(!uuid(orderId))throw fail('الطلب غير صالح.');const row=(await pool.query('SELECT * FROM membership_stripe_checkouts WHERE order_id=$1',[orderId])).rows[0];

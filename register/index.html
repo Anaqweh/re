@@ -20,7 +20,7 @@
       <div class="summary"><div class="summary-row"><span>الدورة</span><b id="summaryCourse">—</b></div><div class="summary-row" id="summaryCertRow" style="display:none"><span>الشهادة</span><b id="summaryCertificate">—</b></div><div class="summary-row summary-total"><span>المبلغ المستحق</span><b id="total">—</b></div></div>
       <div id="paymentArea" class="payment"><h2 class="section-title">طريقة الدفع<small>اختر الطريقة المتاحة لهذه الدورة.</small></h2><div class="choice-grid" id="paymentChoices"></div><div id="bankBox" class="bank-box"><h3>بيانات التحويل البنكي</h3><p id="bankName"></p><p id="bankAccount"></p><p id="bankIban"></p><div class="upload"><label for="receipt">ارفع وصل التحويل <span class="req">*</span></label><input id="receipt" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"><p class="hint">PDF أو صورة JPG أو PNG أو WEBP واضحة، بحد أقصى 5 MB.</p></div></div></div>
       <button class="submit" id="submitButton" type="submit">إرسال طلب التسجيل</button><p class="note">سيتم التواصل معك لتأكيد التسجيل عند الحاجة.</p></form><div class="success" id="success"><div class="check">✓</div><h2>تم استلام طلبك</h2><p id="successText">شكرًا لتسجيلك. سيقوم فريق INEXC بمراجعة طلبك والتواصل معك قريبًا.</p><div class="ref" id="reference"></div><a class="back" href="/">العودة إلى الدورات</a></div></section>
-      <aside class="card side"><h2>كل ما تحتاجه في مكان واحد</h2><p>تظهر لك التفاصيل الصحيحة بحسب الدورة التي اخترتها، من دون خطوات زائدة.</p><div class="feature"><i>١</i><div><b>سعر واضح</b><span>يتم حساب سعر الدورة والشهادة تلقائيًا.</span></div></div><div class="feature"><i>٢</i><div><b>شهادة مرنة</b><span>مشمولة، اختيارية، أو غير متاحة حسب كل دورة.</span></div></div><div class="feature"><i>٣</i><div><b>دفع يناسبك</b><span>دفع إلكتروني، تحويل بنكي، أو بطاقة INEXC بحسب الخيارات المتاحة للدورة.</span></div></div></aside>
+      <aside class="card side"><h2>كل ما تحتاجه في مكان واحد</h2><p>تظهر لك التفاصيل الصحيحة بحسب الدورة التي اخترتها، من دون خطوات زائدة.</p><div class="feature"><i>١</i><div><b>سعر واضح</b><span>يتم حساب سعر الدورة والشهادة تلقائيًا.</span></div></div><div class="feature"><i>٢</i><div><b>شهادة مرنة</b><span>مشمولة، اختيارية، أو غير متاحة حسب كل دورة.</span></div></div><div class="feature"><i>٣</i><div><b>دفع يناسبك</b><span>دفع إلكتروني، تحويل بنكي، أو باقة INEXC بحسب الخيارات المتاحة للدورة.</span></div></div></aside>
     </div></main>
   <script src="inexc-registration-config.js"></script>
   <script src="inexc-branding.js"></script>
@@ -39,7 +39,7 @@
       if(!paid){selectedPayment='';toggleBank();return}
       const methods=[...new Set([...(selectedCourse.payments||[]),...(window.INEXCStripeEnabled&&!selectedCourse.paymentsManaged?['stripe']:[])])].filter(type=>type==='bank'||(type==='stripe'&&window.INEXCStripeEnabled)||(type==='link'&&configuredPaymentLink(selectedCourse.paymentLink)));
       selectedPayment=methods.includes(selectedPayment)?selectedPayment:methods.includes('bank')?'bank':methods[0]||'';
-      $('paymentChoices').innerHTML=methods.length?methods.map(type=>`<label class="choice"><input type="radio" name="payment" value="${type}" ${type===selectedPayment?'checked':''}><b>${type==='stripe'?'الدفع الإلكتروني':type==='link'?'الدفع عبر الرابط':'تحويل بنكي'}</b><small>${type==='stripe'?'ادفع ببطاقتك البنكية عبر صفحة دفع آمنة؛ يُؤكّد التسجيل بعد نجاح الدفع.':type==='link'?'انتقل إلى صفحة الدفع بعد تسجيل بياناتك، دون رفع وصل.':'ارفع وصل التحويل للمراجعة وتأكيد التسجيل.'}</small></label>`).join(''):'<p class="hint">لا توجد طريقة دفع نقدية مفعّلة لهذه الدورة حاليًا. استخدم بطاقة INEXC إن كانت متاحة أدناه، أو تواصل مع الإدارة.</p>';
+      $('paymentChoices').innerHTML=methods.length?methods.map(type=>`<label class="choice"><input type="radio" name="payment" value="${type}" ${type===selectedPayment?'checked':''}><b>${type==='stripe'?'الدفع الإلكتروني':type==='link'?'الدفع عبر الرابط':'تحويل بنكي'}</b><small>${type==='stripe'?'ادفع ببطاقتك البنكية عبر صفحة دفع آمنة؛ يُؤكّد التسجيل بعد نجاح الدفع.':type==='link'?'انتقل إلى صفحة الدفع بعد تسجيل بياناتك، دون رفع وصل.':'ارفع وصل التحويل للمراجعة وتأكيد التسجيل.'}</small></label>`).join(''):'<p class="hint">لا توجد طريقة دفع نقدية مفعّلة لهذه الدورة حاليًا. استخدم باقة INEXC إن كانت متاحة أدناه، أو تواصل مع الإدارة.</p>';
       document.querySelectorAll('[name=payment]').forEach(input=>input.onchange=()=>{selectedPayment=input.value;toggleBank();updateSummary()});
       toggleBank();
     }
@@ -48,7 +48,7 @@
     $('course').onchange=renderCourse;
     $('registrationForm').onsubmit=e=>{e.preventDefault();alert('انتظر اكتمال تحميل بيانات التسجيل، ثم حاول مجددًا.');};renderCourses();
   </script>
-  <script src="/clean-routes.js"></script><script src="inexc-do-registration.js?v=20261016-payment-choice3"></script><script src="/register/inexc-membership-registration.js?v=20261016-payment-choice3"></script>
+  <script src="/clean-routes.js"></script><script src="inexc-do-registration.js?v=20261017-packages1"></script><script src="/register/inexc-membership-registration.js?v=20261017-packages1"></script>
   <script src="/inexc-whatsapp.js"></script>
   <script src="/inexc-site-assistant.js"></script>
 </body></html>

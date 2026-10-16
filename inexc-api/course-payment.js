@@ -41,7 +41,7 @@ export async function coursePaymentInput(pool,input,previous){
  let defaults;
  if(!previous&&(input.payments===undefined||input.membershipEnabled===undefined))defaults=(await pool.query('SELECT * FROM course_payment_settings WHERE id=true')).rows[0];
  const methods=input.payments===undefined?(previous?.payment_methods??defaults?.default_methods??['stripe','bank']):coursePaymentMethods(input.payments);
- if(input.membershipEnabled!==undefined&&typeof input.membershipEnabled!=='boolean')throw fail('إعداد بطاقة INEXC غير صالح.');
+ if(input.membershipEnabled!==undefined&&typeof input.membershipEnabled!=='boolean')throw fail('إعداد باقة INEXC غير صالح.');
  const membershipEnabled=input.membershipEnabled??previous?.membership_enabled??defaults?.default_membership_enabled??true;
  if(methods.includes('link')&&!validCoursePaymentLink(input.paymentLink??previous?.payment_link))throw fail('أدخل رابط دفع خارجي صالحًا يبدأ بـ https:// أو أوقف طريقة الرابط الخارجي. Stripe لا يحتاج رابطًا يدويًا.');
  return {methods,membershipEnabled};
@@ -58,7 +58,7 @@ export function createCoursePaymentControls({pool,stripe,publicCourse}){
   const action=input.action||'replace';
   if(!['replace','enable-stripe','disable-stripe'].includes(action))throw fail('الإجراء غير صالح.');
   const requested=action==='replace'?coursePaymentMethods(input.payments):null;
-  if(action==='replace'&&typeof input.membershipEnabled!=='boolean')throw fail('حدد حالة بطاقة INEXC.');
+  if(action==='replace'&&typeof input.membershipEnabled!=='boolean')throw fail('حدد حالة باقة INEXC.');
   const db=await pool.connect();let count=0;
   try{
    await db.query('BEGIN');

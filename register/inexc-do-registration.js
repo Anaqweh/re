@@ -76,7 +76,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (receiptError) return alert(receiptError);
     }
     const total = institutional ? 0 : selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
-    if (!institutional && total > 0 && !['bank','link','stripe'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم بطاقتك التدريبية.');
+    if (!institutional && total > 0 && !['bank','link','stripe'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم باقتك التدريبية.');
     registrationPending = true;
     const button = document.getElementById('submitButton');
     button.disabled = true;

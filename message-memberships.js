@@ -1,3 +1,5 @@
+const packageText=value=>String(value??'').replaceAll('بطاق','باق');
+const packagePlan=p=>({...p,...Object.fromEntries(['name','perks','featureLines','badgeText','stockLabel','lowStockLabel'].filter(k=>typeof p[k]==='string').map(k=>[k,packageText(p[k])]))});
 import {richTextPrefix,normaliseMessageBody} from './inexc-api/message-format.js';
 import {renderMail,mailIdentityDefaults} from './inexc-api/message-mail.js?v=20261015-sub1';
 
@@ -8,6 +10,7 @@ const months=value=>Number(value)+(Number(value)>=3&&Number(value)<=10?' أشه�
 const paragraph=(text,style={})=>({type:'paragraph',direction:'rtl',runs:[{text,...style}]});
 
 export function membershipFeatures(plan){
+  plan=packagePlan(plan);
   const explicit=String(plan.featureLines||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   if(explicit.length)return [...new Set(explicit)];
   const features=[],units=Number(plan.bookingUnits),course=Number(plan.courseUnitCost),diploma=Number(plan.diplomaUnitCost);
@@ -26,31 +29,32 @@ export function membershipFeatures(plan){
 // Use the existing rich-text format: drafts, templates, preview and delivery all
 // keep the same content without a server migration or a new HTML email engine.
 export function membershipEmailPayload(plans,selectedIds,options={}){
+  plans=plans.map(packagePlan);
   const wanted=new Set(selectedIds),selected=plans.filter(p=>wanted.has(p.id)&&p.active!==false);
-  if(!selected.length)throw Error('اختر بطاقة تدريبية واحدة على الأقل.');
-  const blocks=[paragraph(options.introduction??'مرحبًا {{name}}،\nاختر ما يناسب رحلتك في التعلّم من بطاقات INEXC التدريبية، وتعرّف إلى المزايا المتاحة لكل بطاقة.')];
+  if(!selected.length)throw Error('اختر باقة تدريبية واحدة على الأقل.');
+  const blocks=[paragraph(options.introduction??'مرحبًا {{name}}،\nاختر ما يناسب رحلتك في التعلّم من باقات INEXC التدريبية، وتعرّف إلى المزايا المتاحة لكل باقة.')];
   for(const plan of selected){
-    if(!String(plan.name||'').trim()||plan.priceUsd===null||plan.priceUsd===undefined||!Number.isFinite(Number(plan.priceUsd))||Number(plan.priceUsd)<0)throw Error('راجع اسم البطاقة وسعرها في إدارة البطاقات قبل إعداد الرسالة.');
+    if(!String(plan.name||'').trim()||plan.priceUsd===null||plan.priceUsd===undefined||!Number.isFinite(Number(plan.priceUsd))||Number(plan.priceUsd)<0)throw Error('راجع اسم الباقة وسعرها في إدارة الباقات قبل إعداد الرسالة.');
     blocks.push({type:'divider',runs:[]});
     if(plan.badgeText)blocks.push(paragraph(String(plan.badgeText),{color:'#1559d6',size:13}));
     blocks.push({type:'heading',direction:'rtl',runs:[{text:String(plan.name),bold:true,color:'#173d68',size:24}]});
     blocks.push({type:'paragraph',direction:'ltr',align:'right',runs:[{text:price(plan.priceUsd),bold:true,color:'#1559d6',size:32},{text:' USD',color:'#52647a',size:14}]});
     if(Number(plan.validMonths)>0)blocks.push(paragraph('مدة الصلاحية: '+months(plan.validMonths),{color:'#52647a',size:14}));
     for(const feature of membershipFeatures(plan))blocks.push({type:'bullet',direction:'rtl',runs:[{text:feature}]});
-    if(plan.remaining!==undefined&&Number(plan.remaining)<=0)blocks.push(paragraph('هذه البطاقة غير متاحة للشراء حاليًا.',{color:'#52647a',size:14}));
+    if(plan.remaining!==undefined&&Number(plan.remaining)<=0)blocks.push(paragraph('هذه الباقة غير متاحة للشراء حاليًا.',{color:'#52647a',size:14}));
     const detailsUrl=cardsUrl+'?plan='+encodeURIComponent(plan.id),bookingUrl=cardsUrl+'?book='+encodeURIComponent(plan.id);
-    blocks.push({type:'button',direction:'rtl',align:'right',href:detailsUrl,button:{kind:'url',label:'استعرض البطاقة ومزاياها',target:detailsUrl,variant:'solid',color:'#1559d6',align:'right',radius:12,fullWidth:true,size:16},runs:[{text:'استعرض البطاقة ومزاياها'}]});
-    if(plan.remaining===undefined||Number(plan.remaining)>0)blocks.push({type:'paragraph',direction:'rtl',align:'center',runs:[{text:'احجز هذه البطاقة مباشرة',href:bookingUrl,color:'#1559d6',size:14}]});
+    blocks.push({type:'button',direction:'rtl',align:'right',href:detailsUrl,button:{kind:'url',label:'استعرض الباقة ومزاياها',target:detailsUrl,variant:'solid',color:'#1559d6',align:'right',radius:12,fullWidth:true,size:16},runs:[{text:'استعرض الباقة ومزاياها'}]});
+    if(plan.remaining===undefined||Number(plan.remaining)>0)blocks.push({type:'paragraph',direction:'rtl',align:'center',runs:[{text:'احجز هذه الباقة مباشرة',href:bookingUrl,color:'#1559d6',size:14}]});
   }
-  blocks.push({type:'divider',runs:[]},paragraph('للاطّلاع على التفاصيل والتوافر الحالي واختيار بطاقتك، تفضّل بزيارة صفحة البطاقات التدريبية.',{color:'#52647a',size:14}));
-  blocks.push({type:'button',direction:'rtl',align:'center',href:cardsUrl,button:{kind:'url',label:'استعراض البطاقات والتسجيل',target:cardsUrl,variant:'solid',color:'#1559d6',align:'center',radius:0,fullWidth:false,size:16},runs:[{text:'استعراض البطاقات والتسجيل'}]});
+  blocks.push({type:'divider',runs:[]},paragraph('للاطّلاع على التفاصيل والتوافر الحالي واختيار باقتك، تفضّل بزيارة صفحة الباقات التدريبية.',{color:'#52647a',size:14}));
+  blocks.push({type:'button',direction:'rtl',align:'center',href:cardsUrl,button:{kind:'url',label:'استعراض الباقات والتسجيل',target:cardsUrl,variant:'solid',color:'#1559d6',align:'center',radius:0,fullWidth:false,size:16},runs:[{text:'استعراض الباقات والتسجيل'}]});
   return {
     ...mailIdentityDefaults(false),designVersion:3,layout:'signature',plain:false,
     fontFamily:'ibm',headingFont:'ibm',bodySize:16,headingSize:30,lineHeight:1.9,
-    brandColor:'#1559d6',brandCaption:'INEXC TRAINING',brandName:'بطاقات INEXC التدريبية',brandTagline:'معرفة. تطبيق. أثر.',
+    brandColor:'#1559d6',brandCaption:'INEXC TRAINING',brandName:'باقات INEXC التدريبية',brandTagline:'معرفة. تطبيق. أثر.',
     headerEnabled:true,heroEnabled:true,footerEnabled:true,signatureEnabled:true,
-    eyebrow:'مساحة أوسع للتعلّم',headline:selected.length===1?selected[0].name:'اختر البطاقة التي تناسبك',intro:'',panels:[],buttons:[],
-    subject:options.subject??(selected.length===1?selected[0].name+' | INEXC Training':'بطاقات INEXC التدريبية | اختر ما يناسبك'),
+    eyebrow:'مساحة أوسع للتعلّم',headline:selected.length===1?selected[0].name:'اختر الباقة التي تناسبك',intro:'',panels:[],buttons:[],
+    subject:options.subject??(selected.length===1?selected[0].name+' | INEXC Training':'باقات INEXC التدريبية | اختر ما يناسبك'),
     preheader:selected.map(p=>p.name).join(' · ').slice(0,180),
     message:normaliseMessageBody(richTextPrefix+JSON.stringify({direction:'rtl',blocks})),
     ctaLabel:'',ctaUrl:'',
@@ -59,35 +63,35 @@ export function membershipEmailPayload(plans,selectedIds,options={}){
 }
 
 export async function mountMembershipEmail({target,api,onCompose,settings={}}){
-  target.innerHTML='<div class="empty" role="status">جارٍ تحميل البطاقات التدريبية…</div>';
+  target.innerHTML='<div class="empty" role="status">جارٍ تحميل الباقات التدريبية…</div>';
   let plans;
   try{
     const rows=await api('/memberships/plans',{cache:'no-store'});
-    if(!Array.isArray(rows))throw Error('تعذّر قراءة بيانات البطاقات.');
-    plans=rows.filter(p=>p.active!==false);
+    if(!Array.isArray(rows))throw Error('تعذّر قراءة بيانات الباقات.');
+    plans=rows.map(packagePlan).filter(p=>p.active!==false);
   }catch(error){
-    target.innerHTML=`<div class="card"><h2>تعذّر تحميل البطاقات</h2><p>${esc(error.message)}</p><button type="button" data-membership-retry>إعادة المحاولة</button></div>`;
+    target.innerHTML=`<div class="card"><h2>تعذّر تحميل الباقات</h2><p>${esc(error.message)}</p><button type="button" data-membership-retry>إعادة المحاولة</button></div>`;
     target.querySelector('[data-membership-retry]').onclick=()=>mountMembershipEmail({target,api,onCompose,settings});return;
   }
-  if(!plans.length){target.innerHTML='<div class="empty"><h2>لا توجد بطاقات منشورة حاليًا</h2><p>أظهر البطاقات من قسم بطاقات INEXC، ثم افتح هذا النموذج مجددًا.</p></div>';return;}
+  if(!plans.length){target.innerHTML='<div class="empty"><h2>لا توجد باقات منشورة حاليًا</h2><p>أظهر الباقات من قسم باقات INEXC، ثم افتح هذا النموذج مجددًا.</p></div>';return;}
   if(!document.querySelector('[data-membership-email-style]')){
     const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./message-memberships.css?v=20261016-mail1',import.meta.url).href;link.dataset.membershipEmailStyle='';document.head.append(link);
   }
-  target.innerHTML=`<div class="section-head"><div class="eyebrow">INEXC / TRAINING CARDS</div><h2>إرسال البطاقات التدريبية</h2><p class="muted">بطاقة واحدة، بطاقتان، أو جميع البطاقات في رسالة واحدة. اختر البطاقات وراجع المعاينة، ثم حدّد المستلمين.</p></div>
+  target.innerHTML=`<div class="section-head"><div class="eyebrow">INEXC / TRAINING PACKAGES</div><h2>إرسال الباقات التدريبية</h2><p class="muted">باقة واحدة، باقتان، أو جميع الباقات في رسالة واحدة. اختر الباقات وراجع المعاينة، ثم حدّد المستلمين.</p></div>
   <div class="membership-mail-grid"><form class="card stack membership-mail-form">
-    <fieldset class="membership-mail-picker"><legend>1. اختر البطاقات</legend><div class="row between"><label class="row"><input type="checkbox" data-membership-all checked>تحديد جميع البطاقات</label><span class="muted" data-membership-count role="status"></span></div>
-    <div class="membership-mail-options">${plans.map(p=>`<label class="membership-mail-option"><input type="checkbox" data-membership-id="${esc(p.id)}" checked><span><strong>${esc(p.name)}</strong><small>${Number(p.validMonths)>0?'صلاحية '+months(p.validMonths):'بطاقة تدريبية'}${p.remaining!==undefined&&Number(p.remaining)<=0?' · غير متاحة للشراء حاليًا':''}</small></span><b dir="ltr">${price(p.priceUsd)} <small>USD</small></b></label>`).join('')}</div></fieldset>
-    <fieldset class="membership-mail-picker"><legend>2. أضف لمستك</legend><div class="fields"><label>عنوان البريد<input data-membership-subject maxlength="160" required value="بطاقات INEXC التدريبية | اختر ما يناسبك" dir="auto"></label><label>مقدمة الرسالة<textarea data-membership-introduction maxlength="1000" rows="5" dir="auto">مرحبًا {{name}}،
-اختر ما يناسب رحلتك في التعلّم من بطاقات INEXC التدريبية، وتعرّف إلى المزايا المتاحة لكل بطاقة.</textarea></label></div><p class="hint">تظهر الأسعار والمزايا الحالية. يمكنك تعديل النص وحفظه كقالب في الخطوة التالية.</p></fieldset>
+    <fieldset class="membership-mail-picker"><legend>1. اختر الباقات</legend><div class="row between"><label class="row"><input type="checkbox" data-membership-all checked>تحديد جميع الباقات</label><span class="muted" data-membership-count role="status"></span></div>
+    <div class="membership-mail-options">${plans.map(p=>`<label class="membership-mail-option"><input type="checkbox" data-membership-id="${esc(p.id)}" checked><span><strong>${esc(p.name)}</strong><small>${Number(p.validMonths)>0?'صلاحية '+months(p.validMonths):'باقة تدريبية'}${p.remaining!==undefined&&Number(p.remaining)<=0?' · غير متاحة للشراء حاليًا':''}</small></span><b dir="ltr">${price(p.priceUsd)} <small>USD</small></b></label>`).join('')}</div></fieldset>
+    <fieldset class="membership-mail-picker"><legend>2. أضف لمستك</legend><div class="fields"><label>عنوان البريد<input data-membership-subject maxlength="160" required value="باقات INEXC التدريبية | اختر ما يناسبك" dir="auto"></label><label>مقدمة الرسالة<textarea data-membership-introduction maxlength="1000" rows="5" dir="auto">مرحبًا {{name}}،
+اختر ما يناسب رحلتك في التعلّم من باقات INEXC التدريبية، وتعرّف إلى المزايا المتاحة لكل باقة.</textarea></label></div><p class="hint">تظهر الأسعار والمزايا الحالية. يمكنك تعديل النص وحفظه كقالب في الخطوة التالية.</p></fieldset>
     <div class="notice error" data-membership-error role="alert" hidden></div><button type="submit" class="primary" data-membership-continue>اختيار المستلمين ومتابعة الرسالة</button><p class="hint">تفتح الخطوة التالية محرّر الرسالة. الإرسال يتم بعد مراجعة المستلمين وتأكيده.</p>
-  </form><div class="card membership-mail-preview"><div class="row between"><h3>معاينة البريد</h3><div class="row" role="group" aria-label="حجم المعاينة"><button type="button" data-membership-device="desktop" aria-pressed="true">حاسوب</button><button type="button" data-membership-device="phone" aria-pressed="false">هاتف</button></div></div><div class="membership-mail-envelope"><span>الموضوع</span><strong data-membership-preview-subject></strong></div><div class="membership-mail-preview-surface"><iframe sandbox="" title="معاينة رسالة البطاقات التدريبية" data-membership-preview></iframe></div></div></div>`;
+  </form><div class="card membership-mail-preview"><div class="row between"><h3>معاينة البريد</h3><div class="row" role="group" aria-label="حجم المعاينة"><button type="button" data-membership-device="desktop" aria-pressed="true">حاسوب</button><button type="button" data-membership-device="phone" aria-pressed="false">هاتف</button></div></div><div class="membership-mail-envelope"><span>الموضوع</span><strong data-membership-preview-subject></strong></div><div class="membership-mail-preview-surface"><iframe sandbox="" title="معاينة رسالة الباقات التدريبية" data-membership-preview></iframe></div></div></div>`;
   const $=s=>target.querySelector(s),inputs=[...target.querySelectorAll('[data-membership-id]')];
   const chosen=()=>inputs.filter(n=>n.checked).map(n=>n.dataset.membershipId);
   let payload,busy=false,subjectEdited=false;
   function preview(){
     const ids=chosen(),all=$('[data-membership-all]');all.checked=ids.length===inputs.length;all.indeterminate=ids.length>0&&!all.checked;
     $('[data-membership-count]').textContent=`${ids.length} / ${inputs.length}`;
-    if(!subjectEdited)$('[data-membership-subject]').value=ids.length===1?plans.find(p=>p.id===ids[0]).name+' | INEXC Training':'بطاقات INEXC التدريبية | اختر ما يناسبك';
+    if(!subjectEdited)$('[data-membership-subject]').value=ids.length===1?plans.find(p=>p.id===ids[0]).name+' | INEXC Training':'باقات INEXC التدريبية | اختر ما يناسبك';
     const error=$('[data-membership-error]');
     try{
       payload={...settings,...membershipEmailPayload(plans,ids,{subject:$('[data-membership-subject]').value.trim(),introduction:$('[data-membership-introduction]').value})};

@@ -1,3 +1,4 @@
+function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 // Learner records, card checkout and explicitly requested card recovery. No mail workers.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -27,48 +28,48 @@ export async function setupLearnerService(db){
 }
 
 export function cardQuote(card,course,certificateRequested=false,now=new Date()){
- if(card.status!=='active'||new Date(card.expires_at)<=now)throw fail('هذه البطاقة غير فعّالة أو انتهت صلاحيتها.');
- if(!course.active||!course.membership_enabled)throw fail('هذه الدورة غير متاحة للحجز بالبطاقة.');
- if(course.member_booking_opens_at&&new Date(course.member_booking_opens_at)>now)throw fail('الحجز لحاملي البطاقات لم يبدأ بعد.');
+ if(card.status!=='active'||new Date(card.expires_at)<=now)throw fail('هذه الباقة غير فعّالة أو انتهت صلاحيتها.');
+ if(!course.active||!course.membership_enabled)throw fail('هذه الدورة غير متاحة للحجز بالباقة.');
+ if(course.member_booking_opens_at&&new Date(course.member_booking_opens_at)>now)throw fail('الحجز لحاملي الباقات لم يبدأ بعد.');
  const kind=course.membership_kind==='diploma'?'diploma':'course';
  const cost=Number(kind==='diploma'?card.diploma_unit_cost:card.course_unit_cost);
  if(!Number.isInteger(cost)||cost<=0)throw fail('تعذّر تحديد رصيد هذه الدورة. تواصل مع الإدارة.');
- if(Number(card.units_remaining)<cost)throw fail('الرصيد المتبقي في البطاقة لا يكفي لحجز هذه الدورة.');
+ if(Number(card.units_remaining)<cost)throw fail('الرصيد المتبقي في الباقة لا يكفي لحجز هذه الدورة.');
  const discount=Math.max(0,Math.min(100,Number(card.certificate_discount)||0));
  const certificateFee=course.certificate_mode==='optional'&&certificateRequested?Math.round(positive(course.certificate_price)*(100-discount))/100:0;
- if(certificateFee>0&&!course.payment_methods?.includes('bank'))throw fail('رسوم الشهادة الاختيارية مع بطاقة INEXC تحتاج تحويلًا بنكيًا، وهو غير مفعّل لهذه الدورة. اختر التسجيل دون الشهادة أو استخدم طريقة دفع أخرى متاحة.');
+ if(certificateFee>0&&!course.payment_methods?.includes('bank'))throw fail('رسوم الشهادة الاختيارية مع باقة INEXC تحتاج تحويلًا بنكيًا، وهو غير مفعّل لهذه الدورة. اختر التسجيل دون الشهادة أو استخدم طريقة دفع أخرى متاحة.');
  return {cost,kind,remainingBefore:Number(card.units_remaining),remainingAfter:Number(card.units_remaining)-cost,certificateFee,certificateDiscount:discount};
 }
 
 // The card row is locked on ONE transaction connection until both booking and debit commit.
 export async function createCardRegistration(pool,input){
  if(!uuid(input.courseId))throw fail('اختر دورة صالحة.');
- if(!text(input.name)||!text(input.phone)||!email(input.email)||!text(input.code))throw fail('أكمل بيانات التسجيل ورقم البطاقة.');
+ if(!text(input.name)||!text(input.phone)||!email(input.email)||!text(input.code))throw fail('أكمل بيانات التسجيل ورقم الباقة.');
  const client=await pool.connect();
  try{
   await client.query('BEGIN');
   const card=(await client.query(cardQuery+' WHERE upper(c.card_number)=upper($1) AND lower(c.holder_email)=$2 FOR UPDATE OF c',[text(input.code,80),email(input.email)])).rows[0];
-  if(!card)throw fail('رقم البطاقة أو البريد الإلكتروني غير صحيح.',404);
+  if(!card)throw fail('رقم الباقة أو البريد الإلكتروني غير صحيح.',404);
   const previous=(await client.query(`SELECT r.id,r.reference,r.status,r.total,r.certificate_fee_amount,d.units_used FROM membership_redemptions d JOIN registrations r ON r.id=d.registration_id WHERE d.card_id=$1 AND d.course_id=$2 AND d.status='used' AND r.status<>'ملغى' ORDER BY d.created_at LIMIT 1`,[card.id,input.courseId])).rows[0];
   if(previous){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}
   const course=(await client.query('SELECT * FROM courses WHERE id=$1 FOR SHARE',[input.courseId])).rows[0];
   if(!course)throw fail('الدورة غير متاحة للتسجيل.');
   const quote=cardQuote(card,course,input.certificateRequested);
   if((input.expectedUnits!=null&&Number(input.expectedUnits)!==quote.cost)||(input.expectedCertificateFee!=null&&Number(input.expectedCertificateFee)!==quote.certificateFee))throw fail('تغيّرت تكلفة الحجز. تحقّق من الرصيد والرسوم مجددًا قبل التأكيد.',409);
-  if(quote.certificateFee>0&&!input.receiptPath)throw fail('الحجز بالبطاقة يغطي الدورة. أرفق وصل رسوم الشهادة الاختيارية بعد الخصم، أو اختر التسجيل دونها.');
+  if(quote.certificateFee>0&&!input.receiptPath)throw fail('الحجز بالباقة يغطي الدورة. أرفق وصل رسوم الشهادة الاختيارية بعد الخصم، أو اختر التسجيل دونها.');
   const certificate=course.certificate_mode==='none'?'لا':course.certificate_mode==='included'||input.certificateRequested?course.certificate_name:'لا';
   const reference='INX-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomBytes(5).toString('hex').toUpperCase();
   const registration=(await client.query(`INSERT INTO registrations(reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,certificate_fee_amount,certificate_fee_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'membership','مسجل بالبطاقة',$9,$10,$8,$11) RETURNING id`,[reference,text(input.name,150),email(input.email),text(input.phone,50),course.id,course.name,certificate,quote.certificateFee,input.receiptPath||'',card.id,quote.certificateFee>0?'pending':'not_required'])).rows[0];
   const redemption=(await client.query(`INSERT INTO membership_redemptions(card_id,course_id,registration_id,units_used,course_kind) VALUES($1,$2,$3,$4,$5) RETURNING id`,[card.id,course.id,registration.id,quote.cost,quote.kind])).rows[0];
   await client.query('UPDATE registrations SET membership_redemption_id=$1 WHERE id=$2',[redemption.id,registration.id]);
   const debited=await client.query('UPDATE membership_cards SET units_remaining=units_remaining-$1,updated_at=now() WHERE id=$2 AND units_remaining>=$1 RETURNING units_remaining',[quote.cost,card.id]);
-  if(!debited.rowCount)throw fail('تغيّر رصيد البطاقة. تحقق منه مجددًا.',409);
+  if(!debited.rowCount)throw fail('تغيّر رصيد الباقة. تحقق منه مجددًا.',409);
   await client.query('COMMIT');
   return {ok:true,reference,status:'مسجل بالبطاقة',registrationId:registration.id,unitsUsed:quote.cost,remaining:Number(debited.rows[0].units_remaining),certificateFee:quote.certificateFee,courseName:course.name};
  }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
 }
 
-function cardView(c){return {number:c.card_number,planName:c.plan_name,status:c.status==='active'&&new Date(c.expires_at)<=new Date()?'expired':c.status,expiresAt:c.expires_at,unitsTotal:Number(c.units_total),unitsRemaining:Number(c.units_remaining),courseUnitCost:Number(c.course_unit_cost),diplomaUnitCost:Number(c.diploma_unit_cost)};}
+function cardView(c){return {number:c.card_number,planName:trainingPackageText(c.plan_name),status:c.status==='active'&&new Date(c.expires_at)<=new Date()?'expired':c.status,expiresAt:c.expires_at,unitsTotal:Number(c.units_total),unitsRemaining:Number(c.units_remaining),courseUnitCost:Number(c.course_unit_cost),diplomaUnitCost:Number(c.diploma_unit_cost)};}
 export async function learnerDashboard(db,address){
  const normalized=email(address);
  const registrations=(await db.query(`SELECT r.id,r.reference,r.name,r.course_id,r.course_name,r.status,r.payment_method,r.created_at,r.certificate_fee_amount,r.certificate_fee_status,COALESCE(c.training_hours,0) AS training_hours,c.course_date,c.location,COALESCE(p.state,'not_started') AS learning_state,COALESCE(p.progress_percent,0) AS progress_percent,COALESCE(p.attended_hours,0) AS attended_hours,p.completed_at FROM registrations r LEFT JOIN courses c ON c.id=r.course_id LEFT JOIN learner_progress p ON p.registration_id=r.id WHERE lower(r.email)=$1 AND COALESCE(r.request_kind,'individual')<>'institution' ORDER BY r.created_at DESC`,[normalized])).rows;
@@ -94,7 +95,7 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
   res.set('Cache-Control','no-store');
   const raw=req.body?.email,address=typeof raw==='string'?raw.trim().toLowerCase():'';
   if(address.length>190||!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(address))throw fail('أدخل بريدًا إلكترونيًا صحيحًا.');
-  if(!mailEnabled||typeof sendEmail!=='function'||typeof emailShell!=='function')return res.status(503).json({error:'استرجاع رقم البطاقة غير متاح مؤقتًا. حاول لاحقًا أو تواصل مع الإدارة.'});
+  if(!mailEnabled||typeof sendEmail!=='function'||typeof emailShell!=='function')return res.status(503).json({error:'استرجاع رقم الباقة غير متاح مؤقتًا. حاول لاحقًا أو تواصل مع الإدارة.'});
   await pool.query("DELETE FROM learner_recovery_limits WHERE last_request_at<now()-interval '2 days'");
   // Atomic limits persist across restarts. No raw email addresses or IPs are stored here.
   const ipLimit=await pool.query(`INSERT INTO learner_recovery_limits(key_hash) VALUES($1)
@@ -107,15 +108,15 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
    requests=CASE WHEN learner_recovery_limits.window_started_at<=now()-interval '1 day' THEN 1 ELSE learner_recovery_limits.requests+1 END,last_request_at=now()
    WHERE learner_recovery_limits.last_request_at<=now()-interval '10 minutes' AND (learner_recovery_limits.window_started_at<=now()-interval '1 day' OR learner_recovery_limits.requests<5) RETURNING key_hash`,[hash('email:'+address)]);
   // Respond before looking up cards or contacting Resend: neither response nor mail latency reveals membership.
-  res.status(202).json({ok:true,message:'إذا كانت هناك بطاقة مرتبطة بهذا البريد، فستصلك رسالة برقمها. تفقد الوارد والبريد غير المرغوب فيه، وانتظر 10 دقائق قبل إعادة الطلب.'});
+  res.status(202).json({ok:true,message:'إذا كانت هناك باقة مرتبطة بهذا البريد، فستصلك رسالة برقمها. تفقد الوارد والبريد غير المرغوب فيه، وانتظر 10 دقائق قبل إعادة الطلب.'});
   if(!claimed.rowCount)return;
   try{
    const cards=(await pool.query(`SELECT c.card_number,c.holder_name,p.name AS plan_name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE lower(c.holder_email)=$1 ORDER BY c.created_at DESC`,[address])).rows;
    if(!cards.length)return;
-   const title=cards.length===1?'رقم بطاقتك التدريبية':'أرقام بطاقاتك التدريبية';
-   const content=`<h1 style="font-size:23px;color:#103b70">${title}</h1><p>مرحبًا ${escapeHtml(cards[0].holder_name)}،</p><p>بناءً على طلبك، هذه بيانات البطاقات المرتبطة ببريدك الإلكتروني:</p>${cards.map(card=>`<div style="background:#eef6ff;border:1px solid #d3e5f8;border-radius:10px;padding:16px;margin:14px 0"><strong>${escapeHtml(card.plan_name)}</strong><div dir="ltr" style="direction:ltr;text-align:center;font-family:monospace;font-size:20px;font-weight:bold;color:#0866c6;margin-top:8px">${escapeHtml(card.card_number)}</div></div>`).join('')}<p>استخدم بريدك الإلكتروني ورقم البطاقة للدخول إلى صفحتك التدريبية.</p><p style="text-align:center"><a href="https://www.inexctraining.com/account.html" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:9px;padding:12px 20px;font-weight:bold">الدخول إلى صفحتي</a></p><p style="font-size:12px;color:#64778c">احتفظ برقم بطاقتك لنفسك. إذا لم تطلب هذه الرسالة، يمكنك تجاهلها؛ لم تتغير بيانات بطاقتك أو رصيدها.</p>`;
-   const plain=`${title}\n\n${cards.map(card=>`${card.plan_name}: ${card.card_number}`).join('\n')}\n\nاستخدم بريدك ورقم البطاقة للدخول:\nhttps://www.inexctraining.com/account.html\n\nإذا لم تطلب الرسالة، تجاهلها. لم تتغير بيانات بطاقتك أو رصيدها.`;
-   await sendEmail({to:address,subject:title+' | INEXC',html:emailShell({title,preview:'بيانات بطاقتك بناءً على طلب الاسترجاع.',content}),text:plain,marketing:false,idempotencyKey:'learner-card-recovery/'+crypto.randomUUID()});
+   const title=cards.length===1?'رقم باقتك التدريبية':'أرقام باقاتك التدريبية';
+   const content=`<h1 style="font-size:23px;color:#103b70">${title}</h1><p>مرحبًا ${escapeHtml(cards[0].holder_name)}،</p><p>بناءً على طلبك، هذه بيانات الباقات المرتبطة ببريدك الإلكتروني:</p>${cards.map(card=>`<div style="background:#eef6ff;border:1px solid #d3e5f8;border-radius:10px;padding:16px;margin:14px 0"><strong>${escapeHtml(trainingPackageText(card.plan_name))}</strong><div dir="ltr" style="direction:ltr;text-align:center;font-family:monospace;font-size:20px;font-weight:bold;color:#0866c6;margin-top:8px">${escapeHtml(card.card_number)}</div></div>`).join('')}<p>استخدم بريدك الإلكتروني ورقم الباقة للدخول إلى صفحتك التدريبية.</p><p style="text-align:center"><a href="https://www.inexctraining.com/account.html" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:9px;padding:12px 20px;font-weight:bold">الدخول إلى صفحتي</a></p><p style="font-size:12px;color:#64778c">احتفظ برقم باقتك لنفسك. إذا لم تطلب هذه الرسالة، يمكنك تجاهلها؛ لم تتغير بيانات باقتك أو رصيدها.</p>`;
+   const plain=`${title}\n\n${cards.map(card=>`${trainingPackageText(card.plan_name)}: ${card.card_number}`).join('\n')}\n\nاستخدم بريدك ورقم الباقة للدخول:\nhttps://www.inexctraining.com/account.html\n\nإذا لم تطلب الرسالة، تجاهلها. لم تتغير بيانات باقتك أو رصيدها.`;
+   await sendEmail({to:address,subject:title+' | INEXC',html:emailShell({title,preview:'بيانات باقتك بناءً على طلب الاسترجاع.',content}),text:plain,marketing:false,idempotencyKey:'learner-card-recovery/'+crypto.randomUUID()});
   }catch(error){logger.error('Learner card recovery delivery failed',{status:Number(error.status)||500})}
  }));
  app.post('/api/learner/session',asyncRoute(async(req,res)=>{
@@ -126,12 +127,12 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
   const attempt=attempts.get(key)||{count:0,until:now+10*60*1000};
   if(attempt.count>=12)return res.status(429).json({error:'محاولات كثيرة. انتظر عشر دقائق ثم أعد المحاولة.'});
   attempt.count++;attempts.set(key,attempt);
-  if(!cardToken&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)||!code))throw fail('أدخل بريدك ورقم البطاقة أو رمز الدخول الخاص.');
+  if(!cardToken&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)||!code))throw fail('أدخل بريدك ورقم الباقة أو رمز الدخول الخاص.');
   let matched=false;
   if(/^[a-f\d]{48}$/.test(cardToken)){const card=(await pool.query('SELECT holder_email FROM membership_cards WHERE access_token=$1',[cardToken])).rows[0];if(card){address=email(card.holder_email);matched=true}}
   if(!matched&&code)matched=(await pool.query('SELECT holder_email FROM membership_cards WHERE upper(card_number)=upper($1) AND lower(holder_email)=$2',[code,address])).rowCount>0;
   if(!matched&&code)matched=(await pool.query('SELECT id FROM learner_access_keys WHERE email=$1 AND token_hash=$2 AND revoked_at IS NULL',[address,hash(code)])).rowCount>0;
-  if(!matched)throw fail('بيانات الدخول غير صحيحة. استخدم البريد المرتبط ببطاقتك أو رمز الدخول الذي زوّدتك به الإدارة.',401);
+  if(!matched)throw fail('بيانات الدخول غير صحيحة. استخدم البريد المرتبط بباقتك أو رمز الدخول الذي زوّدتك به الإدارة.',401);
   attempts.delete(key);const token=crypto.randomBytes(32).toString('hex'),expiresAt=new Date(now+8*60*60*1000).toISOString();
   await pool.query('DELETE FROM learner_sessions WHERE expires_at<now()');
   await pool.query('INSERT INTO learner_sessions(token_hash,email,expires_at) VALUES($1,$2,$3)',[hash(token),address,expiresAt]);

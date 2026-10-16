@@ -106,7 +106,7 @@ export function createStripePayments({pool,env=process.env,client,notify=()=>{},
  }
 
  async function checkout(input){
-  if(!enabled())throw fail('الدفع عبر Stripe غير مفعّل حاليًا. اختر التحويل البنكي أو بطاقة INEXC.',503);
+  if(!enabled())throw fail('الدفع عبر Stripe غير مفعّل حاليًا. اختر التحويل البنكي أو باقة INEXC.',503);
   const data={name:text(input.name,150),email:text(input.email,180).toLowerCase(),phone:text(input.phone,50),courseId:text(input.course_id,80),certificate:input.certificate==='yes'};
   const key=text(input.request_key,80);
   if(!uuid(key)||!uuid(data.courseId)||!data.name||!data.phone||!/^\S+@\S+\.\S+$/.test(data.email))throw fail('أكمل بيانات التسجيل والدورة والبريد الإلكتروني.');
