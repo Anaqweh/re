@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js service-catalog.js learner-service.js course-payment.js stripe-payments.js membership-payments.js check-stripe-readiness.js import-course-catalog.js course-catalog-20261016.json message-subscriptions.js message-subscription-links.js message-contacts.js message-file-reader.py message-format.js message-mail.js message-mail-legacy.js message-mail-v4.js message-format-v4.js message-design.js message-font-faces.js message-studio.js message-studio-schema.js message-suppression.js package.json Dockerfile)
+inexc_files=(server.js service-catalog.js service-link-images.js learner-service.js course-payment.js stripe-payments.js membership-payments.js check-stripe-readiness.js import-course-catalog.js course-catalog-20261016.json message-subscriptions.js message-subscription-links.js message-contacts.js message-file-reader.py message-format.js message-mail.js message-mail-legacy.js message-mail-v4.js message-format-v4.js message-design.js message-font-faces.js message-studio.js message-studio-schema.js message-suppression.js package.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?

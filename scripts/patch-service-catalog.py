@@ -18,9 +18,13 @@ if setup not in s:
     anchor='setupDatabase().then(() => setupLearnerService(pool))'
     if s.count(anchor)!=1: raise SystemExit('Startup anchor changed; no files modified.')
     s=s.replace(anchor,setup+'.then(() => setupLearnerService(pool))')
-if 'COPY service-catalog.js server.js learner-service.js' not in d:
+if 'COPY service-catalog.js service-link-images.js server.js learner-service.js' not in d and 'COPY service-catalog.js server.js learner-service.js' not in d:
     anchor='COPY server.js learner-service.js'
     if d.count(anchor)!=1: raise SystemExit('Docker copy anchor changed; no files modified.')
     d=d.replace(anchor,'COPY service-catalog.js server.js learner-service.js')
+if 'COPY service-catalog.js service-link-images.js server.js learner-service.js' not in d:
+    anchor='COPY service-catalog.js server.js learner-service.js'
+    if d.count(anchor)!=1: raise SystemExit('Service image Docker anchor changed; no files modified.')
+    d=d.replace(anchor,'COPY service-catalog.js service-link-images.js server.js learner-service.js')
 server.write_text(s); docker.write_text(d)
 print('Only service catalogue hooks added; existing API code retained.')

@@ -12,7 +12,7 @@ inexc_services_stage="$(mktemp -d)"
 inexc_services_backup="$PWD/services-backup-$(date -u +%Y%m%dT%H%M%S)-$$"
 inexc_services_installed=0
 inexc_services_started=0
-inexc_services_files=(server.js Dockerfile service-catalog.js)
+inexc_services_files=(server.js Dockerfile service-catalog.js service-link-images.js)
 cleanup(){
  local result=$?
  trap - EXIT
@@ -31,10 +31,11 @@ cleanup(){
 trap cleanup EXIT
 cp -- server.js Dockerfile "$inexc_services_stage/"
 curl -fsSL --retry 2 "https://raw.githubusercontent.com/Anaqweh/re/$inexc_services_ref/inexc-api/service-catalog.js" -o "$inexc_services_stage/service-catalog.js"
+curl -fsSL --retry 2 "https://raw.githubusercontent.com/Anaqweh/re/$inexc_services_ref/inexc-api/service-link-images.js" -o "$inexc_services_stage/service-link-images.js"
 curl -fsSL --retry 2 "https://raw.githubusercontent.com/Anaqweh/re/$inexc_services_ref/scripts/patch-service-catalog.py" -o "$inexc_services_stage/patch.py"
 python3 "$inexc_services_stage/patch.py" "$inexc_services_stage"
 # Parse with the existing container's Node, before changing host files.
-for file in server.js service-catalog.js; do docker compose exec -T api node --input-type=module --check < "$inexc_services_stage/$file"; done
+for file in server.js service-catalog.js service-link-images.js; do docker compose exec -T api node --input-type=module --check < "$inexc_services_stage/$file"; done
 mkdir -p "$inexc_services_backup"
 for file in "${inexc_services_files[@]}"; do
  if [[ -f "$file" ]]; then cp -- "$file" "$inexc_services_backup/$file"; else touch "$inexc_services_backup/$file.absent"; fi
@@ -47,7 +48,7 @@ docker compose up -d --no-build --no-deps api
 inexc_services_healthy=0
 for attempt in {1..20}; do
  if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 &&
-    curl -fsS http://127.0.0.1:3000/api/services | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("version")==1 and d.get("requestLinks")==1 and isinstance(d.get("items"),list) else 1)' 2>/dev/null &&
+    curl -fsS http://127.0.0.1:3000/api/services | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("version")==1 and d.get("requestLinks")==1 and d.get("linkImages")==1 and isinstance(d.get("items"),list) else 1)' 2>/dev/null &&
     [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/services)" == 401 ]] &&
     [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/services/requests)" == 401 ]]; then
   inexc_services_healthy=1; break
@@ -55,7 +56,7 @@ for attempt in {1..20}; do
  sleep 2
 done
 (( inexc_services_healthy == 1 )) || { echo 'Service catalogue health check failed.' >&2; exit 1; }
-echo 'INEXC automatic service request links enabled. Automatic and custom links are available from Administration > Services.'
+echo 'INEXC service links and automatic link images enabled. Uploaded images keep priority.'
 echo 'No services, registrations, payments or emails were created by this update.'
 echo 'Existing scheduled workers resume their previously configured schedule.'
 echo "Previous files: $inexc_services_backup"

@@ -3,9 +3,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
+import {fetchServiceLinkImage} from './service-link-images.js';
 const uuid=/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-const fields=['name','category','summary','details','audience','delivery','duration','price_text','image_url','action_label','action_url','published','sort_order'];
+const fields=['name','category','summary','details','audience','delivery','duration','price_text','image_url','link_image_url','link_image_source','action_label','action_url','published','sort_order'];
 const columns='id,'+fields.join(',')+',revision,created_at,updated_at';
 export async function setupServiceCatalog(pool){await pool.query(`CREATE TABLE IF NOT EXISTS service_catalog (
  id UUID PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '', details TEXT NOT NULL DEFAULT '',
@@ -13,7 +14,7 @@ export async function setupServiceCatalog(pool){await pool.query(`CREATE TABLE I
  image_url TEXT NOT NULL DEFAULT '', action_label TEXT NOT NULL DEFAULT 'اطلب الخدمة', action_url TEXT NOT NULL DEFAULT '',
  published BOOLEAN NOT NULL DEFAULT false, sort_order INTEGER NOT NULL DEFAULT 0 CHECK(sort_order BETWEEN 0 AND 999999),
  revision INTEGER NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-)`);await pool.query(`CREATE TABLE IF NOT EXISTS service_requests (
+)`);await pool.query("ALTER TABLE service_catalog ADD COLUMN IF NOT EXISTS link_image_url TEXT NOT NULL DEFAULT ''");await pool.query("ALTER TABLE service_catalog ADD COLUMN IF NOT EXISTS link_image_source TEXT NOT NULL DEFAULT ''");await pool.query(`CREATE TABLE IF NOT EXISTS service_requests (
  id UUID PRIMARY KEY, reference TEXT UNIQUE NOT NULL, service_id UUID NOT NULL REFERENCES service_catalog(id), service_name TEXT NOT NULL,
  name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
  details TEXT NOT NULL, preferred_timing TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -26,10 +27,10 @@ function url(value,image=false){
 }
 export function serviceInput(body){
  if(!body||typeof body!=='object'||Array.isArray(body))throw fail('بيانات الخدمة غير صالحة.');const out={};
- for(const [key,max]of Object.entries({name:160,category:80,summary:400,details:6000,audience:200,delivery:100,duration:100,price_text:100,image_url:1000,action_label:60,action_url:1000})){
+ for(const [key,max]of Object.entries({name:160,category:80,summary:400,details:6000,audience:200,delivery:100,duration:100,price_text:100,image_url:1000,link_image_url:2000,link_image_source:1000,action_label:60,action_url:1000})){
   if(body[key]!=null&&typeof body[key]!=='string')throw fail('تحقق من النصوص المدخلة.');out[key]=String(body[key]||'').trim();if(out[key].length>max)throw fail('النص أطول من الحد المسموح: '+key);
  }
- if(!out.name)throw fail('اكتب اسم الخدمة.');out.image_url=url(out.image_url,true);out.action_url=url(out.action_url);out.action_label||='اطلب الخدمة';
+ if(!out.name)throw fail('اكتب اسم الخدمة.');out.image_url=url(out.image_url,true);out.action_url=url(out.action_url);out.action_label||='اطلب الخدمة';out.link_image_url=url(out.link_image_url,true);if(out.link_image_source!==out.action_url||!out.action_url){out.link_image_url='';out.link_image_source=''}
  if(typeof body.published!=='boolean')throw fail('حدد حالة ظهور الخدمة.');out.published=body.published;
  if(!Number.isInteger(body.sort_order)||body.sort_order<0||body.sort_order>999999)throw fail('ترتيب الظهور يجب أن يكون عددًا صحيحًا موجبًا أو صفرًا.');out.sort_order=body.sort_order;
  if(out.published&&!out.summary)throw fail('أضف وصفًا مختصرًا قبل نشر الخدمة.');return out;
@@ -49,10 +50,10 @@ export function serviceImageExtension(buffer){
  if(buffer.length>=12&&buffer.toString('ascii',0,4)==='RIFF'&&buffer.toString('ascii',8,12)==='WEBP')return 'webp';
  throw fail('اختر صورة PNG أو JPG أو WebP صالحة.');
 }
-export function installServiceCatalog({app,pool,auth,uploadDir}){
+export function installServiceCatalog({app,pool,auth,uploadDir,linkImage=fetchServiceLinkImage}){
  const route=fn=>async(req,res,next)=>{try{await fn(req,res)}catch(e){next(e)}};
- app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,requestLinks:1,items:result.rows})}));
- app.get('/api/admin/services',auth,route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,items:result.rows})}));
+ app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,requestLinks:1,linkImages:1,items:result.rows})}));
+ app.get('/api/admin/services',auth,route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,linkImages:1,items:result.rows})}));
  app.get('/api/admin/services/requests',auth,route(async(_req,res)=>{const result=await pool.query('SELECT * FROM service_requests ORDER BY created_at DESC,id DESC LIMIT 101');res.set('Cache-Control','no-store').json({version:1,items:result.rows.slice(0,100),hasMore:result.rows.length>100})}));
  app.post('/api/services/:id/requests',route(async(req,res)=>{
   res.set('Cache-Control','no-store');if(!uuid.test(req.params.id))throw fail('الخدمة غير متاحة.',404);const input=requestInput(req.body);
@@ -65,6 +66,15 @@ export function installServiceCatalog({app,pool,auth,uploadDir}){
    ON CONFLICT(id) DO NOTHING RETURNING reference`,[input.id,'SV-'+crypto.randomBytes(8).toString('hex').toUpperCase(),req.params.id,...requestFields.map(k=>input[k])]);
   if(result.rows[0])return res.status(201).json({ok:true,reference:result.rows[0].reference});
   const retry=await existing();if(retry)return res.json({ok:true,reference:retry.reference});throw fail('هذه الخدمة غير متاحة للطلب حاليًا.',404);
+ }));
+ const imageCache=new Map();
+ app.post('/api/admin/services/link-image',auth,route(async(req,res)=>{
+  if(typeof req.body?.url!=='string'||!req.body.url.trim()||req.body.url.length>1000)throw fail('ضع رابط الصفحة أولًا.');const source=req.body.url.trim();
+  let cached=imageCache.get(source);if(!cached||cached.until<Date.now()){
+   if(imageCache.size>=100)imageCache.delete(imageCache.keys().next().value);
+   cached={until:Date.now()+5*60*1000,promise:linkImage(source)};imageCache.set(source,cached);
+  }
+  try{const result=await cached.promise;res.set('Cache-Control','no-store').json(result)}catch(e){imageCache.delete(source);throw fail(e.message||'تعذر استخراج صورة الرابط.')}
  }));
  app.post('/api/admin/services',auth,route(async(req,res)=>{
   if(!uuid.test(req.body?.id||''))throw fail('معرّف الخدمة غير صالح.');const data=serviceInput(req.body),values=fields.map(k=>data[k]);

@@ -18,7 +18,7 @@ inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_old_container")"
 inexc_image_name="$(docker inspect --format '{{.Config.Image}}' "$inexc_old_container")"
 inexc_installed=0
 inexc_started=0
-inexc_files=(server.js service-catalog.js learner-service.js course-payment.js stripe-payments.js membership-payments.js check-stripe-readiness.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
+inexc_files=(server.js service-catalog.js service-link-images.js learner-service.js course-payment.js stripe-payments.js membership-payments.js check-stripe-readiness.js import-course-catalog.js course-catalog-20261016.json Dockerfile)
 
 inexc_rollback() {
   local inexc_exit=$?
