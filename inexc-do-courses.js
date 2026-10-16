@@ -10,6 +10,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!courses.length) return;
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
     const price = value => Number(value) === 0 ? 'مجاني' : `${Number(value).toLocaleString('ar-AE')} <small>د.إ</small>`;
+    const dateLabel = value => esc(value).replace(/(\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2})/g,'<bdi dir="ltr">$1</bdi>');
     const apiOrigin = endpoint.replace(/\/api\/?$/, '');
     const courseDetailsUrl = course => `/course/?id=${encodeURIComponent(course.id)}`;
     const overview = course => String(course.description || '').split(/\r?\n/).find(line => line.trim() && !line.startsWith('## ')) || '';
@@ -25,7 +26,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       <span class="course-label">${esc(course.category || 'دورة تدريبية')}</span>
       <h3>${esc(course.name)}</h3><p>${esc(overview(course))}</p>
       ${(course.axes || []).length ? `<div class="course-axes"><b>من محاور البرنامج</b><ul>${previewAxes(course).map(axis => `<li>${esc(axis)}</li>`).join('')}</ul></div>` : ''}
-      <div class="course-meta"><span>${esc(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
+      <div class="course-meta"><span>${dateLabel(course.date || 'سيحدد لاحقًا')}</span><span>${esc(course.location || 'عن بُعد / حضوري')}</span></div>
       <div class="course-bottom"><div class="course-quick-info">${Number(course.hours) > 0 ? `<span class="course-hours">⏱ ${Number(course.hours).toLocaleString('ar-AE')} ساعة</span>` : ''}<div class="price">${price(course.price)}</div></div>
       <a class="course-link" href="${esc(courseDetailsUrl(course))}">تفاصيل وتسجيل</a></div>
     </article>`).join('');
