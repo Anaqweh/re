@@ -47,14 +47,15 @@ docker compose up -d --no-build --no-deps api
 inexc_services_healthy=0
 for attempt in {1..20}; do
  if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 &&
-    curl -fsS http://127.0.0.1:3000/api/services | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("version")==1 and isinstance(d.get("items"),list) else 1)' 2>/dev/null &&
-    [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/services)" == 401 ]]; then
+    curl -fsS http://127.0.0.1:3000/api/services | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("version")==1 and d.get("requestLinks")==1 and isinstance(d.get("items"),list) else 1)' 2>/dev/null &&
+    [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/services)" == 401 ]] &&
+    [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/services/requests)" == 401 ]]; then
   inexc_services_healthy=1; break
  fi
  sleep 2
 done
 (( inexc_services_healthy == 1 )) || { echo 'Service catalogue health check failed.' >&2; exit 1; }
-echo 'INEXC services enabled. Add services from Administration > Services.'
+echo 'INEXC automatic service request links enabled. Automatic and custom links are available from Administration > Services.'
 echo 'No services, registrations, payments or emails were created by this update.'
 echo 'Existing scheduled workers resume their previously configured schedule.'
 echo "Previous files: $inexc_services_backup"

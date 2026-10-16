@@ -1,4 +1,4 @@
-/* Independent service catalogue. No course, payment, registration or mail writes. */
+/* Independent service catalogue and requests. No course, payment, registration or mail writes. */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,6 +13,10 @@ export async function setupServiceCatalog(pool){await pool.query(`CREATE TABLE I
  image_url TEXT NOT NULL DEFAULT '', action_label TEXT NOT NULL DEFAULT 'اطلب الخدمة', action_url TEXT NOT NULL DEFAULT '',
  published BOOLEAN NOT NULL DEFAULT false, sort_order INTEGER NOT NULL DEFAULT 0 CHECK(sort_order BETWEEN 0 AND 999999),
  revision INTEGER NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+)`);await pool.query(`CREATE TABLE IF NOT EXISTS service_requests (
+ id UUID PRIMARY KEY, reference TEXT UNIQUE NOT NULL, service_id UUID NOT NULL REFERENCES service_catalog(id), service_name TEXT NOT NULL,
+ name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
+ details TEXT NOT NULL, preferred_timing TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 )`)}
 function url(value,image=false){
  if(!value)return '';
@@ -28,7 +32,16 @@ export function serviceInput(body){
  if(!out.name)throw fail('اكتب اسم الخدمة.');out.image_url=url(out.image_url,true);out.action_url=url(out.action_url);out.action_label||='اطلب الخدمة';
  if(typeof body.published!=='boolean')throw fail('حدد حالة ظهور الخدمة.');out.published=body.published;
  if(!Number.isInteger(body.sort_order)||body.sort_order<0||body.sort_order>999999)throw fail('ترتيب الظهور يجب أن يكون عددًا صحيحًا موجبًا أو صفرًا.');out.sort_order=body.sort_order;
- if(out.published&&(!out.summary||!out.action_url))throw fail('أضف وصفًا مختصرًا ورابطًا للطلب قبل نشر الخدمة.');return out;
+ if(out.published&&!out.summary)throw fail('أضف وصفًا مختصرًا قبل نشر الخدمة.');return out;
+}
+const requestFields=['name','email','phone','organization','details','preferred_timing'];
+function requestInput(body){
+ if(!body||typeof body!=='object'||!uuid.test(body.id||''))throw fail('أعد تحميل نموذج الطلب وحاول مجددًا.');const out={id:body.id};
+ for(const [key,max]of Object.entries({name:150,email:180,phone:50,organization:220,details:3000,preferred_timing:240})){
+  if(body[key]!=null&&typeof body[key]!=='string')throw fail('تحقق من بيانات الطلب.');out[key]=String(body[key]||'').trim();if(out[key].length>max)throw fail('أحد الحقول أطول من الحد المسموح.');
+ }
+ if(!out.name||!out.email||!out.phone||!out.details)throw fail('أدخل بيانات التواصل وتفاصيل طلبك.');
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.email))throw fail('أدخل بريدًا إلكترونيًا صحيحًا.');return out;
 }
 export function serviceImageExtension(buffer){
  if(buffer.length>=8&&buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'png';
@@ -38,8 +51,21 @@ export function serviceImageExtension(buffer){
 }
 export function installServiceCatalog({app,pool,auth,uploadDir}){
  const route=fn=>async(req,res,next)=>{try{await fn(req,res)}catch(e){next(e)}};
- app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,items:result.rows})}));
+ app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,requestLinks:1,items:result.rows})}));
  app.get('/api/admin/services',auth,route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,items:result.rows})}));
+ app.get('/api/admin/services/requests',auth,route(async(_req,res)=>{const result=await pool.query('SELECT * FROM service_requests ORDER BY created_at DESC,id DESC LIMIT 101');res.set('Cache-Control','no-store').json({version:1,items:result.rows.slice(0,100),hasMore:result.rows.length>100})}));
+ app.post('/api/services/:id/requests',route(async(req,res)=>{
+  res.set('Cache-Control','no-store');if(!uuid.test(req.params.id))throw fail('الخدمة غير متاحة.',404);const input=requestInput(req.body);
+  const existing=async()=>{const row=(await pool.query('SELECT * FROM service_requests WHERE id=$1',[input.id])).rows[0];if(!row)return null;
+   if(row.service_id!==req.params.id.toLowerCase()||requestFields.some(k=>row[k]!==input[k]))throw fail('أُرسل هذا الطلب سابقًا ببيانات مختلفة. أعد فتح نموذج الطلب لإرسال طلب جديد.',409);return row;
+  };
+  const previous=await existing();if(previous)return res.json({ok:true,reference:previous.reference});
+  const result=await pool.query(`INSERT INTO service_requests(id,reference,service_id,service_name,${requestFields.join(',')})
+   SELECT $1,$2,id,name,${requestFields.map((_,i)=>'$'+(i+4)).join(',')} FROM service_catalog WHERE id=$3 AND published=true
+   ON CONFLICT(id) DO NOTHING RETURNING reference`,[input.id,'SV-'+crypto.randomBytes(8).toString('hex').toUpperCase(),req.params.id,...requestFields.map(k=>input[k])]);
+  if(result.rows[0])return res.status(201).json({ok:true,reference:result.rows[0].reference});
+  const retry=await existing();if(retry)return res.json({ok:true,reference:retry.reference});throw fail('هذه الخدمة غير متاحة للطلب حاليًا.',404);
+ }));
  app.post('/api/admin/services',auth,route(async(req,res)=>{
   if(!uuid.test(req.body?.id||''))throw fail('معرّف الخدمة غير صالح.');const data=serviceInput(req.body),values=fields.map(k=>data[k]);
   const result=await pool.query(`INSERT INTO service_catalog(id,${fields.join(',')}) VALUES($1,${fields.map((_,i)=>'$'+(i+2)).join(',')}) ON CONFLICT(id) DO NOTHING RETURNING ${columns}`,[req.body.id,...values]);
