@@ -13,7 +13,7 @@
  function renderSummary(){
   const mode=$('courseCardScope').value;legacy.checked=mode!=='none';$('courseCardPlans').hidden=mode!=='selected';
   const names=plans.filter(p=>selected().includes(p.id)).map(p=>p.cardName);
-  $('courseCardSummary').textContent=mode==='all'?'صالحة لجميع البطاقات الحالية والجديدة، وفق الرصيد والصلاحية.':mode==='none'?'التسجيل بالبطاقة غير متاح لهذه الدورة.':names.length?'صالحة لـ'+names.join('، ولـ'):'اختر بطاقة واحدة على الأقل.';
+  $('courseCardSummary').textContent=mode==='all'?'صالحة لجميع البطاقات الحالية والجديدة، وفق الرصيد والصلاحية.':mode==='none'?'التسجيل بالبطاقة غير متاح لهذه الدورة.':names.length?'صالحة ل'+names.join('، ول'):'اختر بطاقة واحدة على الأقل.';
  }
  function setCourse(course={}){
   current=course;$('courseFeatured').checked=course.featured===true;

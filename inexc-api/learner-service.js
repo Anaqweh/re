@@ -30,7 +30,7 @@ export async function setupLearnerService(db){
 export function cardQuote(card,course,certificateRequested=false,now=new Date()){
  if(card.status!=='active'||new Date(card.expires_at)<=now)throw fail('هذه البطاقة غير فعّالة أو انتهت صلاحيتها.');
  if(!course.active||!course.membership_enabled)throw fail('هذه الدورة غير متاحة للحجز بالبطاقة.');
- if(!cardAllowedForCourse(card,course))throw fail('هذه الدورة غير صالحة لـ'+membershipCardName(card.plan_name)+'. اختر دورة تقبل بطاقتك أو طريقة دفع أخرى.');
+ if(!cardAllowedForCourse(card,course))throw fail('هذه الدورة غير صالحة ل'+membershipCardName(card.plan_name)+'. اختر دورة تقبل بطاقتك أو طريقة دفع أخرى.');
  if(course.member_booking_opens_at&&new Date(course.member_booking_opens_at)>now)throw fail('الحجز لحاملي البطاقات لم يبدأ بعد.');
  const kind=course.membership_kind==='diploma'?'diploma':'course';
  const cost=Number(kind==='diploma'?card.diploma_unit_cost:card.course_unit_cost);
