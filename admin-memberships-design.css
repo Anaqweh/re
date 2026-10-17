@@ -1,0 +1,54 @@
+#memberships{color:#193c5b;--member-border:#dce8f3;--member-muted:#5b738b}
+#memberships>.membership-dashboard{padding:28px!important;max-width:1360px;margin:auto;border-radius:22px;box-shadow:0 15px 45px #17446b10}
+#memberships .membership-dashboard>.tools{display:flex;align-items:center;gap:10px;padding-bottom:20px;border-bottom:1px solid var(--member-border);margin-bottom:18px}
+#memberships .membership-dashboard>.tools h2{font-size:25px!important;font-weight:700;line-height:1.5}
+#memberships .membership-dashboard>.tools .note{background:none;padding:0;margin:3px 0 0;font-size:15px;color:var(--member-muted)}
+#memberships .membership-dashboard>.tools button{min-height:44px;font-size:14px;padding-inline:14px}
+#memberships .membership-section-nav{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0 20px}
+#memberships .membership-section-nav a{display:inline-flex;align-items:center;gap:9px;padding:10px 15px;min-height:44px;border-radius:11px;background:#f1f6fc;border:1px solid #dce9f5;color:#1f527f;text-decoration:none;font-size:14px;font-weight:600}
+#memberships .membership-section-nav a:hover,#memberships .membership-section-nav a:focus-visible{background:#e3f0fc;border-color:#92bde4}
+#memberships .membership-section-nav span{font-size:12px;color:#4d83b4;direction:ltr}
+#memberships #membershipSummary{margin:0 0 24px!important;box-shadow:none!important;border-color:var(--member-border)!important}
+#memberships .membership-overview{padding:20px 24px;background:linear-gradient(110deg,#eaf5ff,#fff 80%)}
+#memberships .membership-overview strong{font-size:18px}
+#memberships .membership-overview small{font-size:13px}
+#memberships .membership-overview-stats span{font-size:13px;padding:9px 12px}
+#memberships .membership-overview-stats b{font-size:18px}
+#memberships .membership-table{table-layout:auto;font-size:14px}
+#memberships .membership-table th{font-size:13px;padding:13px 18px}
+#memberships .membership-table td{padding:16px 18px;font-size:14px}
+#memberships .membership-name{font-size:15px!important}
+#memberships .membership-sub{font-size:12px}
+#memberships .membership-remaining{font-size:17px}
+#memberships .membership-meta{font-size:13px}
+#memberships .membership-value{font-size:16px}
+#memberships .membership-toggle{font-size:13px;min-height:40px}
+#memberships .membership-detail{padding:18px 24px}
+#memberships .membership-summary-cell small{font-size:12px}
+#memberships .membership-summary-note{font-size:13px}
+#memberships .membership-section{scroll-margin-top:24px;border:1px solid var(--member-border);background:#fff;border-radius:18px;padding:22px;margin:18px 0;box-shadow:0 8px 24px #184e7810;min-width:0}
+#memberships .membership-section>h3{font-size:19px!important;line-height:1.5;color:#143d65!important;margin:0 0 15px!important;padding-bottom:13px;border-bottom:1px solid #e6edf5}
+#memberships .membership-section>.note{font-size:14px;line-height:1.8;margin-bottom:16px}
+#memberships .membership-section>.table{overflow-x:auto;min-width:0}
+#memberships #membershipPlans{overflow:visible}
+#memberships #membershipPlans>.note{font-size:13px;margin-bottom:14px}
+#memberships .plan-editor{margin:10px 0;border-color:var(--member-border)}
+#memberships .plan-editor>summary{padding:16px 20px;min-height:74px}
+#memberships .plan-editor-title{font-size:16px}
+#memberships .plan-editor-stats span{font-size:12px;padding:5px 9px}
+#memberships .plan-editor>summary:after{font-size:13px}
+#memberships .plan-editor-body{padding:18px 22px}
+#memberships .plan-section h5{font-size:16px;margin-bottom:12px}
+#memberships .plan-section p{font-size:13px}
+#memberships .plan-grid label,#memberships .plan-grid-wide label{font-size:14px!important;line-height:1.5;color:#2c4d69!important}
+#memberships .plan-grid :is(input,select),#memberships .plan-grid-wide textarea{font-size:15px;min-height:44px;margin:3px 0 0}
+#memberships .plan-toggle{font-size:14px;min-height:44px}
+#memberships .plan-actions button{min-height:44px;font-size:14px}
+#memberships #membershipOrders article{box-shadow:none;border-color:var(--member-border)!important;padding:18px 20px!important}
+#memberships #membershipOrders article strong{font-size:16px}
+#memberships #membershipOrders article small,#memberships #membershipOrders article div{line-height:1.7}
+#memberships #membershipCards table,#memberships #membershipCourses table{min-width:780px}
+#memberships #membershipCards th,#memberships #membershipCards td,#memberships #membershipCourses th,#memberships #membershipCourses td{font-size:13px;padding:12px 13px;white-space:normal;vertical-align:middle}
+#memberships #membershipCourses :is(input,select){min-width:150px;font-size:14px}
+#memberships #membershipMessage{font-size:14px}
+@media(max-width:760px){#memberships>.membership-dashboard{padding:16px!important;border-radius:16px}#memberships .membership-dashboard>.tools{align-items:stretch;flex-direction:column}#memberships .membership-dashboard>.tools>div{width:100%}#memberships .membership-dashboard>.tools button{width:100%}#memberships .membership-section-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#memberships .membership-section-nav a{padding:9px;font-size:12px}#memberships .membership-section{padding:16px;margin:14px 0}#memberships .membership-table td{padding:5px 0}#memberships .membership-table tr:not(.membership-detail-row){padding:14px 16px}#memberships .membership-overview{padding:16px}#memberships .membership-overview-stats{width:100%}#memberships .membership-overview-stats span{flex:1;text-align:center}#memberships .plan-grid{grid-template-columns:minmax(0,1fr)}#memberships .plan-editor-body{padding:14px}}
