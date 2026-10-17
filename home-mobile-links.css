@@ -1,0 +1,10 @@
+/* Important destinations remain visible when the desktop navigation collapses. */
+.mobile-explore{display:none}
+@media(max-width:800px){
+  .mobile-explore{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
+  .mobile-explore a{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:82px;padding:13px 14px;border:1px solid #c8e1fa;border-radius:14px;background:#fff;color:#10487e;box-shadow:0 8px 22px #0753980d}
+  .mobile-explore a strong{font-size:15px;line-height:1.45;font-weight:700}
+  .mobile-explore a span{font-size:12px;line-height:1.5;color:#5a728b}
+  .mobile-explore a:focus-visible{outline:3px solid #3385d0;outline-offset:3px}
+}
+@media(max-width:380px){.mobile-explore{grid-template-columns:1fr}.mobile-explore a{min-height:68px}}
