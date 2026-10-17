@@ -414,6 +414,8 @@ async function setupDatabase() {
     units_total INTEGER NOT NULL, units_remaining INTEGER NOT NULL, activated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_token TEXT');
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS membership_cards_share_token_unique ON membership_cards(share_token) WHERE share_token IS NOT NULL');
   await pool.query(`CREATE TABLE IF NOT EXISTS membership_redemptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), card_id UUID NOT NULL REFERENCES membership_cards(id) ON DELETE CASCADE,
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE RESTRICT, registration_id UUID,
@@ -958,6 +960,21 @@ app.get('/api/memberships/card',async(req,res,next)=>{try{
   const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190),clean(req.query.token,100));
   if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
   res.json(found.snapshot);
+}catch(error){next(error);}});
+// A public link contains its own random identifier and exposes only the visual card fields.
+app.post('/api/memberships/card/share',async(req,res,next)=>{try{
+  const found=await getMembershipCard(clean(req.body?.code,80),clean(String(req.body?.email||'').toLowerCase(),190),clean(req.body?.token,100));
+  if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
+  const row=(await pool.query('UPDATE membership_cards SET share_token=COALESCE(share_token,$2) WHERE id=$1 RETURNING share_token',[found.row.id,crypto.randomBytes(32).toString('hex')])).rows[0];
+  res.set('Cache-Control','no-store').json({url:'https://www.inexctraining.com/my-card/?share='+row.share_token});
+}catch(error){next(error);}});
+app.get('/api/memberships/card/shared',async(req,res,next)=>{try{
+  const token=clean(req.query.share,100);
+  if(!/^[a-f0-9]{64}$/.test(token))return res.status(404).json({error:'رابط البطاقة غير متاح.'});
+  const result=await pool.query('SELECT c.holder_name,c.status,c.expires_at,p.name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.share_token=$1',[token]);
+  if(!result.rowCount)return res.status(404).json({error:'رابط البطاقة غير متاح.'});
+  const row=result.rows[0];
+  res.set('Cache-Control','no-store').json({holderName:row.holder_name,status:row.status,expiresAt:row.expires_at,cardName:membershipCardName(row.name),plan:{name:trainingPackageText(row.name)}});
 }catch(error){next(error);}});
 app.post('/api/memberships/verify',async(req,res,next)=>{try{
   const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
