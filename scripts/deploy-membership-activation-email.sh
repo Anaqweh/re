@@ -31,7 +31,7 @@ cleanup(){
 trap cleanup EXIT
 curl --fail --silent --show-error --location --retry 2 \
   "https://raw.githubusercontent.com/Anaqweh/re/$inexc_release_ref/inexc-api/server.js" -o "$inexc_stage/server.js"
-docker compose exec -T api node --check < "$inexc_stage/server.js"
+docker compose exec -T api node --input-type=module --check < "$inexc_stage/server.js"
 cp -- server.js "$inexc_backup"
 cp -- "$inexc_stage/server.js" server.js
 inexc_installed=1
