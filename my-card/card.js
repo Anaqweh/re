@@ -8,7 +8,7 @@
  function cardData(snapshot){
   const plan=snapshot.plan||{},title=window.INEXCCardLabels.cardName(snapshot.cardName||plan.name);
   const expired=snapshot.status==='expired'||(snapshot.expiresAt&&new Date(snapshot.expiresAt).getTime()<Date.now());
-  const status=snapshot.status==='suspended'?'بطاقة موقوفة':expired?'انتهت صلاحية البطاقة':Number(snapshot.unitsRemaining)===0?'الرصيد مستنفد':snapshot.status==='active'?'بطاقة فعّالة':'بطاقة تدريبية';
+  const status=snapshot.status==='suspended'?'بطاقة موقوفة':expired?'انتهت صلاحية البطاقة':snapshot.publicStatus|| (Number(snapshot.unitsRemaining)===0?'الرصيد مستنفد':snapshot.status==='active'?'بطاقة فعّالة':'بطاقة تدريبية');
   return {
    data:{profile:{full_name:snapshot.holderName,specialty:plan.name||title},digitalId:{idNumber:share?'INEXC':snapshot.cardNumber,tierLabel:status}},
    options:{demo:preview,title,subtitle:'INEXC MEMBERSHIP CARD',numberLabel:share?'بطاقة تدريبية':'رقم البطاقة',status:'صالحة حتى '+date(snapshot.expiresAt),qrCaption:'افتح صفحة البطاقة',
