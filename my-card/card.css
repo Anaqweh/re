@@ -41,6 +41,11 @@
 .membership-page .share-dialog .share-note{margin:16px 0;padding:12px 14px;border-radius:10px;background:#ebf5ff}
 .membership-page .share-link-label{display:block;margin-bottom:7px;font:600 14px/1.5 INEXCPlex,Arial,sans-serif}
 .membership-page .share-link{display:block;width:100%;min-height:45px;margin-bottom:12px;padding:10px 12px;border:1px solid #b8d7f5;border-radius:9px;background:#f8fbff;color:#24496e;font:400 14px/1.5 Arial,sans-serif;text-align:left}
+.membership-page .shared-offer{margin:18px 0 40px;padding:22px;border:1px solid #c8def4;border-radius:18px;background:#fff;box-shadow:0 12px 30px #1662a212}
+.membership-page .shared-offer-kicker{color:#0866c6;font:600 13px/1.5 INEXCPlex,Arial,sans-serif}
+.membership-page .shared-offer h2{margin:6px 0 8px;color:#103b70;font:700 20px/1.6 INEXCPlex,Arial,sans-serif}
+.membership-page .shared-offer p{margin:0 0 16px;color:#50677e;font:400 15px/1.8 INEXCPlex,Arial,sans-serif}
+.membership-page .shared-offer a{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:9px 18px;border-radius:10px;background:#0866c6;color:#fff;text-decoration:none;font:600 14px/1.5 INEXCPlex,Arial,sans-serif}
 @media(max-width:540px){.membership-page .share-dialog{max-height:95dvh;padding:14px}.membership-page .share-card-frame{padding:7px}}
 @media(max-width:540px){.membership-page .share-actions{grid-template-columns:1fr}}
 @media(max-width:540px){
