@@ -57,6 +57,32 @@ test('preview is visibly non-issued and never fetches membership records',()=>{
  const {dom,w,calls}=setup('?preview=1');assert.equal(calls.length,0);assert.equal(w.document.querySelector('#previewNotice').hidden,false);
  assert.match(w.document.querySelector('.tc-card-strip').textContent,/غير صادر/);assert.equal(w.document.querySelector('.tc-card-type strong').textContent,'بطاقة الريادة');dom.window.close();
 });
+test('public sharing shows the same card artwork without the membership number or private details',async()=>{
+ const safe={holderName:'اسم حامل البطاقة',cardName:'بطاقة الانطلاقة',status:'active',expiresAt:'2099-01-28T00:00:00Z',plan:{name:'باقة الانطلاقة'}};
+ const {dom,w,calls}=setup('?share=public-share',safe);await tick();const d=w.document;
+ assert.match(calls[0],/memberships\/card\/shared\?share=public-share$/);
+ assert.equal(d.querySelector('.tc-card-type strong').textContent,'بطاقة الانطلاقة');
+ assert.equal(d.querySelector('.tc-number').textContent,'INEXC');
+ assert.equal(d.querySelector('.tc-name').textContent,'اسم حامل البطاقة');
+ assert.equal(d.querySelector('#shareTools').hidden,true);
+ assert.equal(d.querySelector('.stats').hidden,true);
+ assert.equal(d.querySelector('.history').hidden,true);
+ assert.equal(d.querySelector('#learnerWorkspaceLink').parentElement.hidden,true);
+ assert.doesNotMatch(d.querySelector('#result').textContent,/INX-EXAMPLE-001|private@example.com/);
+ dom.window.close();
+});
+test('private card offers share notice before creating a distinct public URL',async()=>{
+ const {dom,w}=setup('?token=private-bearer');await tick();const d=w.document;
+ assert.equal(d.querySelector('#shareTools').hidden,false);
+ assert.match(d.querySelector('.share-note').textContent,/أي شخص لديه الرابط/);
+ let request;w.fetch=async(url,options)=>{request={url,options};return {ok:true,json:async()=>({url:'https://www.inexctraining.com/my-card/?share=public-token'})}};
+ w.navigator.clipboard={writeText:async value=>{assert.match(value,/\?share=public-token$/);assert.doesNotMatch(value,/private-bearer/)}};
+ d.querySelector('#copyShare').click();await tick();
+ assert.match(request.url,/memberships\/card\/share$/);
+ assert.equal(JSON.parse(request.options.body).token,'private-bearer');
+ assert.match(d.querySelector('#shareStatus').textContent,/نُسخ/);
+ dom.window.close();
+});
 test('failed lookup keeps recovery controls available and restores the lookup button',async()=>{
  const {dom,w}=setup('?token=invalid',{error:'لم نجد البطاقة'},false);await tick();assert.equal(w.document.querySelector('#error').textContent,'لم نجد البطاقة');assert.equal(w.document.querySelector('#show').disabled,false);assert.equal(w.document.querySelector('.tc-card'),null);dom.window.close();
 });
