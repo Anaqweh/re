@@ -40,18 +40,18 @@ test('code/email lookup retains endpoint and escapes names and booking history',
  assert.equal(d.querySelector('#history b').textContent,p.redemptions[0].courseName);assert.equal(d.querySelector('#history script'),null);
  assert.equal(d.querySelector('#lookup').style.display,'none');dom.window.close();
 });
-test('membership download uses the same named design, embedded assets, and safe lookup QR',async()=>{
- const {dom,w}=setup('?token=private-bearer');await tick();let output,filename;
+test('membership download uses a PNG filename while retaining the approved card design and safe QR',async()=>{
+ const {dom,w}=setup('?token=private-bearer');await tick();let filename,mime;
  w.fetch=async path=>({ok:true,blob:async()=>new w.Blob(['fixture'],{type:path.endsWith('woff2')?'font/woff2':'image/jpeg'})});
- const original=w.TraineeCard.svgFile;w.TraineeCard.svgFile=async(...args)=>{output=await original(...args);return output};
- w.URL.createObjectURL=()=> 'blob:fixture';w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=function(){filename=this.download};
- w.document.querySelector('#downloadCard').click();
- for(let i=0;i<20&&!output;i++)await tick();
+ const output=await w.TraineeCard.svgFile({profile:{full_name:'اسم حامل البطاقة',specialty:'باقة الانطلاقة'},digitalId:{idNumber:'INX-EXAMPLE-001',tierLabel:'الرصيد مستنفد'}},{title:'بطاقة الانطلاقة',subtitle:'INEXC MEMBERSHIP CARD',qrUrl:'https://www.inexctraining.com/my-card/'});
  const svg=new w.DOMParser().parseFromString(output,'image/svg+xml');
- assert.equal(svg.querySelector('parsererror'),null);assert.match(svg.documentElement.textContent,/بطاقة الانطلاقة/);assert.match(svg.documentElement.textContent,/INEXC MEMBERSHIP CARD/);
- assert.doesNotMatch(output,/بطاقة المتدرب|DIGITAL LEARNER ID|private-bearer|private@example/);
- assert.match(output,/data:image\/jpeg;base64/);assert.match(output,/data:font\/woff2;base64/);
- assert.equal(filename,'INEXC-card-INX-EXAMPLE-001.svg');assert.match(w.document.querySelector('#downloadStatus').textContent,/تم تجهيز/);dom.window.close();
+ assert.equal(svg.querySelector('parsererror'),null);assert.match(svg.documentElement.textContent,/بطاقة الانطلاقة/);
+ assert.doesNotMatch(output,/private-bearer|private@example/);assert.match(output,/data:image\/jpeg;base64/);assert.match(output,/data:font\/woff2;base64/);
+ w.TraineeCard.pngFile=async()=>new w.Blob(['png'],{type:'image/png'});
+ w.TraineeCard.downloadPNG=(blob,number)=>{mime=blob.type;filename='INEXC-card-'+number+'.png'};
+ w.document.querySelector('#downloadCard').click();for(let i=0;i<20&&!filename;i++)await tick();
+ assert.equal(mime,'image/png');assert.equal(filename,'INEXC-card-INX-EXAMPLE-001.png');
+ assert.match(w.document.querySelector('#downloadStatus').textContent,/PNG/);dom.window.close();
 });
 test('preview is visibly non-issued and never fetches membership records',()=>{
  const {dom,w,calls}=setup('?preview=1');assert.equal(calls.length,0);assert.equal(w.document.querySelector('#previewNotice').hidden,false);
