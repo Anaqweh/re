@@ -107,7 +107,7 @@
   const status=$('shareStatus'),button=$(native?'nativeShare':'copyShare');status.textContent='جارٍ تجهيز الرابط…';button.disabled=true;
   try{
    const url=await getShareUrl();
-   if(native&&navigator.share){await navigator.share({title:current.options.title,text:'بطاقتي التدريبية لدى INEXC',url});status.textContent='تم فتح خيارات المشاركة.'}
+   if(native&&navigator.share){await navigator.share({url});status.textContent='تم فتح خيارات المشاركة بالرابط فقط.'}
    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);status.textContent='نُسخ رابط المشاركة. رقم البطاقة لا يظهر للآخرين.'}
    else{$('shareLink').focus();$('shareLink').select();status.textContent='الرابط محدد؛ انسخه للمشاركة.'}
   }catch(error){status.textContent=error.name==='AbortError'?'أُلغيت المشاركة.':error.message||'تعذر مشاركة البطاقة.'}
