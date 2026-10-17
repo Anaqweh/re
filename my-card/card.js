@@ -1,19 +1,19 @@
 /* Display the issued membership card with the existing approved INEXC design. */
 (()=>{
  'use strict';
- const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),token=params.get('token')||'';
- const preview=params.get('preview')==='1'&&!token;
- let current;
+ const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),token=params.get('token')||'',share=params.get('share')||'';
+ const preview=params.get('preview')==='1'&&!token&&!share;
+ let current,shareUrl='';
  const date=value=>value&&Number.isFinite(new Date(value).getTime())?new Intl.DateTimeFormat('ar-AE',{year:'numeric',month:'long',day:'numeric'}).format(new Date(value)):'غير محدد';
  function cardData(snapshot){
   const plan=snapshot.plan||{},title=window.INEXCCardLabels.cardName(snapshot.cardName||plan.name);
   const expired=snapshot.status==='expired'||(snapshot.expiresAt&&new Date(snapshot.expiresAt).getTime()<Date.now());
   const status=snapshot.status==='suspended'?'بطاقة موقوفة':expired?'انتهت صلاحية البطاقة':Number(snapshot.unitsRemaining)===0?'الرصيد مستنفد':snapshot.status==='active'?'بطاقة فعّالة':'بطاقة تدريبية';
   return {
-   data:{profile:{full_name:snapshot.holderName,specialty:plan.name||title},digitalId:{idNumber:snapshot.cardNumber,tierLabel:status}},
-   options:{demo:preview,title,subtitle:'INEXC MEMBERSHIP CARD',numberLabel:'رقم البطاقة',status:'صالحة حتى '+date(snapshot.expiresAt),qrCaption:'افتح صفحة البطاقة',
+   data:{profile:{full_name:snapshot.holderName,specialty:plan.name||title},digitalId:{idNumber:share?'INEXC':snapshot.cardNumber,tierLabel:status}},
+   options:{demo:preview,title,subtitle:'INEXC MEMBERSHIP CARD',numberLabel:share?'بطاقة تدريبية':'رقم البطاقة',status:'صالحة حتى '+date(snapshot.expiresAt),qrCaption:'افتح صفحة البطاقة',
     // Membership access tokens are private. The QR opens lookup, never the bearer link.
-    qrUrl:new URL('/my-card/',location.origin).href}
+    qrUrl:share?location.href:new URL('/my-card/',location.origin).href}
   };
  }
  function show(snapshot){
@@ -34,18 +34,44 @@
   }
   if(!history.childElementCount){const empty=document.createElement('p');empty.className='entry';empty.textContent='لم تستخدم البطاقة في أي حجز بعد.';history.append(empty)}
   $('lookup').style.display='none';$('result').style.display='block';
+  if(share){
+   $('learnerWorkspaceLink').parentElement.hidden=true;
+   $('downloadCard').hidden=true;
+   document.querySelector('.stats').hidden=true;
+   document.querySelector('.history').hidden=true;
+   document.querySelector('.intro p').textContent='بطاقة تدريبية تمت مشاركتها للعرض.';
+  }else if(!preview){$('shareTools').hidden=false}
  }
  async function load(){
   $('error').textContent='';$('show').disabled=true;
   try{
-   const query=token?'token='+encodeURIComponent(token):'code='+encodeURIComponent($('code').value.trim())+'&email='+encodeURIComponent($('email').value.trim());
-   const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card?'+query),snapshot=await response.json();
+   const query=share?'share='+encodeURIComponent(share):token?'token='+encodeURIComponent(token):'code='+encodeURIComponent($('code').value.trim())+'&email='+encodeURIComponent($('email').value.trim());
+   const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+(share?'/memberships/card/shared?':'/memberships/card?')+query,{cache:'no-store'}),snapshot=await response.json();
    if(!response.ok)throw Error(snapshot.error||'تعذر عرض البطاقة.');
    show(snapshot);
   }catch(error){$('error').textContent=error.message||'تعذر عرض البطاقة.'}
   finally{$('show').disabled=false}
  }
  $('show').addEventListener('click',load);
+ async function getShareUrl(){
+  if(shareUrl)return shareUrl;
+  const body=token?{token}:{code:$('code').value.trim(),email:$('email').value.trim()};
+  const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
+  const payload=await response.json();if(!response.ok)throw Error(payload.error||'تعذر تجهيز رابط المشاركة.');
+  shareUrl=payload.url;return shareUrl;
+ }
+ async function shareAction(native){
+  const status=$('shareStatus'),button=$(native?'nativeShare':'copyShare');status.textContent='جارٍ تجهيز الرابط…';button.disabled=true;
+  try{
+   const url=await getShareUrl();
+   if(native&&navigator.share){await navigator.share({title:current.options.title,text:'بطاقتي التدريبية لدى INEXC',url});status.textContent='تم فتح خيارات المشاركة.'}
+   else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);status.textContent='نُسخ رابط المشاركة. رقم البطاقة لا يظهر للآخرين.'}
+   else{const input=document.createElement('input');input.value=url;input.setAttribute('aria-label','رابط مشاركة البطاقة');$('shareTools').append(input);input.select();status.textContent='انسخ الرابط المحدد للمشاركة.'}
+  }catch(error){status.textContent=error.name==='AbortError'?'أُلغيت المشاركة.':error.message||'تعذر مشاركة البطاقة.'}
+  finally{button.disabled=false}
+ }
+ $('copyShare').addEventListener('click',()=>shareAction(false));
+ $('nativeShare').addEventListener('click',()=>shareAction(true));
  $('downloadCard').addEventListener('click',async()=>{
   if(!current)return;
   const button=$('downloadCard'),feedback=$('downloadStatus');button.disabled=true;feedback.textContent='';
@@ -60,5 +86,5 @@
  if(preview){
   $('previewNotice').hidden=false;
   show({cardName:'بطاقة الريادة',cardNumber:'INEXC-DEMO-001',holderName:'سارة محمد عبدالله',status:'active',expiresAt:'2027-01-28T00:00:00Z',unitsRemaining:8,unitsTotal:10,plan:{name:'باقة الريادة',certificateDiscount:20,earlyAccessHours:24},redemptions:[]});
- }else if(token)load();
+ }else if(token||share)load();
 })();
