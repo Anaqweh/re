@@ -415,6 +415,7 @@ async function setupDatabase() {
     expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_token TEXT');
+  await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_image BYTEA');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS membership_cards_share_token_unique ON membership_cards(share_token) WHERE share_token IS NOT NULL');
   await pool.query(`CREATE TABLE IF NOT EXISTS membership_redemptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), card_id UUID NOT NULL REFERENCES membership_cards(id) ON DELETE CASCADE,
@@ -966,7 +967,33 @@ app.post('/api/memberships/card/share',async(req,res,next)=>{try{
   const found=await getMembershipCard(clean(req.body?.code,80),clean(String(req.body?.email||'').toLowerCase(),190),clean(req.body?.token,100));
   if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
   const row=(await pool.query('UPDATE membership_cards SET share_token=COALESCE(share_token,$2) WHERE id=$1 RETURNING share_token',[found.row.id,crypto.randomBytes(32).toString('hex')])).rows[0];
-  res.set('Cache-Control','no-store').json({url:'https://www.inexctraining.com/my-card/?share='+row.share_token});
+  res.set('Cache-Control','no-store').json({url:'https://api.inexctraining.com/api/memberships/card/public/'+row.share_token});
+}catch(error){next(error);}});
+app.post('/api/memberships/card/share/image',express.raw({type:'image/png',limit:'3mb'}),async(req,res,next)=>{try{
+  const shareToken=clean(req.get('X-Card-Share'),100),accessToken=clean(req.get('X-Card-Token'),100);
+  const code=clean(req.get('X-Card-Code'),80),email=clean(String(req.get('X-Card-Email')||'').toLowerCase(),190);
+  if(!/^[a-f0-9]{64}$/.test(shareToken)||!Buffer.isBuffer(req.body)||req.body.length<100||req.body.length>3*1024*1024||!req.body.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))||req.body.readUInt32BE(16)!==2160||req.body.readUInt32BE(20)!==1360)return res.status(400).json({error:'صورة البطاقة غير صالحة.'});
+  const found=await getMembershipCard(code,email,accessToken);
+  if(!found||found.row.share_token!==shareToken)return res.status(404).json({error:'تعذر حفظ معاينة البطاقة.'});
+  await pool.query('UPDATE membership_cards SET share_image=$2 WHERE id=$1',[found.row.id,req.body]);
+  res.set('Cache-Control','no-store').json({ok:true});
+}catch(error){next(error);}});
+app.get('/api/memberships/card/public/:share/image',async(req,res,next)=>{try{
+  const shareToken=clean(req.params.share,100);
+  if(!/^[a-f0-9]{64}$/.test(shareToken))return res.status(404).end();
+  const result=await pool.query('SELECT share_image FROM membership_cards WHERE share_token=$1',[shareToken]);
+  if(!result.rowCount||!result.rows[0].share_image)return res.status(404).end();
+  res.type('png').set('Cache-Control','public, max-age=300').send(result.rows[0].share_image);
+}catch(error){next(error);}});
+app.get('/api/memberships/card/public/:share',async(req,res,next)=>{try{
+  const shareToken=clean(req.params.share,100);
+  if(!/^[a-f0-9]{64}$/.test(shareToken))return res.status(404).send('رابط البطاقة غير متاح.');
+  const result=await pool.query('SELECT c.holder_name,c.share_image,p.name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.share_token=$1',[shareToken]);
+  if(!result.rowCount||!result.rows[0].share_image)return res.status(404).send('رابط البطاقة غير متاح.');
+  const row=result.rows[0],title=membershipCardName(row.name)+' | '+row.holder_name;
+  const base='https://api.inexctraining.com/api/memberships/card/public/'+shareToken;
+  const view='https://www.inexctraining.com/my-card/?share='+shareToken;
+  res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title><meta property="og:type" content="website"><meta property="og:site_name" content="INEXC Training"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="اطّلع على البطاقة التدريبية لدى INEXC."><meta property="og:url" content="${base}"><meta property="og:image" content="${base}/image"><meta property="og:image:secure_url" content="${base}/image"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="2160"><meta property="og:image:height" content="1360"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeHtml(title)}"><meta name="twitter:image" content="${base}/image"><style>*{box-sizing:border-box}body{margin:0;background:#eef6ff;color:#153e65;font:16px/1.8 Arial,sans-serif}.wrap{max-width:770px;margin:auto;padding:24px 16px 48px}header{font-weight:700;padding:10px 0 24px}.panel{background:white;border:1px solid #d7e7f5;border-radius:20px;padding:clamp(14px,3vw,28px);box-shadow:0 12px 32px #174a7018}h1{font-size:clamp(21px,4vw,30px);line-height:1.5;margin:0 0 14px}.card-image{display:block;width:100%;height:auto;border-radius:16px}p{margin:16px 0;color:#49657d}a.button{display:inline-block;background:#0866c6;color:white;padding:11px 22px;border-radius:10px;text-decoration:none;font-weight:bold}</style></head><body><div class="wrap"><header>INEXC · التميز الابتكاري</header><main class="panel"><h1>${escapeHtml(title)}</h1><img class="card-image" src="${base}/image" width="1080" height="680" alt="${escapeHtml(title)}"><p>بطاقة تدريبية للعرض؛ لا يظهر رقم البطاقة أو بيانات الدخول.</p><a class="button" href="${view}">عرض البطاقة على الموقع</a></main></div></body></html>`);
 }catch(error){next(error);}});
 app.get('/api/memberships/card/shared',async(req,res,next)=>{try{
   const token=clean(req.query.share,100);
