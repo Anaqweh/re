@@ -27,7 +27,7 @@ function render() {
   const host = document.getElementById('plans');
   host.innerHTML = plans.map(p => {
     const soldOut = p.remaining <= 0;
-    const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
+    const items = window.INEXCMembershipFeatures ? window.INEXCMembershipFeatures.list(description(p)) : description(p).map(x => '<li>' + esc(x) + '</li>').join('');
     return '<article class="plan ' + ((p.featured ?? (p.slug === 'mastery')) ? 'featured' : '') + '">' +
       ((p.badgeText ?? (p.slug === 'mastery' ? 'الأكثر توازنًا' : '')) ? '<span class="ribbon">'+esc(p.badgeText ?? 'الأكثر توازنًا')+'</span>' : '') +
       '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
@@ -101,7 +101,19 @@ function followPlanLink(){
  // availability and order creation remain in their existing verified flow.
  if(booking&&!button.disabled)openPlan(id);
 }
-Promise.all([fetch(API+'/memberships/plans').then(r=>r.ok?r.json():Promise.reject()),loadPaymentOptions()])
+Promise.all([fetch(API+'/memberships/plans',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()),loadPaymentOptions()])
  .then(([data,options])=>{plans=data.map(packagePlan);paymentOptions=options;const total=plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0);document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+total+' باقة';render();
   if(new URLSearchParams(location.search).get('resume')==='1'){try{const draft=JSON.parse(sessionStorage.getItem('inexc_membership_purchase_draft'));if(draft&&Date.now()-draft.createdAt<3600000&&plans.some(p=>p.id===draft.plan_id)){openPlan(draft.plan_id);for(const id of ['name','email','phone'])el(id).value=draft[id]||''}}catch{}}else followPlanLink();
  }).catch(()=>el('plans').innerHTML='<p>تعذّر تحميل الباقات ووسائل الدفع الآن. أعد تحميل الصفحة لاحقًا.</p>');
+
+// Re-read the catalog after editing plans in another tab, without interrupting checkout.
+document.addEventListener('visibilitychange', async () => {
+ if (document.hidden || busy || el('dialog').open) return;
+ try {
+  const response = await fetch(API+'/memberships/plans',{cache:'no-store'});
+  if (!response.ok) return;
+  plans = (await response.json()).map(packagePlan);
+  document.querySelector('.hero .tag').textContent='إصدار عضوية محدود — '+plans.reduce((sum,p)=>sum+Number(p.maxCards||0),0)+' باقة';
+  render();
+ } catch (_) { /* Keep the last successfully loaded catalog visible. */ }
+});
