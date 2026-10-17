@@ -919,8 +919,21 @@ function cardSnapshot(row, redemptions = []) {
 async function sendMembershipActivationEmail(card){
  const plan=(await pool.query('SELECT name FROM membership_plans WHERE id=$1',[card.plan_id])).rows[0];
  const name=membershipCardName(plan?.name);
- const content='<p>مرحبًا '+escapeHtml(card.holder_name)+'،</p><p>تم تأكيد الدفع وإصدار '+escapeHtml(name)+'. يمكنك استخدامها لحجز الدورات المتاحة لها.</p><p><b>رقم البطاقة:</b> <span dir="ltr">'+escapeHtml(card.card_number)+'</span></p><p><a href="https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token)+'">عرض '+escapeHtml(name)+'</a></p>';
- await sendEmail({to:card.holder_email,subject:'تم تفعيل '+name+' | INEXC',html:emailShell({title:name+' جاهزة',preview:'تم تأكيد الدفع وإصدار بطاقتك.',content})});
+ const cardUrl='https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token);
+ const accountUrl='https://www.inexctraining.com/account.html';
+ const content=`<p>مرحبًا ${escapeHtml(card.holder_name)}،</p>
+ <p>تم تأكيد الدفع وإصدار <strong>${escapeHtml(name)}</strong>. يمكنك استخدامها لحجز الدورات المتاحة لها.</p>
+ <div style="background:#f1f7ff;border:1px solid #d4e6f8;border-radius:12px;padding:16px;margin:18px 0">
+ <span style="display:block;color:#526d88;font-size:13px;margin-bottom:7px">رقم بطاقتك</span>
+ <strong dir="ltr" style="display:block;direction:ltr;text-align:center;color:#103b70;font-size:19px">${escapeHtml(card.card_number)}</strong></div>
+ <p style="text-align:center;margin:22px 0"><a href="${cardUrl}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:10px;padding:12px 22px;font-weight:bold">عرض ${escapeHtml(name)}</a></p>
+ <div style="border-top:1px solid #e2edf8;margin-top:22px;padding-top:18px"><h2 style="color:#103b70;font-size:18px;margin:0 0 8px">صفحتك التدريبية الخاصة</h2>
+ <p>يمكنك الدخول إليها في أي وقت للاطلاع على دوراتك وشهاداتك ورصيد بطاقتك وحجوزاتك. استخدم <strong>البريد الإلكتروني الذي وصلتك عليه هذه الرسالة</strong> و<strong>رقم البطاقة المذكور أعلاه</strong> عند الدخول.</p>
+ <p style="text-align:center;margin:18px 0"><a href="${accountUrl}" style="display:inline-block;background:#eaf4ff;color:#075aaf;text-decoration:none;border:1px solid #cce2f8;border-radius:10px;padding:12px 22px;font-weight:bold">الدخول إلى صفحتي التدريبية</a></p>
+ <p style="color:#58728a;font-size:12px">رابط الصفحة المباشر: <a href="${accountUrl}" style="color:#075aaf">${accountUrl}</a></p></div>
+ <p style="color:#657b90;font-size:12px">احتفظ برقم بطاقتك ورابط عرضها لنفسك.</p>`;
+ const plain=`مرحبًا ${card.holder_name}،\nتم تأكيد الدفع وإصدار ${name}.\nرقم البطاقة: ${card.card_number}\nعرض البطاقة: ${cardUrl}\n\nصفحتك التدريبية الخاصة: ${accountUrl}\nللدخول، استخدم البريد الإلكتروني الذي وصلتك عليه هذه الرسالة ورقم البطاقة أعلاه. يمكنك متابعة دوراتك وشهاداتك ورصيدك وحجوزاتك من صفحتك.\n\nاحتفظ برقم بطاقتك ورابط عرضها لنفسك.`;
+ await sendEmail({to:card.holder_email,subject:'تم تفعيل '+name+' | INEXC',html:emailShell({title:name+' جاهزة',preview:'بطاقتك جاهزة وصفحتك التدريبية متاحة للدخول.',content}),text:plain});
 }
 async function getMembershipCard(code,email,accessToken='') {
   const byToken=clean(accessToken,100);
