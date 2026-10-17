@@ -971,10 +971,10 @@ app.post('/api/memberships/card/share',async(req,res,next)=>{try{
 app.get('/api/memberships/card/shared',async(req,res,next)=>{try{
   const token=clean(req.query.share,100);
   if(!/^[a-f0-9]{64}$/.test(token))return res.status(404).json({error:'رابط البطاقة غير متاح.'});
-  const result=await pool.query('SELECT c.holder_name,c.status,c.expires_at,p.name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.share_token=$1',[token]);
+  const result=await pool.query('SELECT c.holder_name,c.status,c.expires_at,c.units_remaining,p.name FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.share_token=$1',[token]);
   if(!result.rowCount)return res.status(404).json({error:'رابط البطاقة غير متاح.'});
   const row=result.rows[0];
-  res.set('Cache-Control','no-store').json({holderName:row.holder_name,status:row.status,expiresAt:row.expires_at,cardName:membershipCardName(row.name),plan:{name:trainingPackageText(row.name)}});
+  res.set('Cache-Control','no-store').json({holderName:row.holder_name,status:row.status,publicStatus:Number(row.units_remaining)===0?'الرصيد مستنفد':'',expiresAt:row.expires_at,cardName:membershipCardName(row.name),plan:{name:trainingPackageText(row.name)}});
 }catch(error){next(error);}});
 app.post('/api/memberships/verify',async(req,res,next)=>{try{
   const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
