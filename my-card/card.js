@@ -81,7 +81,7 @@
   previewImage.className='share-preview-image';$('shareCardPreview').replaceChildren(previewImage);
   const credentials=token?{'X-Card-Token':token}:{'X-Card-Code':$('code').value.trim(),'X-Card-Email':$('email').value.trim()};
   const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card/share/image',{method:'POST',headers:{'Content-Type':'image/png','X-Card-Share':shareToken,...credentials},body:image,cache:'no-store'});
-  if(!response.ok)throw Error('تعذر حفظ صورة معاينة الرابط. حاول مرة أخرى.');
+  if(!response.ok){const failure=await response.json().catch(()=>({}));throw Error((failure.error||'تعذر حفظ صورة معاينة الرابط')+' ('+response.status+'، '+Math.ceil(image.size/1024)+' KB).')}
   const saved=await response.json();
   if(!saved.url||new URL(saved.url).pathname!==new URL(url).pathname)throw Error('تعذر تأكيد رابط المشاركة.');
   return saved.url;
