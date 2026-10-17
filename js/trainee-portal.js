@@ -239,7 +239,7 @@
     });
     cardAssets = (async () => {
       if (!global.INEXCQRCode) await script('/vendor/inexc-qr.js?v=20261016-card1');
-      if (!global.TraineeCard) await script('/js/trainee-card.js?v=20261016-card1');
+      if (!global.TraineeCard) await script('/js/trainee-card.js?v=20261018-png1');
     })().catch(error => { cardAssets = null; throw error; });
     return cardAssets;
   }
