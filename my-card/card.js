@@ -50,10 +50,9 @@
   if(!current)return;
   const button=$('downloadCard'),feedback=$('downloadStatus');button.disabled=true;feedback.textContent='';
   try{
-   const svg=await window.TraineeCard.svgFile(current.data,current.options),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
-   const link=document.createElement('a');link.href=url;link.download='INEXC-card-'+String(current.data.digitalId.idNumber).replace(/[^A-Za-z0-9_-]/g,'')+(preview?'-PREVIEW':'')+'.svg';
-   document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
-   feedback.textContent='تم تجهيز البطاقة للتحميل.';feedback.style.color='#27623c';
+   const blob=await window.TraineeCard.pngFile(current.data,current.options);
+   window.TraineeCard.downloadPNG(blob,current.data.digitalId.idNumber,preview);
+   feedback.textContent='تم تجهيز البطاقة كصورة PNG.';feedback.style.color='#27623c';
   }catch(error){feedback.textContent=error.message||'تعذر تحميل البطاقة. أعد المحاولة.';feedback.style.color='#b02b3a'}
   finally{button.disabled=false}
  });
