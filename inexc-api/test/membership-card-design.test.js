@@ -83,6 +83,19 @@ test('private card offers share notice before creating a distinct public URL',as
  assert.match(d.querySelector('#shareStatus').textContent,/نُسخ/);
  dom.window.close();
 });
+test('share preview uses the approved card without the private number before copying',async()=>{
+ const {dom,w}=setup('?token=private-bearer');await tick();const d=w.document;
+ const dialog=d.querySelector('#shareDialog');dialog.showModal=()=>{dialog.open=true};
+ w.fetch=async()=>({ok:true,json:async()=>({url:'https://www.inexctraining.com/my-card/?share=public-token'})});
+ d.querySelector('#openShare').click();await tick();
+ assert.equal(dialog.open,true);
+ assert.equal(d.querySelector('#shareCardPreview .tc-name').textContent,'اسم حامل البطاقة');
+ assert.equal(d.querySelector('#shareCardPreview .tc-number').textContent,'INEXC');
+ assert.equal(d.querySelector('#shareCardPreview .tc-card-type strong').textContent,'بطاقة الانطلاقة');
+ assert.equal(d.querySelector('#shareLink').value,'https://www.inexctraining.com/my-card/?share=public-token');
+ assert.doesNotMatch(d.querySelector('#shareDialog').textContent,/INX-EXAMPLE-001|private-bearer|private@example.com/);
+ dom.window.close();
+});
 test('failed lookup keeps recovery controls available and restores the lookup button',async()=>{
  const {dom,w}=setup('?token=invalid',{error:'لم نجد البطاقة'},false);await tick();assert.equal(w.document.querySelector('#error').textContent,'لم نجد البطاقة');assert.equal(w.document.querySelector('#show').disabled,false);assert.equal(w.document.querySelector('.tc-card'),null);dom.window.close();
 });
