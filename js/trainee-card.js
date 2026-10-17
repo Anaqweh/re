@@ -79,6 +79,10 @@
   ctx.font='700 22px Arial,sans-serif';ctx.fillText('◎  www.inexctraining.com',466,591);
   ctx.direction='rtl';ctx.textAlign='right';ctx.font='600 21px INEXCPlex,Arial,sans-serif';ctx.fillText(m.status,1152,590,285);
   ctx.strokeStyle='#0fc7ff';ctx.lineWidth=3;ctx.strokeRect(1.5,1.5,1197,627);
+  // Keep the full resolution while reducing PNG entropy below the API upload limit.
+  const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),channels=pixels.data;
+  for(let i=0;i<channels.length;i+=4){channels[i]&=252;channels[i+1]&=252;channels[i+2]&=252}
+  ctx.putImageData(pixels,0,0);
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
   if(!blob)throw Error('تعذر حفظ صورة المشاركة.');return blob;
  }
