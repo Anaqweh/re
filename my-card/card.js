@@ -3,7 +3,7 @@
  'use strict';
  const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),token=params.get('token')||'',share=params.get('share')||'';
  const preview=params.get('preview')==='1'&&!token&&!share;
- let current,shareUrl='';
+ let current,shareUrl='',sharePreviewObjectUrl='';
  const date=value=>value&&Number.isFinite(new Date(value).getTime())?new Intl.DateTimeFormat('ar-AE',{year:'numeric',month:'long',day:'numeric'}).format(new Date(value)):'غير محدد';
  function cardData(snapshot){
   const plan=snapshot.plan||{},title=window.INEXCCardLabels.cardName(snapshot.cardName||plan.name);
@@ -66,9 +66,8 @@
   shareUrl=payload.url;return shareUrl;
  }
  function renderSharePreview(url){
-  const publicData={...current.data,digitalId:{...current.data.digitalId,idNumber:'INEXC'}};
-  const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url||new URL('/my-card/',location.origin).href};
-  $('shareCardPreview').innerHTML=window.TraineeCard.renderCard(publicData,publicOptions);
+  if(sharePreviewObjectUrl){URL.revokeObjectURL(sharePreviewObjectUrl);sharePreviewObjectUrl=''}
+  $('shareCardPreview').innerHTML='<p class="share-image-loading">جارٍ تجهيز صورة المشاركة الفعلية…</p>';
  }
  async function saveSocialPreview(url){
   const shareToken=new URL(url).pathname.split('/').pop();
@@ -76,6 +75,10 @@
   const publicData={...current.data,digitalId:{...current.data.digitalId,idNumber:'INEXC'}};
   const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url};
   const image=await window.TraineeCard.socialPreviewPNG(publicData,publicOptions);
+  if(sharePreviewObjectUrl)URL.revokeObjectURL(sharePreviewObjectUrl);
+  sharePreviewObjectUrl=URL.createObjectURL(image);
+  const previewImage=document.createElement('img');previewImage.src=sharePreviewObjectUrl;previewImage.alt='صورة مشاركة '+current.options.title+' باسم '+current.data.profile.full_name;
+  previewImage.className='share-preview-image';$('shareCardPreview').replaceChildren(previewImage);
   const credentials=token?{'X-Card-Token':token}:{'X-Card-Code':$('code').value.trim(),'X-Card-Email':$('email').value.trim()};
   const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card/share/image',{method:'POST',headers:{'Content-Type':'image/png','X-Card-Share':shareToken,...credentials},body:image,cache:'no-store'});
   if(!response.ok)throw Error('تعذر حفظ صورة معاينة الرابط. حاول مرة أخرى.');
@@ -92,7 +95,7 @@
   renderSharePreview('');
   dialog.showModal();
   try{
-   const url=await getShareUrl();
+   const url=shareUrl||await getShareUrl();
    $('shareLink').value=url;renderSharePreview(url);
    status.textContent='جارٍ تجهيز صورة البطاقة لتظهر عند مشاركة الرابط…';
    shareUrl=await saveSocialPreview(url);
@@ -106,7 +109,7 @@
  async function shareAction(native){
   const status=$('shareStatus'),button=$(native?'nativeShare':'copyShare');status.textContent='جارٍ تجهيز الرابط…';button.disabled=true;
   try{
-   const url=await getShareUrl();
+   const url=shareUrl||await getShareUrl();
    if(native&&navigator.share){await navigator.share({url});status.textContent='تم فتح خيارات المشاركة بالرابط فقط.'}
    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);status.textContent='نُسخ رابط المشاركة. رقم البطاقة لا يظهر للآخرين.'}
    else{$('shareLink').focus();$('shareLink').select();status.textContent='الرابط محدد؛ انسخه للمشاركة.'}
