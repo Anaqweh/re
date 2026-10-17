@@ -65,6 +65,16 @@
   const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url||new URL('/my-card/',location.origin).href};
   $('shareCardPreview').innerHTML=window.TraineeCard.renderCard(publicData,publicOptions);
  }
+ async function saveSocialPreview(url){
+  const shareToken=new URL(url).pathname.split('/').pop();
+  if(!/^[a-f0-9]{64}$/.test(shareToken))throw Error('تعذر تجهيز رابط البطاقة.');
+  const publicData={...current.data,digitalId:{...current.data.digitalId,idNumber:'INEXC'}};
+  const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url};
+  const image=await window.TraineeCard.pngFile(publicData,publicOptions);
+  const credentials=token?{'X-Card-Token':token}:{'X-Card-Code':$('code').value.trim(),'X-Card-Email':$('email').value.trim()};
+  const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card/share/image',{method:'POST',headers:{'Content-Type':'image/png','X-Card-Share':shareToken,...credentials},body:image,cache:'no-store'});
+  if(!response.ok)throw Error('تعذر حفظ صورة معاينة الرابط. حاول مرة أخرى.');
+ }
  $('openShare').addEventListener('click',async()=>{
   if(!current)return;
   const dialog=$('shareDialog'),status=$('shareStatus');
@@ -76,8 +86,10 @@
   try{
    const url=await getShareUrl();
    $('shareLink').value=url;renderSharePreview(url);
+   status.textContent='جارٍ تجهيز صورة البطاقة لتظهر عند مشاركة الرابط…';
+   await saveSocialPreview(url);
    $('copyShare').disabled=false;$('nativeShare').disabled=false;
-   status.textContent='المعاينة جاهزة. انسخ الرابط أو شارك البطاقة.';
+   status.textContent='أصبحت صورة البطاقة جاهزة للظهور مع الرابط. انسخه أو شاركه.';
   }catch(error){status.textContent=error.message||'تعذر تجهيز رابط المشاركة.'}
  });
  $('closeShare').addEventListener('click',()=>$('shareDialog').close());
