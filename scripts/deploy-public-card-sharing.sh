@@ -40,9 +40,10 @@ inexc_started=1
 docker compose up -d --no-build --no-deps api
 for inexc_attempt in {1..20}; do
   if curl --fail --silent http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("learnerVersion")==1 else 1)' 2>/dev/null; then
-    inexc_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3000/api/memberships/card/shared?share=invalid')"
-    if [[ "$inexc_status" == 404 ]]; then
-      echo "Public card sharing API deployed. Backup: $inexc_api_dir/$inexc_backup"
+    inexc_status="$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3000/api/memberships/card/public/invalid')"
+    inexc_body="$(curl -sS 'http://127.0.0.1:3000/api/memberships/card/public/invalid' 2>/dev/null || true)"
+    if [[ "$inexc_status" == 404 && "$inexc_body" == *'رابط البطاقة غير متاح.'* ]]; then
+      echo "Public card image previews deployed. Backup: $inexc_api_dir/$inexc_backup"
       exit 0
     fi
   fi
