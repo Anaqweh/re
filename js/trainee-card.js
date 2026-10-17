@@ -41,6 +41,32 @@
    return blob;
   }finally{URL.revokeObjectURL(source)}
  }
+ async function socialPreviewPNG(data,options={}){
+  const m=model(data,options);
+  if(m.id!=='INEXC')throw Error('معاينة المشاركة لا تقبل رقم البطاقة.');
+  await Promise.all([document.fonts?.load('700 48px INEXCPlex'),document.fonts?.load('500 26px INEXCPlex')]);
+  const logo=new Image();logo.src='/assets/inexc-approved-logo.jpg';await logo.decode();
+  const canvas=document.createElement('canvas');canvas.width=2400;canvas.height=1260;
+  const ctx=canvas.getContext('2d');if(!ctx)throw Error('تعذر تجهيز صورة المشاركة على هذا الجهاز.');
+  ctx.scale(2,2);
+  const round=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()};
+  ctx.fillStyle='#eef5fc';ctx.fillRect(0,0,1200,630);
+  const blue=ctx.createLinearGradient(24,24,1176,570);blue.addColorStop(0,'#0876de');blue.addColorStop(1,'#0756c4');ctx.fillStyle=blue;round(24,24,1152,582,34);
+  ctx.strokeStyle='#ffffff14';ctx.lineWidth=44;ctx.beginPath();ctx.arc(90,70,215,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#fff';round(855,70,260,116,18);
+  const ratio=Math.min(226/logo.width,98/logo.height);ctx.drawImage(logo,985-logo.width*ratio/2,128-logo.height*ratio/2,logo.width*ratio,logo.height*ratio);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='700 38px INEXCPlex,Arial,sans-serif';ctx.fillText(m.title,800,118,660);
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#d8ebff';ctx.font='500 19px Arial,sans-serif';ctx.fillText('INEXC MEMBERSHIP CARD',86,163);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';
+  let size=55;do{ctx.font=`700 ${size}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.name).width<=1015)break;size-=2}while(size>35);
+  ctx.fillText(m.name,1100,300,1015);
+  ctx.fillStyle='#e2f0ff';ctx.font='500 30px INEXCPlex,Arial,sans-serif';ctx.fillText(m.specialty,1100,370,980);
+  ctx.fillStyle='#fff';round(24,504,1152,102,[0,0,34,34]);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#143e6d';ctx.font='700 29px INEXCPlex,Arial,sans-serif';ctx.fillText('شركة التميز الابتكاري للتعليم والتدريب',1100,565,935);
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#587da5';ctx.font='700 17px Arial,sans-serif';ctx.fillText('INEXC',86,564);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  if(!blob)throw Error('تعذر حفظ صورة المشاركة.');return blob;
+ }
  function downloadPNG(blob,number,demo=false){
   const url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download='INEXC-card-'+String(number).replace(/[^A-Za-z0-9_-]/g,'')+(demo?'-PREVIEW':'')+'.png';
@@ -64,5 +90,5 @@
    finally{button.disabled=false;}
   }));
  }
- global.TraineeCard={render,renderCard:(data,options={})=>visual(model(data,options)),bind,model,qrMarkup,svgFile,pngFile,downloadPNG,mount(target,data,options={}){target.innerHTML=render(data,options);bind(target,data,options)}};
+ global.TraineeCard={render,renderCard:(data,options={})=>visual(model(data,options)),bind,model,qrMarkup,svgFile,pngFile,socialPreviewPNG,downloadPNG,mount(target,data,options={}){target.innerHTML=render(data,options);bind(target,data,options)}};
 })(window);
