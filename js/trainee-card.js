@@ -50,20 +50,30 @@
   const ctx=canvas.getContext('2d');if(!ctx)throw Error('تعذر تجهيز صورة المشاركة على هذا الجهاز.');
   ctx.scale(2,2);
   const round=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()};
-  ctx.fillStyle='#eef5fc';ctx.fillRect(0,0,1200,630);
-  const blue=ctx.createLinearGradient(24,24,1176,570);blue.addColorStop(0,'#0876de');blue.addColorStop(1,'#0756c4');ctx.fillStyle=blue;round(24,24,1152,582,34);
-  ctx.strokeStyle='#ffffff14';ctx.lineWidth=44;ctx.beginPath();ctx.arc(90,70,215,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#fff';round(855,70,260,116,18);
-  const ratio=Math.min(226/logo.width,98/logo.height);ctx.drawImage(logo,985-logo.width*ratio/2,128-logo.height*ratio/2,logo.width*ratio,logo.height*ratio);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='700 38px INEXCPlex,Arial,sans-serif';ctx.fillText(m.title,800,118,660);
-  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#d8ebff';ctx.font='500 19px Arial,sans-serif';ctx.fillText('INEXC MEMBERSHIP CARD',86,163);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';
-  let size=55;do{ctx.font=`700 ${size}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.name).width<=1015)break;size-=2}while(size>35);
-  ctx.fillText(m.name,1100,300,1015);
-  ctx.fillStyle='#e2f0ff';ctx.font='500 30px INEXCPlex,Arial,sans-serif';ctx.fillText(m.specialty,1100,370,980);
-  ctx.fillStyle='#fff';round(24,504,1152,102,[0,0,34,34]);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#143e6d';ctx.font='700 29px INEXCPlex,Arial,sans-serif';ctx.fillText('شركة التميز الابتكاري للتعليم والتدريب',1100,565,935);
-  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#587da5';ctx.font='700 17px Arial,sans-serif';ctx.fillText('INEXC',86,564);
+  ctx.fillStyle='#edf5ff';ctx.fillRect(0,0,1200,630);
+  const blue=ctx.createLinearGradient(24,24,1176,528);blue.addColorStop(0,'#0876de');blue.addColorStop(1,'#0756c4');ctx.fillStyle=blue;round(24,24,1152,582,28);
+  ctx.strokeStyle='#ffffff13';ctx.lineWidth=34;ctx.beginPath();ctx.arc(36,34,156,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#fff';round(906,62,220,96,12);
+  const ratio=Math.min(196/logo.width,80/logo.height);ctx.drawImage(logo,1016-logo.width*ratio/2,110-logo.height*ratio/2,logo.width*ratio,logo.height*ratio);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='700 36px INEXCPlex,Arial,sans-serif';ctx.fillText(m.title,848,105,720);
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#e0efff';ctx.font='500 18px Arial,sans-serif';ctx.fillText('INEXC MEMBERSHIP CARD',80,153);
+  ctx.fillStyle='#e9f4ff';round(1014,200,112,124,16);ctx.direction='ltr';ctx.textAlign='center';ctx.fillStyle='#0964cd';ctx.font='700 33px INEXCPlex,Arial,sans-serif';ctx.fillText(m.initials,1070,278,96);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';let size=52;
+  do{ctx.font=`700 ${size}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.name).width<=880)break;size-=2}while(size>34);
+  ctx.fillText(m.name,985,258,880);
+  ctx.fillStyle='#e2f0ff';ctx.font='500 28px INEXCPlex,Arial,sans-serif';ctx.fillText(m.specialty,985,314,850);
+  ctx.font='500 23px INEXCPlex,Arial,sans-serif';ctx.fillText(m.tier,985,357,850);
+  ctx.fillStyle='#fff';round(78,384,126,126,10);
+  if(m.url&&global.INEXCQRCode){
+   const modules=global.INEXCQRCode.create(m.url,{errorCorrectionLevel:'M'}).modules;
+   const moduleSize=110/(modules.size+8);ctx.fillStyle='#17497b';
+   for(let y=0;y<modules.size;y++)for(let x=0;x<modules.size;x++)if(modules.get(y,x))ctx.fillRect(86+(x+4)*moduleSize,392+(y+4)*moduleSize,moduleSize+.06,moduleSize+.06);
+  }
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#d9ecff';ctx.font='500 20px INEXCPlex,Arial,sans-serif';ctx.fillText('بطاقة تدريبية للمشاركة',1100,433);
+  ctx.fillStyle='#fff';ctx.font='700 36px Arial,sans-serif';ctx.fillText('INEXC',1100,478);
+  ctx.fillStyle='#fff';round(24,528,1152,78,[0,0,28,28]);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#143e6d';ctx.font='700 27px INEXCPlex,Arial,sans-serif';ctx.fillText('شركة التميز الابتكاري للتعليم والتدريب',1100,578,940);
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#587da5';ctx.font='600 15px Arial,sans-serif';ctx.fillText('INEXC · LEARNING CONTINUES',80,576);
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
   if(!blob)throw Error('تعذر حفظ صورة المشاركة.');return blob;
  }
