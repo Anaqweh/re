@@ -60,13 +60,35 @@
   const payload=await response.json();if(!response.ok)throw Error(payload.error||'تعذر تجهيز رابط المشاركة.');
   shareUrl=payload.url;return shareUrl;
  }
+ function renderSharePreview(url){
+  const publicData={...current.data,digitalId:{...current.data.digitalId,idNumber:'INEXC'}};
+  const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url||new URL('/my-card/',location.origin).href};
+  $('shareCardPreview').innerHTML=window.TraineeCard.renderCard(publicData,publicOptions);
+ }
+ $('openShare').addEventListener('click',async()=>{
+  if(!current)return;
+  const dialog=$('shareDialog'),status=$('shareStatus');
+  status.textContent='جارٍ تجهيز رابط البطاقة…';
+  $('shareLink').value='جارٍ تجهيز الرابط…';
+  $('copyShare').disabled=true;$('nativeShare').disabled=true;
+  renderSharePreview('');
+  dialog.showModal();
+  try{
+   const url=await getShareUrl();
+   $('shareLink').value=url;renderSharePreview(url);
+   $('copyShare').disabled=false;$('nativeShare').disabled=false;
+   status.textContent='المعاينة جاهزة. انسخ الرابط أو شارك البطاقة.';
+  }catch(error){status.textContent=error.message||'تعذر تجهيز رابط المشاركة.'}
+ });
+ $('closeShare').addEventListener('click',()=>$('shareDialog').close());
+ $('shareDialog').addEventListener('click',event=>{if(event.target===$('shareDialog'))$('shareDialog').close()});
  async function shareAction(native){
   const status=$('shareStatus'),button=$(native?'nativeShare':'copyShare');status.textContent='جارٍ تجهيز الرابط…';button.disabled=true;
   try{
    const url=await getShareUrl();
    if(native&&navigator.share){await navigator.share({title:current.options.title,text:'بطاقتي التدريبية لدى INEXC',url});status.textContent='تم فتح خيارات المشاركة.'}
    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);status.textContent='نُسخ رابط المشاركة. رقم البطاقة لا يظهر للآخرين.'}
-   else{const input=document.createElement('input');input.value=url;input.setAttribute('aria-label','رابط مشاركة البطاقة');$('shareTools').append(input);input.select();status.textContent='انسخ الرابط المحدد للمشاركة.'}
+   else{$('shareLink').focus();$('shareLink').select();status.textContent='الرابط محدد؛ انسخه للمشاركة.'}
   }catch(error){status.textContent=error.name==='AbortError'?'أُلغيت المشاركة.':error.message||'تعذر مشاركة البطاقة.'}
   finally{button.disabled=false}
  }
