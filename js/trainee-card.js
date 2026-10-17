@@ -44,36 +44,41 @@
  async function socialPreviewPNG(data,options={}){
   const m=model(data,options);
   if(m.id!=='INEXC')throw Error('معاينة المشاركة لا تقبل رقم البطاقة.');
-  await Promise.all([document.fonts?.load('700 48px INEXCPlex'),document.fonts?.load('500 26px INEXCPlex')]);
+  await Promise.all([document.fonts?.load('700 72px INEXCPlex'),document.fonts?.load('500 32px INEXCPlex')]);
   const logo=new Image();logo.src='/assets/inexc-approved-logo.jpg';await logo.decode();
   const canvas=document.createElement('canvas');canvas.width=2400;canvas.height=1260;
   const ctx=canvas.getContext('2d');if(!ctx)throw Error('تعذر تجهيز صورة المشاركة على هذا الجهاز.');
   ctx.scale(2,2);
   const round=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()};
-  ctx.fillStyle='#edf5ff';ctx.fillRect(0,0,1200,630);
-  const blue=ctx.createLinearGradient(24,24,1176,528);blue.addColorStop(0,'#0876de');blue.addColorStop(1,'#0756c4');ctx.fillStyle=blue;round(24,24,1152,582,28);
-  ctx.strokeStyle='#ffffff13';ctx.lineWidth=34;ctx.beginPath();ctx.arc(36,34,156,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#fff';round(906,62,220,96,12);
-  const ratio=Math.min(196/logo.width,80/logo.height);ctx.drawImage(logo,1016-logo.width*ratio/2,110-logo.height*ratio/2,logo.width*ratio,logo.height*ratio);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='700 36px INEXCPlex,Arial,sans-serif';ctx.fillText(m.title,848,105,720);
-  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#e0efff';ctx.font='500 18px Arial,sans-serif';ctx.fillText('INEXC MEMBERSHIP CARD',80,153);
-  ctx.fillStyle='#e9f4ff';round(1014,200,112,124,16);ctx.direction='ltr';ctx.textAlign='center';ctx.fillStyle='#0964cd';ctx.font='700 33px INEXCPlex,Arial,sans-serif';ctx.fillText(m.initials,1070,278,96);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';let size=52;
-  do{ctx.font=`700 ${size}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.name).width<=880)break;size-=2}while(size>34);
-  ctx.fillText(m.name,985,258,880);
-  ctx.fillStyle='#e2f0ff';ctx.font='500 28px INEXCPlex,Arial,sans-serif';ctx.fillText(m.specialty,985,314,850);
-  ctx.font='500 23px INEXCPlex,Arial,sans-serif';ctx.fillText(m.tier,985,357,850);
-  ctx.fillStyle='#fff';round(78,384,126,126,10);
+  const glow=(x,y,r,color)=>{const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,color);g.addColorStop(1,'#0064e000');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2)};
+  const bg=ctx.createLinearGradient(0,50,1200,580);bg.addColorStop(0,'#031231');bg.addColorStop(.48,'#043eaa');bg.addColorStop(1,'#0055df');ctx.fillStyle=bg;ctx.fillRect(0,0,1200,630);
+  glow(710,6,470,'#0078ff90');glow(1230,500,420,'#03baff64');glow(320,370,260,'#075be655');
+  ctx.lineWidth=1;ctx.strokeStyle='#3483ed20';for(let x=55;x<550;x+=76){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,548);ctx.stroke()}for(let y=64;y<548;y+=74){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(570,y);ctx.stroke()}
+  ctx.strokeStyle='#038dff';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(-62,546,386,-Math.PI/2,0);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(940,0);ctx.bezierCurveTo(1130,110,740,290,1015,426);ctx.bezierCurveTo(1120,480,1145,535,1200,560);ctx.stroke();
+  for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(1200,65+i*79);ctx.bezierCurveTo(1120,165+i*28,915,240+i*27,935,365+i*12);ctx.bezierCurveTo(945,430,1140,436+i*32,1200,520+i*20);ctx.strokeStyle=['#28caffc9','#76efffaa','#178affae','#0b7bf9aa'][i];ctx.lineWidth=2+i;ctx.stroke()}
+  for(const [x,y] of [[131,187],[297,382],[133,276]]){glow(x,y,18,'#5beaffbb');ctx.fillStyle='#aff7ff';ctx.beginPath();ctx.arc(x,y,2.5,0,7);ctx.fill()}
+  ctx.fillStyle='#fff';round(891,36,277,116,20);const ratio=Math.min(251/logo.width,106/logo.height);ctx.drawImage(logo,1029-logo.width*ratio/2,94-logo.height*ratio/2,logo.width*ratio,logo.height*ratio);
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#f4f8ff';ctx.font='500 18px Arial,sans-serif';ctx.fillText('I N E X C   M E M B E R S H I P',54,71);
+  ctx.fillStyle='#3caaff';ctx.fillRect(54,90,36,1);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';let titleSize=70;do{ctx.font=`700 ${titleSize}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.title).width<645)break;titleSize-=2}while(titleSize>42);ctx.fillText(m.title,934,227,645);
+  ctx.textAlign='left';ctx.direction='ltr';let nameSize=51;do{ctx.font=`700 ${nameSize}px INEXCPlex,Arial,sans-serif`;if(ctx.measureText(m.name).width<650)break;nameSize-=2}while(nameSize>30);ctx.fillText(m.name,334,314,650);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.font='600 23px INEXCPlex,Arial,sans-serif';ctx.fillText(m.specialty,850,362,535);
+  ctx.strokeStyle='#02bbff';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(713,379,178,41,16);ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 24px INEXCPlex,Arial,sans-serif';ctx.textAlign='center';ctx.fillText('بطاقة فعّالة',802,408,165);
+  ctx.fillStyle='#fff';round(50,314,168,200,18);
   if(m.url&&global.INEXCQRCode){
    const modules=global.INEXCQRCode.create(m.url,{errorCorrectionLevel:'M'}).modules;
-   const moduleSize=110/(modules.size+8);ctx.fillStyle='#17497b';
-   for(let y=0;y<modules.size;y++)for(let x=0;x<modules.size;x++)if(modules.get(y,x))ctx.fillRect(86+(x+4)*moduleSize,392+(y+4)*moduleSize,moduleSize+.06,moduleSize+.06);
+   const moduleSize=143/(modules.size+8);ctx.fillStyle='#072c71';
+   for(let y=0;y<modules.size;y++)for(let x=0;x<modules.size;x++)if(modules.get(y,x))ctx.fillRect(62+(x+4)*moduleSize,326+(y+4)*moduleSize,moduleSize+.07,moduleSize+.07);
   }
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#d9ecff';ctx.font='500 20px INEXCPlex,Arial,sans-serif';ctx.fillText('بطاقة تدريبية للمشاركة',1100,433);
-  ctx.fillStyle='#fff';ctx.font='700 36px Arial,sans-serif';ctx.fillText('INEXC',1100,478);
-  ctx.fillStyle='#fff';round(24,528,1152,78,[0,0,28,28]);
-  ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#143e6d';ctx.font='700 27px INEXCPlex,Arial,sans-serif';ctx.fillText('شركة التميز الابتكاري للتعليم والتدريب',1100,578,940);
-  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#587da5';ctx.font='600 15px Arial,sans-serif';ctx.fillText('INEXC · LEARNING CONTINUES',80,576);
+  ctx.direction='rtl';ctx.textAlign='center';ctx.fillStyle='#07347d';ctx.font='700 17px INEXCPlex,Arial,sans-serif';ctx.fillText('افتح صفحة البطاقة',134,498,150);
+  const tile=ctx.createLinearGradient(840,450,920,526);tile.addColorStop(0,'#00c9ff');tile.addColorStop(1,'#0846bc');ctx.fillStyle=tile;round(837,448,81,78,13);ctx.fillStyle='#d7f4ff';ctx.direction='ltr';ctx.textAlign='center';ctx.font='700 43px Arial,sans-serif';ctx.fillText('AI',878,503);
+  ctx.strokeStyle='#afddff';ctx.beginPath();ctx.moveTo(934,467);ctx.lineTo(934,514);ctx.stroke();ctx.direction='rtl';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='600 24px INEXCPlex,Arial,sans-serif';ctx.fillText('التميز الابتكاري',1099,484);ctx.fillText('للتعليم والتدريب',1099,513);
+  ctx.strokeStyle='#a3d8ff99';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(30,547);ctx.lineTo(1170,547);ctx.stroke();
+  ctx.direction='ltr';ctx.textAlign='left';ctx.fillStyle='#fff';ctx.font='500 18px Arial,sans-serif';ctx.fillText('I N E X C  ·  L E A R N I N G  C O N T I N U E S',53,590);
+  ctx.font='700 22px Arial,sans-serif';ctx.fillText('◎  www.inexctraining.com',466,591);
+  ctx.direction='rtl';ctx.textAlign='right';ctx.font='600 21px INEXCPlex,Arial,sans-serif';ctx.fillText(m.status,1152,590,285);
+  ctx.strokeStyle='#0fc7ff';ctx.lineWidth=3;ctx.strokeRect(1.5,1.5,1197,627);
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
   if(!blob)throw Error('تعذر حفظ صورة المشاركة.');return blob;
  }
