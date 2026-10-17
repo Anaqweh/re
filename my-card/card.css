@@ -19,6 +19,16 @@
 .membership-page #membershipCard .tc-card-strip{padding:9px 22px;gap:10px;line-height:1.6}
 .membership-page #downloadCard{font:500 14px/1.5 INEXCPlex,Arial,sans-serif;min-height:44px;padding:11px}
 .membership-page #downloadStatus:empty{display:none}
+.membership-page [hidden]{display:none!important}
+.membership-page .share-tools{margin-top:16px;padding:16px;border:1px solid #cbdff3;background:#f5faff;border-radius:13px}
+.membership-page .share-note{margin:0 0 14px;color:#173e63;font:500 14px/1.9 INEXCPlex,Arial,sans-serif}
+.membership-page .share-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.membership-page .share-actions .btn{min-height:46px;font:600 14px/1.5 INEXCPlex,Arial,sans-serif}
+.membership-page #nativeShare{background:#fff;color:#0866c6;border:1px solid #0866c6}
+.membership-page #shareStatus{margin:9px 0 0;color:#27623c;font:500 13px/1.7 INEXCPlex,Arial,sans-serif}
+.membership-page #shareStatus:empty{display:none}
+.membership-page .share-tools input{width:100%;margin-top:10px;padding:10px;border:1px solid #b8d7f5;border-radius:8px;direction:ltr}
+@media(max-width:540px){.membership-page .share-actions{grid-template-columns:1fr}}
 @media(max-width:540px){
  .membership-page .card{padding:13px}
  .membership-page #membershipCard .tc-card-top{padding:16px 16px 0;gap:10px}
