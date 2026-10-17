@@ -29,6 +29,23 @@
   const portrait=photo?'<image href="'+photo+'" x="900" y="210" width="115" height="140" preserveAspectRatio="xMidYMid slice" clip-path="url(#portrait)"/>':'<text x="957" y="292" text-anchor="middle" fill="#0964cd" font-size="38">'+esc(m.initials)+'</text>';
   return '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="680" viewBox="0 0 1080 680"><defs><linearGradient id="blue"><stop stop-color="#0876de"/><stop offset="1" stop-color="#0756c4"/></linearGradient><clipPath id="portrait"><rect x="900" y="210" width="115" height="140" rx="18"/></clipPath><clipPath id="cardEdge"><rect width="1080" height="680" rx="34"/></clipPath><style>@font-face{font-family:CardPlex;src:url('+font+')}text{font-family:CardPlex,Arial,sans-serif}</style></defs><g clip-path="url(#cardEdge)"><rect width="1080" height="680" fill="url(#blue)"/><circle cx="20" cy="25" r="240" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="65"/><rect x="780" y="45" width="245" height="122" rx="16" fill="#fff"/><image href="'+logo+'" x="792" y="51" width="221" height="110"/><text x="360" y="89" text-anchor="start" direction="rtl" fill="white" font-size="30">'+esc(m.title)+'</text><text x="60" y="132" fill="#dbedff" font-size="20">'+esc(m.subtitle)+'</text><rect x="900" y="210" width="115" height="140" rx="18" fill="#e9f4ff"/>'+portrait+lines.map((line,i)=>'<text x="860" y="'+(246+i*48)+'" text-anchor="start" direction="rtl" fill="white" font-size="'+fontSize+'"'+(line.length>38?' textLength="720" lengthAdjust="spacingAndGlyphs"':'')+'>'+esc(line)+'</text>').join('')+'<text x="860" y="377" text-anchor="start" direction="rtl" fill="#deeeff" font-size="23">'+esc(m.specialty.length>52?m.specialty.slice(0,49)+'…':m.specialty)+'</text><text x="860" y="414" text-anchor="start" direction="rtl" fill="#fff" font-size="20">'+esc(m.tier)+'</text><text x="1015" y="479" text-anchor="start" direction="rtl" fill="#deeeff" font-size="20">'+esc(m.numberLabel)+'</text><text x="1015" y="523" text-anchor="end" direction="ltr" fill="white" font-size="32">'+esc(m.id)+'</text><text x="1015" y="562" text-anchor="start" direction="rtl" fill="#deeeff" font-size="18">التميز الابتكاري للتعليم والتدريب</text><rect x="61" y="398" width="160" height="160" rx="12" fill="white"/>'+qr+'<rect y="604" width="1080" height="76" fill="#eaf4ff"/><text x="1015" y="650" text-anchor="start" direction="rtl" fill="#175a9d" font-size="22">'+esc(m.status)+'</text><text x="60" y="650" fill="#175a9d" font-size="17">INEXC · LEARNING CONTINUES</text></g></svg>';
  }
+ async function pngFile(data,options={}){
+  const svg=await svgFile(data,options),source=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+  try{
+   const image=new Image();image.src=source;await image.decode();
+   const canvas=document.createElement('canvas');canvas.width=2160;canvas.height=1360;
+   const context=canvas.getContext('2d');if(!context)throw Error('تعذر تجهيز الصورة على هذا الجهاز.');
+   context.drawImage(image,0,0,canvas.width,canvas.height);
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+   if(!blob)throw Error('تعذر إنشاء صورة البطاقة. أعد المحاولة.');
+   return blob;
+  }finally{URL.revokeObjectURL(source)}
+ }
+ function downloadPNG(blob,number,demo=false){
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='INEXC-card-'+String(number).replace(/[^A-Za-z0-9_-]/g,'')+(demo?'-PREVIEW':'')+'.png';
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }
  function bind(target,data,options={}){
   const root=target.matches?.('.tc-root')?target:target.querySelector('.tc-root');if(!root)return;
   const m=model(data,options),feedback=root.querySelector('.tc-feedback');
@@ -42,10 +59,10 @@
    }
    button.disabled=true;
    try{if(button.dataset.tcAction==='copy'){await navigator.clipboard.writeText(m.url);feedback.textContent='تم نسخ رابط البطاقة.';}
-    if(button.dataset.tcAction==='download'){const svg=await svgFile(data,options),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='INEXC-'+String(m.id).replace(/[^A-Za-z0-9_-]/g,'')+(m.demo?'-PREVIEW':'')+'.svg';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);feedback.textContent='تم تجهيز البطاقة للتحميل.';}
+    if(button.dataset.tcAction==='download'){downloadPNG(await pngFile(data,options),m.id,m.demo);feedback.textContent='تم تجهيز البطاقة كصورة PNG.';}
    }catch(error){feedback.classList.add('is-error');feedback.textContent=button.dataset.tcAction==='copy'?'انسخ الرابط: '+m.url:error.message||'تعذّر إتمام العملية. أعد المحاولة.';}
    finally{button.disabled=false;}
   }));
  }
- global.TraineeCard={render,renderCard:(data,options={})=>visual(model(data,options)),bind,model,qrMarkup,svgFile,mount(target,data,options={}){target.innerHTML=render(data,options);bind(target,data,options)}};
+ global.TraineeCard={render,renderCard:(data,options={})=>visual(model(data,options)),bind,model,qrMarkup,svgFile,pngFile,downloadPNG,mount(target,data,options={}){target.innerHTML=render(data,options);bind(target,data,options)}};
 })(window);
