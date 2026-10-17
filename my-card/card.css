@@ -38,6 +38,8 @@
 .membership-page .share-close{flex:none;width:42px;height:42px;border:1px solid #d7e5f2;border-radius:12px;background:#f4f8fd;color:#173e63;font-size:28px;line-height:1;cursor:pointer}
 .membership-page .share-close:focus-visible,.membership-page .share-dialog .btn:focus-visible,.membership-page .share-link:focus-visible{outline:3px solid #126bc7;outline-offset:2px}
 .membership-page .share-card-frame{padding:12px;border:1px solid #d8e8f5;border-radius:16px;background:#f2f8ff}
+.membership-page .share-preview-image{display:block;width:100%;height:auto;aspect-ratio:40/21;object-fit:contain;border-radius:10px}
+.membership-page .share-image-loading{margin:0;padding:35px 12px;text-align:center;color:#496b8e;font:500 14px INEXCPlex,Arial,sans-serif}
 .membership-page .share-dialog .share-note{margin:16px 0;padding:12px 14px;border-radius:10px;background:#ebf5ff}
 .membership-page .share-link-label{display:block;margin-bottom:7px;font:600 14px/1.5 INEXCPlex,Arial,sans-serif}
 .membership-page .share-link{display:block;width:100%;min-height:45px;margin-bottom:12px;padding:10px 12px;border:1px solid #b8d7f5;border-radius:9px;background:#f8fbff;color:#0866c6;font:600 14px/1.5 Arial,sans-serif;text-align:left}
