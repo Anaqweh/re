@@ -1,0 +1,9 @@
+/* Four comparable package cards across desktop viewports. */
+@media (min-width:1180px){
+  .wrap{width:min(1360px,calc(100% - 48px))}
+  .plans{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+  .plans .plan{min-width:0;padding:22px 20px}
+  .plans .plan h2{font-size:19px}
+  .plans .features li{font-size:12px;line-height:1.8}
+}
+@media (min-width:801px) and (max-width:1179px){.plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
