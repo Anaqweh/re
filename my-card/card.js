@@ -40,6 +40,11 @@
    document.querySelector('.stats').hidden=true;
    document.querySelector('.history').hidden=true;
    document.querySelector('.intro p').textContent='بطاقة تدريبية تمت مشاركتها للعرض.';
+   const offer=snapshot.offer||{},free=offer.free===true&&/^[a-f0-9-]{36}$/i.test(offer.planId||'');
+   $('sharedOffer').hidden=false;
+   $('sharedOfferText').textContent=free?'يمكنك الاطلاع على الباقة المجانية نفسها ومزاياها على الموقع.':'تعرّف إلى الباقات التدريبية المتاحة واختر ما يناسبك.';
+   $('sharedOfferLink').textContent=free?'الانتقال إلى الباقة المجانية ←':'استعرض جميع الباقات ←';
+   $('sharedOfferLink').href=free?'/cards/?plan='+encodeURIComponent(offer.planId):'/cards/';
   }else if(!preview){$('shareTools').hidden=false}
  }
  async function load(){
@@ -70,10 +75,13 @@
   if(!/^[a-f0-9]{64}$/.test(shareToken))throw Error('تعذر تجهيز رابط البطاقة.');
   const publicData={...current.data,digitalId:{...current.data.digitalId,idNumber:'INEXC'}};
   const publicOptions={...current.options,numberLabel:'بطاقة تدريبية',qrUrl:url};
-  const image=await window.TraineeCard.pngFile(publicData,publicOptions);
+  const image=await window.TraineeCard.socialPreviewPNG(publicData,publicOptions);
   const credentials=token?{'X-Card-Token':token}:{'X-Card-Code':$('code').value.trim(),'X-Card-Email':$('email').value.trim()};
   const response=await fetch(window.INEXC_REGISTRATION_ENDPOINT+'/memberships/card/share/image',{method:'POST',headers:{'Content-Type':'image/png','X-Card-Share':shareToken,...credentials},body:image,cache:'no-store'});
   if(!response.ok)throw Error('تعذر حفظ صورة معاينة الرابط. حاول مرة أخرى.');
+  const saved=await response.json();
+  if(!saved.url||new URL(saved.url).pathname!==new URL(url).pathname)throw Error('تعذر تأكيد رابط المشاركة.');
+  return saved.url;
  }
  $('openShare').addEventListener('click',async()=>{
   if(!current)return;
@@ -87,7 +95,8 @@
    const url=await getShareUrl();
    $('shareLink').value=url;renderSharePreview(url);
    status.textContent='جارٍ تجهيز صورة البطاقة لتظهر عند مشاركة الرابط…';
-   await saveSocialPreview(url);
+   shareUrl=await saveSocialPreview(url);
+   $('shareLink').value=shareUrl;
    $('copyShare').disabled=false;$('nativeShare').disabled=false;
    status.textContent='أصبحت صورة البطاقة جاهزة للظهور مع الرابط. انسخه أو شاركه.';
   }catch(error){status.textContent=error.message||'تعذر تجهيز رابط المشاركة.'}
