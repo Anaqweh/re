@@ -57,8 +57,9 @@ test('preview is visibly non-issued and never fetches membership records',()=>{
  const {dom,w,calls}=setup('?preview=1');assert.equal(calls.length,0);assert.equal(w.document.querySelector('#previewNotice').hidden,false);
  assert.match(w.document.querySelector('.tc-card-strip').textContent,/غير صادر/);assert.equal(w.document.querySelector('.tc-card-type strong').textContent,'بطاقة الريادة');dom.window.close();
 });
-test('public sharing shows the same card artwork without the membership number or private details',async()=>{
- const safe={holderName:'اسم حامل البطاقة',cardName:'بطاقة الانطلاقة',status:'active',expiresAt:'2099-01-28T00:00:00Z',plan:{name:'باقة الانطلاقة'}};
+test('public sharing shows the same card artwork and a direct free-plan option without private details',async()=>{
+ const planId='ac7ea3d2-9ee8-4f89-ab23-8b0a8de49911';
+ const safe={holderName:'اسم حامل البطاقة',cardName:'بطاقة الانطلاقة',status:'active',expiresAt:'2099-01-28T00:00:00Z',plan:{name:'باقة الانطلاقة'},offer:{free:true,planId}};
  const {dom,w,calls}=setup('?share=public-share',safe);await tick();const d=w.document;
  assert.match(calls[0],/memberships\/card\/shared\?share=public-share$/);
  assert.equal(d.querySelector('.tc-card-type strong').textContent,'بطاقة الانطلاقة');
@@ -68,7 +69,14 @@ test('public sharing shows the same card artwork without the membership number o
  assert.equal(d.querySelector('.stats').hidden,true);
  assert.equal(d.querySelector('.history').hidden,true);
  assert.equal(d.querySelector('#learnerWorkspaceLink').parentElement.hidden,true);
+ assert.equal(d.querySelector('#sharedOfferLink').getAttribute('href'),'/cards/?plan='+planId);
  assert.doesNotMatch(d.querySelector('#result').textContent,/INX-EXAMPLE-001|private@example.com/);
+ dom.window.close();
+});
+test('paid shared cards link to all packages',async()=>{
+ const safe={holderName:'اسم حامل البطاقة',cardName:'بطاقة الريادة',status:'active',expiresAt:'2099-01-28T00:00:00Z',plan:{name:'باقة الريادة'},offer:{free:false,planId:null}};
+ const {dom,w}=setup('?share=public-share',safe);await tick();
+ assert.equal(w.document.querySelector('#sharedOfferLink').getAttribute('href'),'/cards/');
  dom.window.close();
 });
 test('sharing saves a safe PNG before the public link can be copied',async()=>{
@@ -78,12 +86,12 @@ test('sharing saves a safe PNG before the public link can be copied',async()=>{
  const id='a'.repeat(64),url='https://api.inexctraining.com/api/memberships/card/public/'+id;
  const dialog=d.querySelector('#shareDialog');dialog.showModal=()=>{dialog.open=true};
  let create,upload,rendered;
- w.TraineeCard.pngFile=async(data,options)=>{rendered={data,options};return new w.Blob(['png'],{type:'image/png'})};
+ w.TraineeCard.socialPreviewPNG=async(data,options)=>{rendered={data,options};return new w.Blob(['png'],{type:'image/png'})};
  w.fetch=async(path,options)=>{
   if(path.endsWith('/memberships/card/share')){create={path,options};return {ok:true,json:async()=>({url})}}
-  upload={path,options};return {ok:true,json:async()=>({ok:true})};
+  upload={path,options};return {ok:true,json:async()=>({ok:true,url:url+'?v=1'})};
  };
- w.navigator.clipboard={writeText:async value=>{assert.equal(value,url);assert.doesNotMatch(value,/private-bearer|INX-EXAMPLE-001/)}};
+ w.navigator.clipboard={writeText:async value=>{assert.equal(value,url+'?v=1');assert.doesNotMatch(value,/private-bearer|INX-EXAMPLE-001/)}};
  d.querySelector('#openShare').click();for(let i=0;i<20&&!upload;i++)await tick();
  assert.equal(dialog.open,true);
  assert.equal(d.querySelector('#shareCardPreview .tc-name').textContent,'اسم حامل البطاقة');
@@ -95,7 +103,7 @@ test('sharing saves a safe PNG before the public link can be copied',async()=>{
  assert.match(upload.path,/memberships\/card\/share\/image$/);
  assert.equal(upload.options.headers['X-Card-Share'],id);
  assert.equal(upload.options.headers['X-Card-Token'],'private-bearer');
- assert.equal(d.querySelector('#shareLink').value,url);
+ assert.equal(d.querySelector('#shareLink').value,url+'?v=1');
  assert.doesNotMatch(d.querySelector('#shareDialog').textContent,/INX-EXAMPLE-001|private-bearer|private@example.com/);
  d.querySelector('#copyShare').click();await tick();
  assert.match(d.querySelector('#shareStatus').textContent,/نُسخ/);
