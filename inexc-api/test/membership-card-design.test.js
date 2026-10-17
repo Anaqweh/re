@@ -71,29 +71,34 @@ test('public sharing shows the same card artwork without the membership number o
  assert.doesNotMatch(d.querySelector('#result').textContent,/INX-EXAMPLE-001|private@example.com/);
  dom.window.close();
 });
-test('private card offers share notice before creating a distinct public URL',async()=>{
+test('sharing saves a safe PNG before the public link can be copied',async()=>{
  const {dom,w}=setup('?token=private-bearer');await tick();const d=w.document;
  assert.equal(d.querySelector('#shareTools').hidden,false);
  assert.match(d.querySelector('.share-note').textContent,/أي شخص لديه الرابط/);
- let request;w.fetch=async(url,options)=>{request={url,options};return {ok:true,json:async()=>({url:'https://www.inexctraining.com/my-card/?share=public-token'})}};
- w.navigator.clipboard={writeText:async value=>{assert.match(value,/\?share=public-token$/);assert.doesNotMatch(value,/private-bearer/)}};
- d.querySelector('#copyShare').click();await tick();
- assert.match(request.url,/memberships\/card\/share$/);
- assert.equal(JSON.parse(request.options.body).token,'private-bearer');
- assert.match(d.querySelector('#shareStatus').textContent,/نُسخ/);
- dom.window.close();
-});
-test('share preview uses the approved card without the private number before copying',async()=>{
- const {dom,w}=setup('?token=private-bearer');await tick();const d=w.document;
+ const id='a'.repeat(64),url='https://api.inexctraining.com/api/memberships/card/public/'+id;
  const dialog=d.querySelector('#shareDialog');dialog.showModal=()=>{dialog.open=true};
- w.fetch=async()=>({ok:true,json:async()=>({url:'https://www.inexctraining.com/my-card/?share=public-token'})});
- d.querySelector('#openShare').click();await tick();
+ let create,upload,rendered;
+ w.TraineeCard.pngFile=async(data,options)=>{rendered={data,options};return new w.Blob(['png'],{type:'image/png'})};
+ w.fetch=async(path,options)=>{
+  if(path.endsWith('/memberships/card/share')){create={path,options};return {ok:true,json:async()=>({url})}}
+  upload={path,options};return {ok:true,json:async()=>({ok:true})};
+ };
+ w.navigator.clipboard={writeText:async value=>{assert.equal(value,url);assert.doesNotMatch(value,/private-bearer|INX-EXAMPLE-001/)}};
+ d.querySelector('#openShare').click();for(let i=0;i<20&&!upload;i++)await tick();
  assert.equal(dialog.open,true);
  assert.equal(d.querySelector('#shareCardPreview .tc-name').textContent,'اسم حامل البطاقة');
  assert.equal(d.querySelector('#shareCardPreview .tc-number').textContent,'INEXC');
  assert.equal(d.querySelector('#shareCardPreview .tc-card-type strong').textContent,'بطاقة الانطلاقة');
- assert.equal(d.querySelector('#shareLink').value,'https://www.inexctraining.com/my-card/?share=public-token');
+ assert.equal(rendered.data.digitalId.idNumber,'INEXC');
+ assert.equal(rendered.options.qrUrl,url);
+ assert.equal(JSON.parse(create.options.body).token,'private-bearer');
+ assert.match(upload.path,/memberships\/card\/share\/image$/);
+ assert.equal(upload.options.headers['X-Card-Share'],id);
+ assert.equal(upload.options.headers['X-Card-Token'],'private-bearer');
+ assert.equal(d.querySelector('#shareLink').value,url);
  assert.doesNotMatch(d.querySelector('#shareDialog').textContent,/INX-EXAMPLE-001|private-bearer|private@example.com/);
+ d.querySelector('#copyShare').click();await tick();
+ assert.match(d.querySelector('#shareStatus').textContent,/نُسخ/);
  dom.window.close();
 });
 test('failed lookup keeps recovery controls available and restores the lookup button',async()=>{
