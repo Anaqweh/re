@@ -52,3 +52,24 @@
 #memberships #membershipCourses :is(input,select){min-width:150px;font-size:14px}
 #memberships #membershipMessage{font-size:14px}
 @media(max-width:760px){#memberships>.membership-dashboard{padding:16px!important;border-radius:16px}#memberships .membership-dashboard>.tools{align-items:stretch;flex-direction:column}#memberships .membership-dashboard>.tools>div{width:100%}#memberships .membership-dashboard>.tools button{width:100%}#memberships .membership-section-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#memberships .membership-section-nav a{padding:9px;font-size:12px}#memberships .membership-section{padding:16px;margin:14px 0}#memberships .membership-table td{padding:5px 0}#memberships .membership-table tr:not(.membership-detail-row){padding:14px 16px}#memberships .membership-overview{padding:16px}#memberships .membership-overview-stats{width:100%}#memberships .membership-overview-stats span{flex:1;text-align:center}#memberships .plan-grid{grid-template-columns:minmax(0,1fr)}#memberships .plan-editor-body{padding:14px}}
+
+/* Show the package choices together; an editor takes the full row while open. */
+#memberships #membershipPlans{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
+#memberships #membershipPlans>.note{grid-column:1/-1;margin:0}
+#memberships #membershipPlans .plan-editor{min-width:0;margin:0;height:100%;align-self:stretch}
+#memberships #membershipPlans .plan-editor>summary{min-height:116px;align-items:flex-start;flex-direction:column;justify-content:space-between;gap:10px}
+#memberships #membershipPlans .plan-editor>summary:after{align-self:flex-end}
+#memberships #membershipPlans .plan-editor-stats{gap:6px}
+#memberships #membershipPlans .plan-editor[open]{grid-column:1/-1;height:auto}
+#memberships #membershipPlans .plan-editor[open]>summary{min-height:0;flex-direction:row;align-items:center}
+/* The same four-column view makes availability and order counts comparable. */
+#memberships #membershipSummary .membership-table{display:block;padding:16px}
+#memberships #membershipSummary .membership-table colgroup,#memberships #membershipSummary .membership-table thead{display:none}
+#memberships #membershipSummary .membership-table tbody{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#memberships #membershipSummary .membership-table tr:not(.membership-detail-row){display:flex;flex-direction:column;gap:8px;min-width:0;border:1px solid #dce8f3;border-radius:14px;padding:15px;background:#fff}
+#memberships #membershipSummary .membership-table tr:not(.membership-detail-row) td{display:block;width:100%;border:0;padding:0;white-space:normal}
+#memberships #membershipSummary .membership-table tr:not(.membership-detail-row) td:last-child{margin-top:auto;padding-top:7px}
+#memberships #membershipSummary .membership-table .membership-detail-row{grid-column:1/-1}
+#memberships #membershipSummary .membership-table .membership-progress{max-width:none}
+@media(max-width:1100px){#memberships #membershipPlans,#memberships #membershipSummary .membership-table tbody{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){#memberships #membershipPlans,#memberships #membershipSummary .membership-table tbody{grid-template-columns:minmax(0,1fr)}#memberships #membershipPlans .plan-editor>summary{min-height:0}#memberships #membershipSummary .membership-table tr:not(.membership-detail-row){display:flex;padding:15px}#memberships #membershipSummary .membership-table tr:not(.membership-detail-row) td{padding:0}}
