@@ -1,0 +1,19 @@
+{
+  "certificate-requests.js": [
+    {
+      "label": "registration contact query",
+      "old": " const rowSQL=`SELECT q.*,r.reference,r.name,r.email,r.course_name,r.certificate,r.course_id,r.status AS registration_status,c.payment_methods",
+      "new": " const rowSQL=`SELECT q.*,r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.course_id,r.status AS registration_status,c.payment_methods"
+    },
+    {
+      "label": "private contact view",
+      "old": "  return {id:row.id,reference:row.reference,courseName:row.course_name,certificateName:row.certificate,amount:row.amount/100,currency:'AED',arabicName:row.arabic_name,englishName:row.english_name,namesConfirmed:!!row.names_confirmed_at,",
+      "new": "  return {id:row.id,reference:row.reference,email:row.email||'',phone:row.phone||'',courseName:row.course_name,certificateName:row.certificate,amount:row.amount/100,currency:'AED',arabicName:row.arabic_name,englishName:row.english_name,namesConfirmed:!!row.names_confirmed_at,"
+    },
+    {
+      "label": "contact capability",
+      "old": "  app.get('/api/certificate-requests/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:1,deferredFreeCourse:true,emailDelayMinutes:3,electronicEnabled:enabled(),emailEnabled:mailEnabled}));",
+      "new": "  app.get('/api/certificate-requests/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:1,contactDetails:true,deferredFreeCourse:true,emailDelayMinutes:3,electronicEnabled:enabled(),emailEnabled:mailEnabled}));"
+    }
+  ]
+}

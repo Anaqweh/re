@@ -54,7 +54,9 @@ test('no certificate creates no request; failing debit rolls back request and re
 test('private checkout requires both names and server price; lost responses reuse one session and secure webhooks settle once',async t=>{
  const h=await harness();t.after(()=>h.close());const {q,credentials,names}=await h.request();
  assert.equal((await h.call('/api/admin/certificate-requests')).status,401);
- assert.equal((await h.call('/api/certificate-requests/status',{body:{...credentials,token:'b'.repeat(64)}})).status,404);
+ const denied=await h.call('/api/certificate-requests/status',{body:{...credentials,token:'b'.repeat(64)}});assert.equal(denied.status,404);assert.equal(denied.data.email,undefined);assert.equal(denied.data.phone,undefined);
+ const contact=await h.call('/api/certificate-requests/status',{body:credentials});assert.equal(contact.data.email,h.input.email);assert.equal(contact.data.phone,h.input.phone);assert.equal(contact.headers.get('cache-control'),'no-store');
+ assert.equal((await h.call('/api/certificate-requests/capabilities')).data.contactDetails,true);
  for(const invalid of [{arabicName:'أحمد',englishName:'Ahmad Anakwa'},{arabicName:'Ahmad Mohammad Anakwa',englishName:'Ahmad Anakwa'},{arabicName:'أحمد محمد عناقوة',englishName:'أحمد محمد'}])await assert.rejects(h.service.checkout({...credentials,...invalid}));
  assert.equal(h.requests.length,0);h.loseNext();await assert.rejects(h.service.checkout({...credentials,...names,amount:1}),/LOST/);
  const result=await h.service.checkout({...credentials,...names,amount:1});assert.match(result.paymentLink,/checkout.stripe.com/);assert.equal(h.sessions.size,1);assert.deepEqual(h.requests[0],h.requests[1]);assert.equal(h.requests[0].params['line_items[0][price_data][unit_amount]'],'9000');assert.equal(h.requests[0].params['custom_text[submit][message]'],'أحمد محمد عناقوة — Ahmad Mohammad Anakwa');

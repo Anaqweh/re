@@ -84,14 +84,14 @@ export function certificateEmail(row,emailShell){
 export function createCertificateRequests({pool,env=process.env,client,sendEmail,emailShell,mailEnabled=false,mailAllowed=async()=>true,now=()=>Date.now(),logger=console}){
  const secret=clean(env.STRIPE_SECRET_KEY,300),live=/^(sk|rk)_live_/.test(secret),stripe=client||stripeClient(secret);
  const enabled=()=>env.STRIPE_CHECKOUT_ENABLED==='1'&&live&&String(env.STRIPE_WEBHOOK_SECRET||'').startsWith('whsec_');
- const rowSQL=`SELECT q.*,r.reference,r.name,r.email,r.course_name,r.certificate,r.course_id,r.status AS registration_status,c.payment_methods
+ const rowSQL=`SELECT q.*,r.reference,r.name,r.email,r.phone,r.course_name,r.certificate,r.course_id,r.status AS registration_status,c.payment_methods
   FROM certificate_requests q JOIN registrations r ON r.id=q.registration_id LEFT JOIN courses c ON c.id=r.course_id`;
  function credentials(input){if(!uuid(input.request)||!/^[a-f\d]{64}$/.test(String(input.token||'')))throw fail('رابط طلب الشهادة غير صالح.',404);return [input.request,input.token]}
  async function find(input,db=pool,lock=false){const row=(await db.query(rowSQL+' WHERE q.id=$1 AND q.access_token=$2'+(lock?' FOR UPDATE OF q,r':''),credentials(input))).rows[0];if(!row)throw fail('رابط طلب الشهادة غير صالح.',404);return row}
  const latest=(db,id)=>db.query('SELECT * FROM certificate_payment_attempts WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[id]).then(r=>r.rows[0]);
  function view(row,attempt){
   const cancelled=row.registration_status==='ملغى',paid=row.state==='paid',noFee=row.amount===0;
-  return {id:row.id,reference:row.reference,courseName:row.course_name,certificateName:row.certificate,amount:row.amount/100,currency:'AED',arabicName:row.arabic_name,englishName:row.english_name,namesConfirmed:!!row.names_confirmed_at,
+  return {id:row.id,reference:row.reference,email:row.email||'',phone:row.phone||'',courseName:row.course_name,certificateName:row.certificate,amount:row.amount/100,currency:'AED',arabicName:row.arabic_name,englishName:row.english_name,namesConfirmed:!!row.names_confirmed_at,
    state:cancelled?'cancelled':row.state,paidAt:row.paid_at,canPay:!cancelled&&!paid&&!noFee&&enabled()&&row.payment_methods?.includes('stripe')===true,
    namesLocked:!!attempt&&!['expired','failed'].includes(attempt.state)&&(!!attempt.stripe_session_id||new Date(attempt.expires_at).getTime()>now())||paid,processing:attempt?.state==='processing',paymentLink:!cancelled&&!paid&&enabled()&&row.payment_methods?.includes('stripe')&&attempt?.state==='open'?attempt.checkout_url:''};
  }
@@ -201,7 +201,7 @@ export function createCertificateRequests({pool,env=process.env,client,sendEmail
  function limit(req){const key=String(req.ip||req.socket?.remoteAddress),at=now();for(const [k,v]of limits)if(v.until<at)limits.delete(k);const current=limits.get(key)||{count:0,until:at+300000};current.count++;limits.set(key,current);if(current.count>180)throw fail('محاولات كثيرة. انتظر دقائق ثم أعد المحاولة.',429)}
  const route=fn=>async(req,res,next)=>{try{res.set('Cache-Control','no-store');await fn(req,res)}catch(e){if(e.status)return res.status(e.status).json({error:e.message});logger.error('Certificate request operation failed',{status:500});res.status(500).json({error:'تعذّر إكمال طلب الشهادة. حاول لاحقًا.'})}};
  function install(app,auth){
-  app.get('/api/certificate-requests/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:1,deferredFreeCourse:true,emailDelayMinutes:3,electronicEnabled:enabled(),emailEnabled:mailEnabled}));
+  app.get('/api/certificate-requests/capabilities',(_req,res)=>res.set('Cache-Control','no-store').json({version:1,contactDetails:true,deferredFreeCourse:true,emailDelayMinutes:3,electronicEnabled:enabled(),emailEnabled:mailEnabled}));
   app.post('/api/certificate-requests/status',route(async(req,res)=>{limit(req);res.json(await status(req.body||{}))}));
   app.post('/api/certificate-requests/checkout',route(async(req,res)=>{limit(req);res.json(await checkout(req.body||{}))}));
   app.get('/api/admin/certificate-requests',auth,route(async(req,res)=>res.json(await list(req.query))));

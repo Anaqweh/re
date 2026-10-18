@@ -8,6 +8,8 @@
  function done(paid){el('certForm').hidden=true;el('certDone').hidden=false;el('certDoneTitle').textContent=paid?'تم سداد رسوم الشهادة بنجاح':'تم تأكيد بيانات الشهادة';el('certDoneText').textContent=paid?'سُجلت عملية الدفع على طلبك، ويمكن لفريق التدريب متابعة بيانات شهادتك.':'حُفظ الاسم بالعربية والإنجليزية على طلبك. لا توجد رسوم مستحقة لهذا الطلب.';message('')}
  function render(d){
   record=d;el('certContent').hidden=false;el('certCourse').textContent=d.courseName;el('certTitle').textContent=d.certificateName;el('certReference').textContent=d.reference;el('certState').textContent=labels[d.state]||'قيد المتابعة';el('certAmount').textContent=d.amount>0?new Intl.NumberFormat('ar-AE',{style:'currency',currency:'AED'}).format(d.amount):'دون رسوم';
+  el('certEmailRow').hidden=typeof d.email!=='string';el('certPhoneRow').hidden=typeof d.phone!=='string';
+  el('certEmail').textContent=d.email||'غير مسجل';el('certPhone').textContent=d.phone||'غير مسجل';
   el('certArabic').value=d.arabicName||'';el('certEnglish').value=d.englishName||'';el('certArabic').readOnly=el('certEnglish').readOnly=d.namesLocked;el('certNamesConsent').checked=!!d.namesConfirmed;
   el('certContinue').textContent=d.amount===0?'تأكيد بيانات الشهادة':d.paymentLink?'استكمال الدفع الآمن':'المتابعة إلى الدفع الآمن';
   el('certPaymentNote').textContent=d.amount===0?'لا يلزم دفع أي مبلغ لهذا الطلب.':'سيظهر مبلغ الشهادة قبل تأكيد الدفع.';
