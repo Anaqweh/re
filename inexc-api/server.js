@@ -901,8 +901,8 @@ app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.qu
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.put('/api/admin/site-sections',auth,async(req,res,next)=>{try{
  const data=req.body||{};if(['courses','packages','services'].some(key=>typeof data[key]!=='boolean')||!Array.isArray(data.links)||data.links.length>6)return res.status(400).json({error:'راجع الأقسام والروابط الإضافية.'});
- const links=data.links.map(item=>({label:clean(item.label,45),href:clean(item.href,220),visible:item.visible===true}));
- if(links.some(link=>!link.label||!/^\/(?!\/)[a-zA-Z0-9/_?=&%#.-]+$/.test(link.href)||/\/(?:admin-portal|api|scripts?)(?:\/|\.|$)/i.test(link.href)))return res.status(400).json({error:'استخدم اسمًا ورابطًا داخليًا صالحًا لكل قسم إضافي.'});
+ const links=data.links.map(item=>{const label=clean(item.label,45),raw=clean(item.href,220);try{const url=new URL(raw,'https://www.inexctraining.com');if(!raw||url.origin!=='https://www.inexctraining.com'||!/^\/(?!\/)/.test(url.pathname)||/\/(?:admin-portal|api|scripts?)(?:\/|\.|$)/i.test(url.pathname))return null;return {label,href:url.pathname+url.search+url.hash,visible:item.visible===true}}catch{return null}});
+ if(links.some(link=>!link?.label))return res.status(400).json({error:'اكتب اسم القسم ورابط صفحة داخل الموقع لكل رابط إضافي.'});
  const value={courses:data.courses,packages:data.packages,services:data.services,links};
  await pool.query('UPDATE site_section_settings SET value=$1,updated_at=now() WHERE id=1',[value]);res.set('Cache-Control','no-store').json(value);
 }catch(error){next(error)}});
