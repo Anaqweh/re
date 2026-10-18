@@ -3,7 +3,7 @@ import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberN
 import {emailFonts,fontStack,fontCSS} from './inexc-api/message-design.js?v=20261015-studio5';
 import {createButtonDesigner} from './message-button-editor.js?v=20261015-studio5';
 import { messagePresets as presets } from './message-presets.js?v=20261015-studio5';
-import { renderMail, mailIdentityDefaults } from './inexc-api/message-mail.js?v=20261015-sub1';
+import { renderMail, mailIdentityDefaults } from './inexc-api/message-mail.js?v=20261018-sections2';
 import { createMessageEditor } from './message-editor.js?v=20261015-studio5';
 import { messageText, messageDirection, richTextPrefix } from './inexc-api/message-format.js?v=20261015-studio5';
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
