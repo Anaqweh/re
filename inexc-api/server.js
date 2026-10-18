@@ -921,22 +921,25 @@ function cardSnapshot(row, redemptions = []) {
     cardName:membershipCardName(row.name), plan, redemptions };
 }
 async function sendMembershipActivationEmail(card){
- const plan=(await pool.query('SELECT name FROM membership_plans WHERE id=$1',[card.plan_id])).rows[0];
+ const plan=(await pool.query('SELECT name,price_usd FROM membership_plans WHERE id=$1',[card.plan_id])).rows[0];
  const name=membershipCardName(plan?.name);
+ const free=Number(plan?.price_usd)===0;
  const cardUrl='https://www.inexctraining.com/my-card/?token='+encodeURIComponent(card.access_token);
  const accountUrl='https://www.inexctraining.com/account.html';
+ const courseUrl='https://www.inexctraining.com/cards/free-course/?plan='+encodeURIComponent(card.plan_id);
  const content=`<p>مرحبًا ${escapeHtml(card.holder_name)}،</p>
- <p>تم تأكيد الدفع وإصدار <strong>${escapeHtml(name)}</strong>. يمكنك استخدامها لحجز الدورات المتاحة لها.</p>
+ <p>${free?'تم تسجيلك في الباقة المجانية وإصدار':'تم تأكيد الدفع وإصدار'} <strong>${escapeHtml(name)}</strong>. ${free?'لا يُطلب منك دفع أي مبلغ. استخدم رقم البطاقة وبريدك لحجز دورة مجانية متاحة.':'يمكنك استخدامها لحجز الدورات المتاحة لها.'}</p>
  <div style="background:#f1f7ff;border:1px solid #d4e6f8;border-radius:12px;padding:16px;margin:18px 0">
  <span style="display:block;color:#526d88;font-size:13px;margin-bottom:7px">رقم بطاقتك</span>
  <strong dir="ltr" style="display:block;direction:ltr;text-align:center;color:#103b70;font-size:19px">${escapeHtml(card.card_number)}</strong></div>
  <p style="text-align:center;margin:22px 0"><a href="${cardUrl}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:10px;padding:12px 22px;font-weight:bold">عرض ${escapeHtml(name)}</a></p>
+ ${free?`<div style="background:#f1f8ff;border:1px solid #d4e6f8;border-radius:12px;padding:18px;margin:18px 0"><h2 style="color:#103b70;font-size:18px;margin:0 0 8px">الدورات المجانية المتاحة</h2><p>افتح الرابط التالي، واختر دورتك، ثم أدخل رقم البطاقة أعلاه والبريد الإلكتروني الذي وصلتك عليه هذه الرسالة. بعد التحقق ستظهر لك شروط مشاركة رابط البطاقة، ثم يمكنك تأكيد حجز الدورة. تظهر الدورات الجديدة هنا عند إضافتها ونشرها.</p><p style="text-align:center"><a href="${courseUrl}" style="display:inline-block;background:#0866c6;color:#fff;text-decoration:none;border-radius:10px;padding:12px 22px;font-weight:bold">استعراض الدورات المجانية</a></p><p style="font-size:12px"><a href="${courseUrl}">${courseUrl}</a></p></div>`:''}
  <div style="border-top:1px solid #e2edf8;margin-top:22px;padding-top:18px"><h2 style="color:#103b70;font-size:18px;margin:0 0 8px">صفحتك التدريبية الخاصة</h2>
  <p>يمكنك الدخول إليها في أي وقت للاطلاع على دوراتك وشهاداتك ورصيد بطاقتك وحجوزاتك. استخدم <strong>البريد الإلكتروني الذي وصلتك عليه هذه الرسالة</strong> و<strong>رقم البطاقة المذكور أعلاه</strong> عند الدخول.</p>
  <p style="text-align:center;margin:18px 0"><a href="${accountUrl}" style="display:inline-block;background:#eaf4ff;color:#075aaf;text-decoration:none;border:1px solid #cce2f8;border-radius:10px;padding:12px 22px;font-weight:bold">الدخول إلى صفحتي التدريبية</a></p>
  <p style="color:#58728a;font-size:12px">رابط الصفحة المباشر: <a href="${accountUrl}" style="color:#075aaf">${accountUrl}</a></p></div>
  <p style="color:#657b90;font-size:12px">احتفظ برقم بطاقتك ورابط عرضها لنفسك.</p>`;
- const plain=`مرحبًا ${card.holder_name}،\nتم تأكيد الدفع وإصدار ${name}.\nرقم البطاقة: ${card.card_number}\nعرض البطاقة: ${cardUrl}\n\nصفحتك التدريبية الخاصة: ${accountUrl}\nللدخول، استخدم البريد الإلكتروني الذي وصلتك عليه هذه الرسالة ورقم البطاقة أعلاه. يمكنك متابعة دوراتك وشهاداتك ورصيدك وحجوزاتك من صفحتك.\n\nاحتفظ برقم بطاقتك ورابط عرضها لنفسك.`;
+ const plain=`مرحبًا ${card.holder_name}،\n${free?'تم تسجيلك مجانًا وإصدار':'تم تأكيد الدفع وإصدار'} ${name}.\nرقم البطاقة: ${card.card_number}\nعرض البطاقة: ${cardUrl}\n${free?'\nالدورات المجانية المتاحة: '+courseUrl+'\nاختر الدورة وأدخل رقم البطاقة والبريد نفسه، ثم وافق على شرط مشاركة رابط البطاقة لتأكيد الحجز. تظهر الدورات الجديدة عند إضافتها.\n':''}\nصفحتك التدريبية الخاصة: ${accountUrl}\nللدخول، استخدم البريد الإلكتروني الذي وصلتك عليه هذه الرسالة ورقم البطاقة أعلاه. يمكنك متابعة دوراتك وشهاداتك ورصيدك وحجوزاتك من صفحتك.\n\nاحتفظ برقم بطاقتك ورابط عرضها لنفسك.`;
  await sendEmail({to:card.holder_email,subject:'تم تفعيل '+name+' | INEXC',html:emailShell({title:name+' جاهزة',preview:'بطاقتك جاهزة وصفحتك التدريبية متاحة للدخول.',content}),text:plain});
 }
 async function getMembershipCard(code,email,accessToken='') {
@@ -1015,6 +1018,30 @@ app.post('/api/memberships/verify',async(req,res,next)=>{try{
   const course=await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true',[courseId]);if(!course.rowCount)return res.status(400).json({error:'الدورة غير متاحة.'});
   const quote=cardQuote(found.row,course.rows[0],req.body?.certificate===true||req.body?.certificate==='yes');
   res.json({ok:true,card:found.snapshot,...quote});
+}catch(error){next(error);}});
+async function freeMembershipCourse(planId){
+ if(!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(String(planId||'')))return null;
+ const plan=(await pool.query('SELECT id,name,price_usd,active FROM membership_plans WHERE id=$1',[planId])).rows[0];
+ if(!plan||Number(plan.price_usd)!==0||plan.active!==true)return null;
+ const courses=(await pool.query("SELECT id,name FROM courses WHERE active=true AND price=0 AND membership_enabled=true AND (membership_plan_ids IS NULL OR $1::uuid=ANY(membership_plan_ids)) ORDER BY CASE WHEN name ILIKE '%الرخصة الدولية%الذكاء الاصطناعي%' THEN 0 ELSE 1 END,updated_at DESC",[plan.id])).rows;
+ return {plan,courses};
+}
+app.get('/api/memberships/free-course',async(req,res,next)=>{try{
+ const result=await freeMembershipCourse(req.query.plan);
+ if(!result)return res.status(404).json({error:'الباقة المجانية غير متاحة.'});
+ res.set('Cache-Control','no-store').json({planName:trainingPackageText(result.plan.name),courses:result.courses});
+}catch(error){next(error);}});
+app.post('/api/memberships/free-course/register',async(req,res,next)=>{try{
+ if(req.body?.shareConsent!==true)return res.status(400).json({error:'لا يمكن تأكيد الحجز دون الموافقة على شرط مشاركة رابط البطاقة.'});
+ const target=await freeMembershipCourse(req.body?.planId);
+ const course=target?.courses.find(c=>c.id===req.body?.courseId);
+ if(!course)return res.status(409).json({error:'هذه الدورة المجانية غير متاحة للحجز بالباقة حاليًا.'});
+ const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190);
+ const found=await getMembershipCard(code,email);
+ if(!found||found.row.plan_id!==target.plan.id)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح لهذه الباقة.'});
+ const result=await createCardRegistration(pool,{courseId:course.id,code,email,name:found.row.holder_name,phone:found.row.holder_phone,certificateRequested:false,shareConsent:true});
+ if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:found.row.holder_name,email,phone:found.row.holder_phone,courseName:result.courseName,total:0,status:result.status});
+ res.set('Cache-Control','no-store').status(result.alreadyRegistered?200:201).json(result);
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/plans',auth,async(_req,res,next)=>{try{res.json(await membershipPlans(true));}catch(error){next(error);}});
 function membershipPlanInput(body) {
@@ -1159,7 +1186,7 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
   try {
     const courseId = clean(req.body.course_id, 80);
     if (clean(req.body.membership_code,80) || req.body.payment_method==='membership') {
-      const result=await createCardRegistration(pool,{courseId,code:req.body.membership_code,email:req.body.email,name:req.body.name,phone:req.body.phone,certificateRequested:req.body.certificate==='yes',expectedUnits:req.body.expected_units,expectedCertificateFee:req.body.expected_certificate_fee,receiptPath:req.file?`/uploads/${req.file.filename}`:''}).catch(error=>{if(req.file?.path)fs.unlink(req.file.path,()=>{});throw error});
+      const result=await createCardRegistration(pool,{courseId,code:req.body.membership_code,email:req.body.email,name:req.body.name,phone:req.body.phone,certificateRequested:req.body.certificate==='yes',shareConsent:req.body.free_share_consent==='yes',expectedUnits:req.body.expected_units,expectedCertificateFee:req.body.expected_certificate_fee,receiptPath:req.file?`/uploads/${req.file.filename}`:''}).catch(error=>{if(req.file?.path)fs.unlink(req.file.path,()=>{});throw error});
       if(result.alreadyRegistered&&req.file?.path)fs.unlink(req.file.path,()=>{});
       if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:clean(req.body.name,150),email:clean(req.body.email,180),phone:clean(req.body.phone,50),courseName:result.courseName,total:result.certificateFee,status:result.status});
       return res.status(result.alreadyRegistered?200:201).json(result);
@@ -1174,6 +1201,7 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     const standardTotal = Number(course.price) + (course.certificate_mode === 'optional' && certificateRequested ? Number(course.certificate_price) : 0);
     const requestedPaymentMethod = clean(req.body.payment_method, 20);
     const paymentMethod = standardTotal === 0 ? 'free' : requestedPaymentMethod;
+    if(paymentMethod==='free'&&req.body.free_share_consent!=='yes')return res.status(400).json({error:'التسجيل المجاني يتطلب الموافقة على شرط مشاركة الرابط قبل التأكيد.'});
     if (paymentMethod !== 'membership' && course.public_booking_opens_at && new Date(course.public_booking_opens_at) > new Date()) return res.status(400).json({ error: 'التسجيل العام لهذه الدورة لم يبدأ بعد.' });
     const checkout = validateCoursePayment(course,{method:paymentMethod,total:standardTotal,hasReceipt:!!req.file});
     const registrationReference = reference();
