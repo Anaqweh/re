@@ -142,3 +142,12 @@ test('registration confirmation removes certificate WhatsApp inquiry and explain
  send(base);await new Promise(r=>setImmediate(r));assert.doesNotMatch(emails[0].html,/الاستفسار|wa.me|واتساب/);
  emails.length=0;send({...base,total:199,certificateRequestId:'LOCAL'});await new Promise(r=>setImmediate(r));assert.match(emails[0].html,/رسوم الشهادة/);assert.match(emails[0].html,/بريد إلكتروني/);assert.ok(emails[0].html.includes((199).toLocaleString('ar-AE')));assert.doesNotMatch(emails[0].html,/واتساب/);
 });
+
+test('certificate email places the saved issuer after the certificate name, escapes it, and omits an empty source',async t=>{
+ const h=await harness();t.after(()=>h.close());await h.query('UPDATE courses SET certificate_issuer=$1',['LOCAL <ACADEMY> & INEXC']);await h.request();
+ await h.query("UPDATE certificate_requests SET email_due_at=now()-interval '1 minute'");await h.service.processEmailQueue();assert.equal(h.emails.length,1);
+ const email=h.emails[0];assert.match(email.html,/مصدر الشهادة/);assert.match(email.html,/LOCAL &lt;ACADEMY&gt; &amp; INEXC/);assert.doesNotMatch(email.html,/<ACADEMY>/);
+ assert.ok(email.html.indexOf('LOCAL CERTIFICATE')<email.html.indexOf('مصدر الشهادة'));assert.ok(email.html.indexOf('مصدر الشهادة')<email.html.indexOf('رقم التسجيل'));assert.match(email.text,/مصدر الشهادة: LOCAL <ACADEMY> & INEXC/);
+ const empty=certificateEmail({id:'LOCAL',amount:0,certificate_issuer:'   '},({content})=>content);assert.doesNotMatch(empty.html,/مصدر الشهادة/);assert.doesNotMatch(empty.text,/مصدر الشهادة/);
+ assert.equal((await h.call('/api/certificate-requests/capabilities')).data.certificateIssuer,true);
+});

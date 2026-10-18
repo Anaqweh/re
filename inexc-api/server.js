@@ -400,7 +400,7 @@ async function setupDatabase() {
     name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', axes TEXT NOT NULL DEFAULT '', outcomes TEXT NOT NULL DEFAULT '', trainer TEXT NOT NULL DEFAULT '',
     course_date TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT 'دورة تدريبية',
     price NUMERIC(10,2) NOT NULL DEFAULT 0, training_hours NUMERIC(8,2) NOT NULL DEFAULT 0, certificate_mode TEXT NOT NULL DEFAULT 'included',
-    certificate_name TEXT NOT NULL DEFAULT 'شهادة إتمام', certificate_price NUMERIC(10,2) NOT NULL DEFAULT 0,
+    certificate_name TEXT NOT NULL DEFAULT 'شهادة إتمام', certificate_price NUMERIC(10,2) NOT NULL DEFAULT 0, certificate_issuer TEXT NOT NULL DEFAULT '',
     payment_methods TEXT[] NOT NULL DEFAULT ARRAY['bank'], payment_link TEXT NOT NULL DEFAULT '',
     bank_name TEXT NOT NULL DEFAULT '', bank_account TEXT NOT NULL DEFAULT '', bank_iban TEXT NOT NULL DEFAULT '',
     active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -510,6 +510,7 @@ async function setupDatabase() {
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS share_slug TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_path TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_sample_path TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate_issuer TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS axes TEXT NOT NULL DEFAULT ''");
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS outcomes TEXT NOT NULL DEFAULT ''");
   await pool.query('ALTER TABLE courses ADD COLUMN IF NOT EXISTS training_hours NUMERIC(8,2) NOT NULL DEFAULT 0');
@@ -580,7 +581,7 @@ function publicCourse(row) {
   return {
     id: row.id, name: row.name, description: row.description, axes: courseAxes(row.axes), outcomes: courseOutcomes(row.outcomes), trainer: row.trainer, date: row.course_date,
     location: row.location, category: row.category, price: Number(row.price), hours: Number(row.training_hours || 0),
-    certificate: { mode: row.certificate_mode, name: row.certificate_name, price: Number(row.certificate_price) },
+    certificate: { mode: row.certificate_mode, name: row.certificate_name, price: Number(row.certificate_price), issuer: row.certificate_issuer || '' },
     payments: row.payment_methods, paymentsManaged:true, paymentLink: row.payment_link,
     bank: { title: bankParts?.[1] || '', name: bankParts?.[2] === '—' ? '' : (bankParts?.[2] || savedBankName), account: row.bank_account, iban: row.bank_iban },
     imageUrl: row.image_path || '', certificateSampleUrl: row.certificate_sample_path || '',
@@ -1622,9 +1623,9 @@ app.post('/api/admin/courses', auth, async (req, res, next) => {
   try {
     const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c); const access=await courseCardInput(pool,c);
     if (!clean(c.name, 180)) return res.status(400).json({ error: 'اسم الدورة مطلوب.' });
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds];
-    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active,membership_enabled,featured,membership_plan_ids)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds,clean(c.certificate?.issuer,240)];
+    const result = await pool.query(`INSERT INTO courses (name,description,axes,outcomes,trainer,course_date,location,category,price,training_hours,certificate_mode,certificate_name,certificate_price,payment_methods,payment_link,bank_name,bank_account,bank_iban,active,membership_enabled,featured,membership_plan_ids,certificate_issuer)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
     const published = publicCourse((await attachCourseCardNames(pool,[saved]))[0]);
@@ -1637,8 +1638,8 @@ app.put('/api/admin/courses/:id', auth, async (req, res, next) => {
     const before = await pool.query('SELECT * FROM courses WHERE id=$1', [req.params.id]);
     if (!before.rowCount) return res.status(404).json({ error: 'الدورة غير موجودة.' });
     const c = req.body || {}; const {methods,membershipEnabled}=await coursePaymentInput(pool,c,before.rows[0]); const access=await courseCardInput(pool,c,before.rows[0]);
-    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds, req.params.id];
-    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,membership_enabled=$20,featured=$21,membership_plan_ids=$22,updated_at=now() WHERE id=$23 RETURNING *`, values);
+    const values = [clean(c.name,180),clean(c.description,1000),courseAxes(c.axes).join('\n'),courseOutcomes(c.outcomes).join('\n'),clean(c.trainer,180),clean(c.date,80),clean(c.location,160),clean(c.category,100),asNumber(c.price),asNumber(c.hours),clean(c.certificate?.mode,20)||'included',clean(c.certificate?.name,180),asNumber(c.certificate?.price),methods,clean(c.paymentLink,500),clean(c.bank?.name,200),clean(c.bank?.account,200),clean(c.bank?.iban,200),c.active !== false,membershipEnabled,access.featured,access.membershipPlanIds,c.certificate&&Object.hasOwn(c.certificate,'issuer')?clean(c.certificate.issuer,240):(before.rows[0].certificate_issuer||''), req.params.id];
+    const result = await pool.query(`UPDATE courses SET name=$1,description=$2,axes=$3,outcomes=$4,trainer=$5,course_date=$6,location=$7,category=$8,price=$9,training_hours=$10,certificate_mode=$11,certificate_name=$12,certificate_price=$13,payment_methods=$14,payment_link=$15,bank_name=$16,bank_account=$17,bank_iban=$18,active=$19,membership_enabled=$20,featured=$21,membership_plan_ids=$22,certificate_issuer=$23,updated_at=now() WHERE id=$24 RETURNING *`, values);
     let saved = result.rows[0];
     if (!saved.share_slug) saved = (await pool.query('UPDATE courses SET share_slug=$1 WHERE id=$2 RETURNING *', [courseSlug(saved.id), saved.id])).rows[0];
     const published = publicCourse((await attachCourseCardNames(pool,[saved]))[0]);

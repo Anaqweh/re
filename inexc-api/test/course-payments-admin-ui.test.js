@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 const read=file=>fs.readFile(new URL('../../'+file,import.meta.url),'utf8'),tick=()=>new Promise(r=>setImmediate(r));
-async function fixture(t,{oldServer=false}={}){
+async function fixture(t,{oldServer=false,issuerSupported=true}={}){
  const dom=new JSDOM(await read('admin-portal.html'),{url:'https://local.invalid/admin-portal.html#payments',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());await tick();
  let valid=true;const requests=[],state={version:2,defaults:{payments:['stripe','bank'],membershipEnabled:true},stripe:{configured:true,ready:null},courses:[{id:'11111111-1111-4111-8111-111111111111',name:'LOCAL A',payments:['stripe','bank'],membershipEnabled:true,price:199,active:true,bank:{},certificate:{}},{id:'22222222-2222-4222-8222-222222222222',name:'LOCAL B <img src=x onerror=alert(1)>',payments:['bank'],membershipEnabled:false,price:299,active:false,bank:{},certificate:{}}]};
  w.INEXC_REGISTRATION_ENDPOINT='https://local.invalid/api';w.sessionStorage.setItem('inexc_do_admin','LOCAL');w.INEXCAdminSession={valid:()=>valid};w.INEXCAdminDrafts={restore(){},captureScope(){},clear(){}};
  w.fetch=async(url,opt={})=>{requests.push({url,opt});let result=[];
-  if(url.endsWith('/stripe-check'))result={ready:true,message:'LOCAL READY'};
+  if(url.endsWith('/certificate-requests/capabilities'))result={certificateIssuer:issuerSupported};
+  else if(url.endsWith('/stripe-check'))result={ready:true,message:'LOCAL READY'};
   else if(url.endsWith('/course-payments')){
    if(oldServer)return {ok:false,status:404,json:async()=>({})};
    if(opt.method==='PUT'){const input=JSON.parse(opt.body),courses=input.scope==='all'?state.courses:state.courses.filter(c=>c.id===input.courseId);for(const c of courses){if(input.action==='enable-stripe')c.payments=[...new Set(['stripe',...c.payments])];else {c.payments=input.payments;c.membershipEnabled=input.membershipEnabled}}state.updated=courses.length;if(input.applyToNew&&input.action!=='enable-stripe')state.defaults={payments:input.payments,membershipEnabled:input.membershipEnabled};}result=state;
@@ -35,4 +36,14 @@ test('actual course editor saves Stripe and disabled membership, while an outdat
  const h=await fixture(t);h.el('courseName').value='LOCAL EDIT';h.el('payBank').checked=false;h.el('payStripe').checked=true;h.el('payMembership').checked=false;
  h.el('courseForm').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await tick();const posted=h.requests.find(r=>r.opt.method==='POST'&&r.url.endsWith('/admin/courses'));assert.ok(posted);assert.deepEqual(JSON.parse(posted.opt.body).payments,['stripe']);assert.equal(JSON.parse(posted.opt.body).membershipEnabled,false);
  const old=await fixture(t,{oldServer:true});old.el('courseForm').dispatchEvent(new old.w.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(old.requests.some(r=>r.opt.method==='POST'),false);assert.match(old.el('courseError').textContent,/حدّث خادم/);
+});
+
+test('course editor restores and saves the issuer, clears it for new courses and prevents an unsupported save',async t=>{
+ const h=await fixture(t);h.state.courses[0].certificate={mode:'optional',name:'LOCAL CERTIFICATE',price:199,issuer:'LOCAL ACADEMY'};
+ await h.w.loadCourses();h.w.edit(h.state.courses[0].id);assert.equal(h.el('certificateIssuer').value,'LOCAL ACADEMY');
+ h.el('certificateIssuer').value='NEW ISSUER';h.el('courseForm').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ const posted=h.requests.find(r=>r.opt.method==='PUT'&&r.url.includes('/admin/courses/'));assert.ok(posted);assert.equal(JSON.parse(posted.opt.body).certificate.issuer,'NEW ISSUER');
+ h.w.fresh();assert.equal(h.el('certificateIssuer').value,'');
+ const old=await fixture(t,{issuerSupported:false});old.el('certificateIssuer').value='LOCAL ISSUER';old.el('courseForm').dispatchEvent(new old.w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ assert.equal(old.requests.some(r=>r.opt.method==='POST'&&r.url.endsWith('/admin/courses')),false);assert.match(old.el('courseError').textContent,/مصدر الشهادة/);assert.equal(old.el('certificateIssuer').value,'LOCAL ISSUER');
 });
