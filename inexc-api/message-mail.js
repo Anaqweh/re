@@ -11,11 +11,13 @@ export function mailIdentityDefaults(english=false) {
   return {brandName:'INEXC Training',brandTagline:english?'Knowledge. Practice. Impact.':'معرفة. تطبيق. أثر.',eyebrow:'',headline:'',intro:'',footerText:english?'INEXC Training · Professional learning':'INEXC Training · للتعلّم والتطوير المهني',footerLinkLabel:'inexctraining.com',footerLinkUrl:'https://www.inexctraining.com/',unsubscribeLabel:english?'Unsubscribe from these emails':'إلغاء الاشتراك في هذه الرسائل',signature:english?'Kind regards,\nThe INEXC Training Team':'مع خالص التحية،\nفريق INEXC Training'};
 }
 export function mailSettings(input={}) {
-  const siteLinks=(Array.isArray(input.siteLinks)?input.siteLinks:[]).slice(0,9).map(item=>{
+  const validLinks=items=>items.map(item=>{
     const label=clean(item?.label,45),href=clean(item?.href,220);
-    try{const url=new URL(href,'https://www.inexctraining.com');return label&&url.origin==='https://www.inexctraining.com'&&!/^\/(?:admin-portal|api)(?:\/|\.|$)/i.test(url.pathname)?{label,href:url.href}:null}catch{return null}
+    try{const url=new URL(href,'https://www.inexctraining.com');return label&&href&&url.protocol==='https:'&&url.username===''&&url.password===''&&!/^\/(?:admin-portal|api)(?:\/|\.|$)/i.test(url.pathname)?{label,href:url.href}:null}catch{return null}
   }).filter(Boolean);
-  const share={shareEnabled:input.shareEnabled===true,shareText:clean(input.shareText,350),shareLabel:clean(input.shareLabel,80),siteLinks};
+  const siteLinks=validLinks((Array.isArray(input.siteLinks)?input.siteLinks:[]).slice(0,9));
+  const customSiteLinks=validLinks((Array.isArray(input.customSiteLinks)?input.customSiteLinks:[]).slice(0,6));
+  const share={shareEnabled:input.shareEnabled===true,shareText:clean(input.shareText,350),shareLabel:clean(input.shareLabel,80),siteLinks,customSiteLinks};
   if(input.designVersion!==3)return {...version4Settings(input),...share};
   const config={...version4Settings({...input,designVersion:2}),designVersion:3,...share};
   config.fontFamily=fontById(input.fontFamily)?input.fontFamily:'tahoma';
@@ -42,6 +44,7 @@ export function checkMessage(payload,options={}) {
     if(!['{{name}}','{{email}}','{{course}}'].includes(token))issues.push(`متغير غير معروف: ${token}`);
     if(token==='{{course}}'&&!options.course)issues.push('اختر دورة أو استبدل متغير اسم الدورة بنص.');
   }
+  for(const item of Array.isArray(payload.customSiteLinks)?payload.customSiteLinks:[]){const label=clean(item?.label,45),href=clean(item?.href,220);let valid=false;try{const url=new URL(href,'https://www.inexctraining.com');valid=!!href&&url.protocol==='https:'&&!url.username&&!url.password}catch{}if(!label||!valid)issues.push('أكمل اسم ورابط HTTPS لكل قسم إضافي في الرسالة.')}
   if(payload.designVersion>=2&&payload.footerEnabled!==false&&payload.footerLinkLabel&&!/^https?:/.test(safeInlineLink(payload.footerLinkUrl)))issues.push('أكمل رابط الموقع في التذييل أو احذف نص الرابط.');
   if(payload.designVersion>=2&&!clean(payload.unsubscribeLabel??'إلغاء الاشتراك',160))issues.push('اكتب نصًا واضحًا لرابط إلغاء الاشتراك.');
   return [...new Set(issues)];
@@ -118,11 +121,9 @@ function renderDesignMail(args){
   const footerUrl=safeInlineLink(merge(config.footerLinkUrl));
   const footer=config.footerEnabled&&(config.footerText||config.footerLinkLabel)?`<tr><td class="mail-pad" bgcolor="${p.pale}" style="padding:24px 36px;border-top:1px solid ${p.line};font-size:13px;line-height:1.9;color:#405773">${config.footerText?`<div dir="auto">${text(config.footerText)}</div>`:''}${config.footerLinkLabel&&/^https?:/.test(footerUrl)?`<a dir="auto" href="${escapeMail(footerUrl)}" style="display:inline-block;margin-top:8px;color:${p.ink};text-decoration:underline">${text(config.footerLinkLabel)}</a>`:''}</td></tr>`:'';
   // The link remains operational even when all optional visual regions are hidden.
-  const unsubscribeLabel=config.unsubscribeLabel||mailIdentityDefaults(english).unsubscribeLabel;
-  const unsubscribe=unsubscribeUrl?`<p style="margin:22px 16px 0;font-size:12px;line-height:1.9;text-align:center"><a href="${escapeMail(unsubscribeUrl)}" style="color:#48617c;text-decoration:underline">${text(unsubscribeLabel)}</a></p>`:'';
   const usedFonts=[config.fontFamily,config.headingFont,...doc.blocks.flatMap(b=>b.runs.map(r=>r.font).filter(Boolean))];
-  const html=`<!doctype html><html lang="${english?'en':'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeMail(title)}</title><style>${fontCSS(usedFonts)}body,table,td{font-family:${fontStack(config.fontFamily)}}h1,h2{font-family:${fontStack(config.headingFont)}}.mail-copy h2{font-size:${Math.max(20,Math.round(config.headingSize*.72))}px}table{mso-table-lspace:0;mso-table-rspace:0}td{overflow-wrap:anywhere;word-break:break-word}img{max-width:100%}a{overflow-wrap:anywhere}@media only screen and (max-width:600px){.mail-outer{padding:12px 6px!important}.mail-shell{width:100%!important}.mail-pad{padding:24px 20px!important}.mail-panel{display:block!important;box-sizing:border-box!important;width:100%!important}.mail-brand,.mail-tagline{display:block!important;width:100%!important;text-align:${align}!important;padding:0!important}.mail-tagline{padding-top:8px!important}h1{font-size:${Math.min(config.headingSize,30)}px!important}}</style></head><body dir="${dir}" style="margin:0;padding:0;background:${plain?'#ffffff':'#edf2f8'};color:${p.ink};font-family:${escapeMail(fontStack(config.fontFamily))}"><div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${escapeMail(preview)}</div>${table(`<tr><td class="mail-outer" align="center" style="padding:32px 12px"><!--[if mso]><table role="presentation" width="640" cellspacing="0" cellpadding="0"><tr><td><![endif]-->${table(`${heading}${hero}${panelSection}<tr><td class="mail-pad mail-copy" dir="${rendered.direction}" align="${align}" style="padding:32px 36px;direction:${rendered.direction};text-align:${align};font-family:${escapeMail(fontStack(config.fontFamily))};font-size:${config.bodySize}px;line-height:${config.lineHeight}">${rendered.html}${action}${extraActions}${signature}</td></tr>${footer}`,'width:100%;max-width:640px;table-layout:fixed;text-align:'+align+';direction:'+dir+';background:#ffffff;border-radius:'+(config.layout==='signature'?'18px':'0')+';border:1px solid '+(plain?'#ffffff':p.line)+';','width="100%" class="mail-shell"')}<!--[if mso]></td></tr></table><![endif]-->${unsubscribe}</td></tr>`,'width:100%;','width="100%"')}</body></html>`;
-  const plainText=[config.headerEnabled?merge(config.brandName):'',config.headerEnabled?merge(config.brandTagline):'',!plain&&config.heroEnabled?[config.eyebrow,config.headline,config.intro].map(merge).filter(Boolean).join('\n'): '',!plain?panels.map(v=>[v.label,v.title,v.text].map(merge).filter(Boolean).join('\n')).join('\n\n'):'',rendered.text,...config.buttons.map(b=>`${merge(b.label)}: ${buttonHref({...b,message:merge(b.message)})}`),ctaLabel&&/^https?:/.test(actionUrl)?`${merge(ctaLabel)}: ${actionUrl}`:'',config.signatureEnabled?merge(config.signature):'',config.footerEnabled?merge(config.footerText):'',config.footerEnabled&&config.footerLinkLabel&&/^https?:/.test(footerUrl)?`${merge(config.footerLinkLabel)}: ${footerUrl}`:'',unsubscribeUrl?`${merge(unsubscribeLabel)}: ${unsubscribeUrl}`:''].filter(Boolean).join('\n\n');
+  const html=`<!doctype html><html lang="${english?'en':'ar'}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeMail(title)}</title><style>${fontCSS(usedFonts)}body,table,td{font-family:${fontStack(config.fontFamily)}}h1,h2{font-family:${fontStack(config.headingFont)}}.mail-copy h2{font-size:${Math.max(20,Math.round(config.headingSize*.72))}px}table{mso-table-lspace:0;mso-table-rspace:0}td{overflow-wrap:anywhere;word-break:break-word}img{max-width:100%}a{overflow-wrap:anywhere}@media only screen and (max-width:600px){.mail-outer{padding:12px 6px!important}.mail-shell{width:100%!important}.mail-pad{padding:24px 20px!important}.mail-panel{display:block!important;box-sizing:border-box!important;width:100%!important}.mail-brand,.mail-tagline{display:block!important;width:100%!important;text-align:${align}!important;padding:0!important}.mail-tagline{padding-top:8px!important}h1{font-size:${Math.min(config.headingSize,30)}px!important}}</style></head><body dir="${dir}" style="margin:0;padding:0;background:${plain?'#ffffff':'#edf2f8'};color:${p.ink};font-family:${escapeMail(fontStack(config.fontFamily))}"><div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${escapeMail(preview)}</div>${table(`<tr><td class="mail-outer" align="center" style="padding:32px 12px"><!--[if mso]><table role="presentation" width="640" cellspacing="0" cellpadding="0"><tr><td><![endif]-->${table(`${heading}${hero}${panelSection}<tr><td class="mail-pad mail-copy" dir="${rendered.direction}" align="${align}" style="padding:32px 36px;direction:${rendered.direction};text-align:${align};font-family:${escapeMail(fontStack(config.fontFamily))};font-size:${config.bodySize}px;line-height:${config.lineHeight}">${rendered.html}${action}${extraActions}${signature}</td></tr>${footer}`,'width:100%;max-width:640px;table-layout:fixed;text-align:'+align+';direction:'+dir+';background:#ffffff;border-radius:'+(config.layout==='signature'?'18px':'0')+';border:1px solid '+(plain?'#ffffff':p.line)+';','width="100%" class="mail-shell"')}<!--[if mso]></td></tr></table><![endif]--></td></tr>`,'width:100%;','width="100%"')}</body></html>`;
+  const plainText=[config.headerEnabled?merge(config.brandName):'',config.headerEnabled?merge(config.brandTagline):'',!plain&&config.heroEnabled?[config.eyebrow,config.headline,config.intro].map(merge).filter(Boolean).join('\n'): '',!plain?panels.map(v=>[v.label,v.title,v.text].map(merge).filter(Boolean).join('\n')).join('\n\n'):'',rendered.text,...config.buttons.map(b=>`${merge(b.label)}: ${buttonHref({...b,message:merge(b.message)})}`),ctaLabel&&/^https?:/.test(actionUrl)?`${merge(ctaLabel)}: ${actionUrl}`:'',config.signatureEnabled?merge(config.signature):'',config.footerEnabled?merge(config.footerText):'',config.footerEnabled&&config.footerLinkLabel&&/^https?:/.test(footerUrl)?`${merge(config.footerLinkLabel)}: ${footerUrl}`:''].filter(Boolean).join('\n\n');
   return {subject:title,html,text:plainText,direction:rendered.direction};
 }
 
@@ -130,18 +131,28 @@ function renderDesignMail(args){
 export function renderMail(args){
   const mail=renderDesignMail(args),settings=mailSettings(args.settings||{});
   const english=mail.direction==='ltr';
-  if(settings.siteLinks.length){
-    const links=settings.siteLinks.map(({label,href})=>`<a href="${escapeMail(href)}" style="display:inline-block;margin:4px;padding:9px 15px;border:1px solid #c9ddf3;border-radius:6px;background:#ffffff;color:#1559d6;text-decoration:none;font-weight:700;font-size:14px">${escapeMail(label)}</a>`).join('');
+  const selectedLinks=[...settings.siteLinks,...settings.customSiteLinks];
+  if(selectedLinks.length){
+    const links=selectedLinks.map(({label,href})=>`<a href="${escapeMail(href)}" style="display:inline-block;margin:4px;padding:9px 15px;border:1px solid #c9ddf3;border-radius:6px;background:#ffffff;color:#1559d6;text-decoration:none;font-weight:700;font-size:14px">${escapeMail(label)}</a>`).join('');
     const section=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:8px 18px 24px"><table role="presentation" width="100%" style="max-width:640px;background:#f2f7fd;border:1px solid #d7e6f6"><tr><td dir="${english?'ltr':'rtl'}" style="padding:19px 18px;font-family:Tahoma,Arial,sans-serif;line-height:1.9"><strong style="display:block;margin-bottom:9px;color:#193b62;font-size:15px">${english?'Explore INEXC Training':'استكشف أقسام الموقع'}</strong>${links}</td></tr></table></td></tr></table>`;
     mail.html=mail.html.replace('</body>',section+'</body>');
-    mail.text+='\n\n'+(english?'Explore INEXC Training':'استكشف أقسام الموقع')+'\n'+settings.siteLinks.map(({label,href})=>label+': '+href).join('\n');
+    mail.text+='\n\n'+(english?'Explore INEXC Training':'استكشف أقسام الموقع')+'\n'+selectedLinks.map(({label,href})=>label+': '+href).join('\n');
   }
-  if(!settings.shareEnabled)return mail;
+  if(settings.shareEnabled){
   const url=args.shareUrl||subscriptionUrl('',true);
   let valid;try{const parsed=new URL(url);valid=parsed.origin==='https://www.inexctraining.com'&&parsed.pathname==='/subscribe.html';}catch{}
-  if(!valid)return mail;
+  if(valid){
   const text=settings.shareText||(english?'Know someone who would enjoy these emails? Share the subscription link.':'تعرف شخصًا قد تهمّه رسائلنا؟ شاركه رابط الاشتراك.');
   const label=settings.shareLabel||(english?'Share with a friend':'شارك مع صديق');
   const section=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:8px 18px 30px"><table role="presentation" width="100%" style="max-width:640px;background:#eef6ff;border:1px solid #cbdff7"><tr><td dir="${english?'ltr':'rtl'}" align="center" style="padding:22px;font-family:Tahoma,Arial,sans-serif;font-size:15px;line-height:1.9;color:#414a57"><p style="margin:0 0 12px">${escapeMail(text)}</p><a href="${escapeMail(url)}" style="display:inline-block;padding:10px 22px;background:#0868ce;color:white;text-decoration:none;border-radius:6px;font-weight:bold">${escapeMail(label)}</a></td></tr></table></td></tr></table>`;
-  return {...mail,html:mail.html.replace('</body>',section+'</body>'),text:mail.text+'\n\n'+text+'\n'+label+': '+url};
+  mail.html=mail.html.replace('</body>',section+'</body>');
+  mail.text+='\n\n'+text+'\n'+label+': '+url;
+  }}
+  if(args.unsubscribeUrl){
+    const label=settings.unsubscribeLabel||mailIdentityDefaults(english).unsubscribeLabel;
+    const last=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:4px 16px 22px;font-family:Tahoma,Arial,sans-serif;font-size:11px;line-height:1.7"><a href="${escapeMail(args.unsubscribeUrl)}" style="font-size:11px;color:#64748b;text-decoration:underline">${escapeMail(label)}</a></td></tr></table>`;
+    mail.html=mail.html.replace('</body>',last+'</body>');
+    mail.text+='\n\n'+label+': '+args.unsubscribeUrl;
+  }
+  return mail;
 }
