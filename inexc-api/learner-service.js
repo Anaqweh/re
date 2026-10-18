@@ -1,3 +1,4 @@
+import {allowsRepeatRegistration} from './registration-policy.js';
 import {membershipCardName,cardAllowedForCourse} from './course-card-access.js';
 import {setupCertificateRequests,enqueueCertificateRequest} from './certificate-requests.js';
 // Learner records, card checkout and explicitly requested card recovery. No mail workers.
@@ -56,7 +57,7 @@ export async function createCardRegistration(pool,input){
   if(!card)throw fail('رقم البطاقة أو البريد الإلكتروني غير صحيح.',404);
   if(Number(card.price_usd)===0&&input.shareConsent!==true)throw fail('يلزم قبول شرط مشاركة رابط البطاقة قبل تأكيد حجز الباقة المجانية.');
   const previous=(await client.query(`SELECT r.id,r.reference,r.status,r.total,r.certificate_fee_amount,d.units_used FROM membership_redemptions d JOIN registrations r ON r.id=d.registration_id WHERE d.card_id=$1 AND d.course_id=$2 AND d.status='used' AND r.status<>'ملغى' ORDER BY d.created_at LIMIT 1`,[card.id,input.courseId])).rows[0];
-  if(previous){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}
+  if(previous&&!allowsRepeatRegistration(card.holder_email)){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}
   const course=(await client.query('SELECT * FROM courses WHERE id=$1 FOR SHARE',[input.courseId])).rows[0];
   if(!course)throw fail('الدورة غير متاحة للتسجيل.');
   if(Number(card.price_usd)===0&&Number(course.price)!==0)throw fail('الباقة المجانية مخصصة للدورات المجانية المتاحة لها.');

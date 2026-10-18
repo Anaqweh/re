@@ -1,3 +1,4 @@
+import {allowsRepeatRegistration} from './registration-policy.js';
 import {membershipCardName,courseCardInput,attachCourseCardNames} from './course-card-access.js';
 import {installSeoSitemap} from './seo-sitemap.js';
 function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
@@ -1264,7 +1265,7 @@ app.post('/api/registrations', upload.single('receipt'), rejectSuppressedCourse,
         await db.query('BEGIN');
         await db.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))',[course.id,email.toLowerCase()]);
         const existing=await db.query("SELECT id FROM registrations WHERE course_id=$1 AND lower(email)=lower($2) AND status<>'ملغى' LIMIT 1",[course.id,email]);
-        if(existing.rowCount){await db.query('COMMIT');return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة المجانية. احتفظ برسالة التأكيد وتابع دوراتك من صفحتك التدريبية.',alreadyRegistered:true});}
+        if(existing.rowCount&&!allowsRepeatRegistration(email)){await db.query('COMMIT');return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة المجانية. احتفظ برسالة التأكيد وتابع دوراتك من صفحتك التدريبية.',alreadyRegistered:true});}
         registrationReference=reference();
         await db.query(`INSERT INTO registrations (reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,membership_redemption_id)
           VALUES ($1,$2,$3,$4,$5,$6,$7,0,'free',$8,'',NULL,NULL)`,[registrationReference,name,email,phone,course.id,course.name,certificate,checkout.status]);

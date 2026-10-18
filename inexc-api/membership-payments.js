@@ -1,3 +1,4 @@
+import {allowsRepeatRegistration} from './registration-policy.js';
 function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 // Membership purchases are isolated from course registration and course payment settings.
 import crypto from 'node:crypto';
@@ -74,9 +75,9 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
    const plan=(await db.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true FOR UPDATE',[data.planId])).rows[0];
    if(!plan||Number(plan.price_usd)!==0)throw fail('هذه الباقة غير متاحة للتسجيل المجاني.');
    const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];
-   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
+   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');if(allowsRepeatRegistration(data.email))return {ok:true,reference:prior.reference,email:data.email};return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
    const existing=(await db.query("SELECT o.reference FROM membership_orders o JOIN membership_cards c ON c.id=o.card_id WHERE o.plan_id=$1 AND lower(o.email)=$2 AND o.payment_method='free' AND o.status='مفعلة' AND c.deleted_at IS NULL LIMIT 1",[plan.id,data.email])).rows[0];
-   if(existing){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
+   if(existing&&!allowsRepeatRegistration(data.email)){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
    await stock(db,plan);
    reference='CARD-'+crypto.randomBytes(9).toString('hex').toUpperCase();
    const row=(await db.query("INSERT INTO membership_orders(reference,plan_id,name,email,phone,total,payment_method,status,request_key,verified_reference,verified_amount,verified_currency,verified_at) VALUES($1,$2,$3,$4,$5,0,'free','مفعلة',$6,$7,0,'USD',now()) RETURNING id",[reference,plan.id,data.name,data.email,data.phone,key,'FREE-'+reference])).rows[0];

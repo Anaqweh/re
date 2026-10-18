@@ -41,6 +41,20 @@ test('card booking is atomic, concurrent retries debit once, and concurrent book
  const results=await Promise.allSettled([createCardRegistration(h.pool,{...h.input,courseId:h.courses[1]}),createCardRegistration(h.pool,{...h.input,courseId:h.courses[2]})]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal((await h.query('SELECT units_remaining FROM membership_cards WHERE id=$1',[h.card])).rows[0].units_remaining,0);
  const replay=await createCardRegistration(h.pool,h.input);assert.equal(replay.alreadyRegistered,true);assert.equal(replay.remaining,0);
 });
+test('owner email may repeat card registration with separate certificate requests and normal balance checks',async t=>{
+ const h=await harness();t.after(()=>h.close());
+ await h.query('UPDATE membership_cards SET holder_email=$1 WHERE id=$2',['ahmadanakwa@gmail.com',h.card]);
+ const input={...h.input,email:' AHMADANAKWA@gmail.com ',certificateRequested:true};
+ const first=await createCardRegistration(h.pool,input),second=await createCardRegistration(h.pool,input);
+ assert.notEqual(first.reference,second.reference);assert.notEqual(first.certificateRequestId,second.certificateRequestId);
+ assert.equal(second.alreadyRegistered,undefined);assert.equal(first.remaining,6);assert.equal(second.remaining,4);
+ assert.equal(second.certificateFee,90);assert.equal((await h.query('SELECT count(*)::int AS n FROM certificate_requests')).rows[0].n,2);
+ await assert.rejects(createCardRegistration(h.pool,{...input,code:'WRONG-CARD'}),e=>e.status===404);
+ await h.query('UPDATE membership_cards SET units_remaining=0 WHERE id=$1',[h.card]);
+ await assert.rejects(createCardRegistration(h.pool,input),/الرصيد/);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM registrations')).rows[0].n,2);
+ assert.equal(h.emails.length,0);
+});
 test('managed certificate payment cannot be confirmed by the old progress selector',async t=>{const h=await harness();t.after(()=>h.close());
  const booked=await createCardRegistration(h.pool,{...h.input,certificateRequested:true});
  const route='/api/admin/learner-records/'+booked.registrationId;

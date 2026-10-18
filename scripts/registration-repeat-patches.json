@@ -1,0 +1,45 @@
+{
+  "server.js": [
+    {
+      "label": "repeat-policy-1",
+      "old": "import {membershipCardName,courseCardInput,attachCourseCardNames} from './course-card-access.js';\n",
+      "new": "import {allowsRepeatRegistration} from './registration-policy.js';\nimport {membershipCardName,courseCardInput,attachCourseCardNames} from './course-card-access.js';\n"
+    },
+    {
+      "label": "repeat-policy-2",
+      "old": "        const existing=await db.query(\"SELECT id FROM registrations WHERE course_id=$1 AND lower(email)=lower($2) AND status<>'ملغى' LIMIT 1\",[course.id,email]);\n        if(existing.rowCount){await db.query('COMMIT');return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة المجانية. احتفظ برسالة التأكيد وتابع دوراتك من صفحتك التدريبية.',alreadyRegistered:true});}\n        registrationReference=reference();\n",
+      "new": "        const existing=await db.query(\"SELECT id FROM registrations WHERE course_id=$1 AND lower(email)=lower($2) AND status<>'ملغى' LIMIT 1\",[course.id,email]);\n        if(existing.rowCount&&!allowsRepeatRegistration(email)){await db.query('COMMIT');return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة المجانية. احتفظ برسالة التأكيد وتابع دوراتك من صفحتك التدريبية.',alreadyRegistered:true});}\n        registrationReference=reference();\n"
+    }
+  ],
+  "learner-service.js": [
+    {
+      "label": "repeat-policy-1",
+      "old": "import {membershipCardName,cardAllowedForCourse} from './course-card-access.js';\n",
+      "new": "import {allowsRepeatRegistration} from './registration-policy.js';\nimport {membershipCardName,cardAllowedForCourse} from './course-card-access.js';\n"
+    },
+    {
+      "label": "repeat-policy-2",
+      "old": "  const previous=(await client.query(`SELECT r.id,r.reference,r.status,r.total,r.certificate_fee_amount,d.units_used FROM membership_redemptions d JOIN registrations r ON r.id=d.registration_id WHERE d.card_id=$1 AND d.course_id=$2 AND d.status='used' AND r.status<>'ملغى' ORDER BY d.created_at LIMIT 1`,[card.id,input.courseId])).rows[0];\n  if(previous){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}\n  const course=(await client.query('SELECT * FROM courses WHERE id=$1 FOR SHARE',[input.courseId])).rows[0];\n",
+      "new": "  const previous=(await client.query(`SELECT r.id,r.reference,r.status,r.total,r.certificate_fee_amount,d.units_used FROM membership_redemptions d JOIN registrations r ON r.id=d.registration_id WHERE d.card_id=$1 AND d.course_id=$2 AND d.status='used' AND r.status<>'ملغى' ORDER BY d.created_at LIMIT 1`,[card.id,input.courseId])).rows[0];\n  if(previous&&!allowsRepeatRegistration(card.holder_email)){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}\n  const course=(await client.query('SELECT * FROM courses WHERE id=$1 FOR SHARE',[input.courseId])).rows[0];\n"
+    }
+  ],
+  "membership-payments.js": [
+    {
+      "label": "repeat-policy-1",
+      "old": "function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}\n",
+      "new": "import {allowsRepeatRegistration} from './registration-policy.js';\nfunction trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}\n"
+    },
+    {
+      "label": "repeat-policy-2",
+      "old": "   const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];\n   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}\n   const existing=(await db.query(\"SELECT o.reference FROM membership_orders o JOIN membership_cards c ON c.id=o.card_id WHERE o.plan_id=$1 AND lower(o.email)=$2 AND o.payment_method='free' AND o.status='مفعلة' AND c.deleted_at IS NULL LIMIT 1\",[plan.id,data.email])).rows[0];\n   if(existing){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}\n   await stock(db,plan);\n",
+      "new": "   const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];\n   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');if(allowsRepeatRegistration(data.email))return {ok:true,reference:prior.reference,email:data.email};return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}\n   const existing=(await db.query(\"SELECT o.reference FROM membership_orders o JOIN membership_cards c ON c.id=o.card_id WHERE o.plan_id=$1 AND lower(o.email)=$2 AND o.payment_method='free' AND o.status='مفعلة' AND c.deleted_at IS NULL LIMIT 1\",[plan.id,data.email])).rows[0];\n   if(existing&&!allowsRepeatRegistration(data.email)){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}\n   await stock(db,plan);\n"
+    }
+  ],
+  "Dockerfile": [
+    {
+      "label": "repeat-policy-1",
+      "old": "RUN mkdir -p /app/uploads\nEXPOSE 3000\n",
+      "new": "RUN mkdir -p /app/uploads\nCOPY registration-policy.js ./\nEXPOSE 3000\n"
+    }
+  ]
+}

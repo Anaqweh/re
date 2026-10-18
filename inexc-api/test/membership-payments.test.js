@@ -31,6 +31,21 @@ async function harness(){
  const input={plan_id:plan,name:'LOCAL BUYER',email:'local@example.invalid',phone:'000000',request_key:crypto.randomUUID(),amount:1,currency:'aed'};
  return {pool,query,plan,before,input,service,sessions,requests,notifications,call,event,loseNextResponse(){loseResponse=true},denyNext(){deny=true},async close(){await new Promise(resolve=>server.close(resolve));await db.close()}};
 }
+test('owner email may repeat free package orders, while retries and other addresses remain unique',async t=>{
+ const h=await harness();t.after(()=>h.close());
+ await h.query('ALTER TABLE membership_cards ADD COLUMN deleted_at TIMESTAMPTZ');
+ await h.query('UPDATE membership_plans SET price_usd=0 WHERE id=$1',[h.plan]);
+ const input={...h.input,email:' AHMADANAKWA@gmail.com '};
+ const first=await h.call('/memberships/free',input);assert.equal(first.status,200);assert.equal(first.data.ok,true);
+ const retry=await h.call('/memberships/free',input);assert.equal(retry.data.reference,first.data.reference);assert.equal(retry.data.ok,true);
+ const second=await h.call('/memberships/free',{...input,request_key:crypto.randomUUID()});assert.equal(second.data.ok,true);assert.notEqual(second.data.reference,first.data.reference);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM membership_cards')).rows[0].n,2);assert.equal(h.notifications.length,2);
+ assert.equal((await h.call('/memberships/free',{...input,name:'CHANGED'})).status,409);
+ const normal=await h.call('/memberships/free',{...h.input,request_key:crypto.randomUUID()});assert.equal(normal.data.ok,true);
+ const duplicate=await h.call('/memberships/free',{...h.input,request_key:crypto.randomUUID()});assert.equal(duplicate.data.alreadyRegistered,true);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM membership_cards')).rows[0].n,3);assert.equal(h.notifications.length,3);
+ assert.equal(h.requests.length,0);
+});
 test('membership-only migration preserves every course field, USD prices and later admin method choices',async t=>{
  const h=await harness();t.after(()=>h.close());
  assert.deepEqual((await h.query('SELECT * FROM courses')).rows,h.before);
