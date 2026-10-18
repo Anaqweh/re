@@ -897,7 +897,7 @@ async function processCourseAlertQueue(options = {}) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
 const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
-app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
+app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','public, max-age=10').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.put('/api/admin/site-sections',auth,async(req,res,next)=>{try{
  const data=req.body||{};if(['courses','packages','services'].some(key=>typeof data[key]!=='boolean')||!Array.isArray(data.links)||data.links.length>6)return res.status(400).json({error:'راجع الأقسام والروابط الإضافية.'});
@@ -910,7 +910,7 @@ app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
     const settings = Object.fromEntries(result.rows.map(row => [row.key, row.value]));
-    res.json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false', testimonialsVisible: settings.testimonials_visible !== 'false' });
+    res.set('Cache-Control','public, max-age=20').json({ logoUrl: settings.brand_logo || '', heroPreviewVisible: settings.hero_preview_visible !== 'false', testimonialsVisible: settings.testimonials_visible !== 'false' });
   } catch (error) { next(error); }
 });
 
@@ -1103,7 +1103,7 @@ app.delete('/api/admin/memberships/cards/:id',auth,async(req,res,next)=>{try{
 }catch(error){next(error);}});
 app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/courses', async (_req, res, next) => {
-  try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json((await attachCourseCardNames(pool,result.rows)).map(publicCourse)); } catch (error) { next(error); }
+  try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.set('Cache-Control','public, max-age=20').json((await attachCourseCardNames(pool,result.rows)).map(publicCourse)); } catch (error) { next(error); }
 });
 app.post('/api/course-alerts', async (req, res, next) => {
   try {
@@ -1140,9 +1140,9 @@ for (const [route,table] of [['/api/course-alerts/unsubscribe','course_alert_sub
 app.get('/api/testimonials', async (_req, res, next) => {
   try {
     const setting = await pool.query("SELECT value FROM app_settings WHERE key='testimonials_visible'");
-    if (setting.rows[0]?.value === 'false') return res.json({ visible: false, testimonials: [] });
+    if (setting.rows[0]?.value === 'false') return res.set('Cache-Control','public, max-age=20').json({ visible: false, testimonials: [] });
     const result = await pool.query("SELECT id,name,content,image_path,rating,verified,status FROM testimonials WHERE status IN ('visible','featured') ORDER BY (status='featured') DESC, created_at DESC");
-    res.json({ visible: true, testimonials: result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true })) });
+    res.set('Cache-Control','public, max-age=20').json({ visible: true, testimonials: result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true })) });
   } catch (error) { next(error); }
 });
 function publicRichText(value) {
