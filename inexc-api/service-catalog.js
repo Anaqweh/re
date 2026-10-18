@@ -52,7 +52,7 @@ export function serviceImageExtension(buffer){
 }
 export function installServiceCatalog({app,pool,auth,uploadDir,linkImage=fetchServiceLinkImage}){
  const route=fn=>async(req,res,next)=>{try{await fn(req,res)}catch(e){next(e)}};
- app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,requestLinks:1,linkImages:1,items:result.rows})}));
+ app.get('/api/services',route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog WHERE published=true ORDER BY sort_order,created_at,id`);res.set('Cache-Control','public, max-age=20').json({version:1,requestLinks:1,linkImages:1,items:result.rows})}));
  app.get('/api/admin/services',auth,route(async(_req,res)=>{const result=await pool.query(`SELECT ${columns} FROM service_catalog ORDER BY sort_order,created_at,id`);res.set('Cache-Control','no-store').json({version:1,linkImages:1,items:result.rows})}));
  app.get('/api/admin/services/requests',auth,route(async(_req,res)=>{const result=await pool.query('SELECT * FROM service_requests ORDER BY created_at DESC,id DESC LIMIT 101');res.set('Cache-Control','no-store').json({version:1,items:result.rows.slice(0,100),hasMore:result.rows.length>100})}));
  app.post('/api/services/:id/requests',route(async(req,res)=>{
