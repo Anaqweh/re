@@ -102,11 +102,21 @@ app.use(express.json({ limit: '1mb' }));
 stripePayments.installRoutes(app);
 membershipPayments.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
-app.use('/uploads', express.static(uploadDir, { maxAge: '1h', index: false, dotfiles: 'deny' }));
+app.use('/uploads', (req,res,next)=>{
+  res.set('X-Content-Type-Options','nosniff');
+  res.set('Content-Security-Policy','sandbox');
+  next();
+}, express.static(uploadDir, { maxAge: '1h', index: false, dotfiles: 'deny', setHeaders(res,file){
+  if(!/\.(?:png|jpe?g|webp|gif|pdf)$/i.test(file))res.setHeader('Content-Disposition','attachment');
+} }));
+
+const receiptExtensions={'application/pdf':'.pdf','image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'};
+const imageExtensions={'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'};
+const courseMediaExtensions={...imageExtensions,'application/pdf':'.pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx'};
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+  filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${receiptExtensions[file.mimetype] || '.bin'}`)
 });
 const upload = multer({
   storage,
@@ -119,18 +129,18 @@ const upload = multer({
 const logoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => cb(null, `brand-logo-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    filename: (_req, file, cb) => cb(null, `brand-logo-${crypto.randomUUID()}${imageExtensions[file.mimetype] || '.bin'}`)
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const permitted = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
-    cb(permitted.includes(file.mimetype) ? null : new Error('ارفع شعارًا بصيغة PNG أو JPG أو WEBP أو SVG.'), permitted.includes(file.mimetype));
+    const permitted = Object.hasOwn(imageExtensions,file.mimetype);
+    cb(permitted ? null : new Error('ارفع شعارًا بصيغة PNG أو JPG أو WEBP.'), permitted);
   }
 });
 const courseMediaUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => cb(null, `course-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    filename: (_req, file, cb) => cb(null, `course-${crypto.randomUUID()}${courseMediaExtensions[file.mimetype] || '.bin'}`)
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -141,7 +151,7 @@ const courseMediaUpload = multer({
 const testimonialImageUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => cb(null, `testimonial-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    filename: (_req, file, cb) => cb(null, `testimonial-${crypto.randomUUID()}${imageExtensions[file.mimetype] || '.bin'}`)
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -1829,7 +1839,7 @@ app.post('/api/admin/campaigns/:id/cancel', auth, async (req, res, next) => {
 app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,trainingPackageText(r.status),r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 installServiceCatalog({app,pool,auth,uploadDir});
-app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); res.status(error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500).json({ error: error.message || 'حدث خطأ في الخادم.' }); });
+app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); const status=error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500; res.status(status).json({ error: status===500 ? 'حدث خطأ في الخادم. حاول مرة أخرى لاحقًا.' : error.message || 'تعذر تنفيذ الطلب.' }); });
 
 setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
 
