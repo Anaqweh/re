@@ -11,7 +11,11 @@ export function mailIdentityDefaults(english=false) {
   return {brandName:'INEXC Training',brandTagline:english?'Knowledge. Practice. Impact.':'معرفة. تطبيق. أثر.',eyebrow:'',headline:'',intro:'',footerText:english?'INEXC Training · Professional learning':'INEXC Training · للتعلّم والتطوير المهني',footerLinkLabel:'inexctraining.com',footerLinkUrl:'https://www.inexctraining.com/',unsubscribeLabel:english?'Unsubscribe from these emails':'إلغاء الاشتراك في هذه الرسائل',signature:english?'Kind regards,\nThe INEXC Training Team':'مع خالص التحية،\nفريق INEXC Training'};
 }
 export function mailSettings(input={}) {
-  const share={shareEnabled:input.shareEnabled===true,shareText:clean(input.shareText,350),shareLabel:clean(input.shareLabel,80)};
+  const siteLinks=(Array.isArray(input.siteLinks)?input.siteLinks:[]).slice(0,9).map(item=>{
+    const label=clean(item?.label,45),href=clean(item?.href,220);
+    try{const url=new URL(href,'https://www.inexctraining.com');return label&&url.origin==='https://www.inexctraining.com'&&!/^\/(?:admin-portal|api)(?:\/|\.|$)/i.test(url.pathname)?{label,href:url.href}:null}catch{return null}
+  }).filter(Boolean);
+  const share={shareEnabled:input.shareEnabled===true,shareText:clean(input.shareText,350),shareLabel:clean(input.shareLabel,80),siteLinks};
   if(input.designVersion!==3)return {...version4Settings(input),...share};
   const config={...version4Settings({...input,designVersion:2}),designVersion:3,...share};
   config.fontFamily=fontById(input.fontFamily)?input.fontFamily:'tahoma';
@@ -125,8 +129,15 @@ function renderDesignMail(args){
 // Opt-in per message: historical campaigns keep their exact previous content.
 export function renderMail(args){
   const mail=renderDesignMail(args),settings=mailSettings(args.settings||{});
+  const english=mail.direction==='ltr';
+  if(settings.siteLinks.length){
+    const links=settings.siteLinks.map(({label,href})=>`<a href="${escapeMail(href)}" style="display:inline-block;margin:4px;padding:9px 15px;border:1px solid #c9ddf3;border-radius:6px;background:#ffffff;color:#1559d6;text-decoration:none;font-weight:700;font-size:14px">${escapeMail(label)}</a>`).join('');
+    const section=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:8px 18px 24px"><table role="presentation" width="100%" style="max-width:640px;background:#f2f7fd;border:1px solid #d7e6f6"><tr><td dir="${english?'ltr':'rtl'}" style="padding:19px 18px;font-family:Tahoma,Arial,sans-serif;line-height:1.9"><strong style="display:block;margin-bottom:9px;color:#193b62;font-size:15px">${english?'Explore INEXC Training':'استكشف أقسام الموقع'}</strong>${links}</td></tr></table></td></tr></table>`;
+    mail.html=mail.html.replace('</body>',section+'</body>');
+    mail.text+='\n\n'+(english?'Explore INEXC Training':'استكشف أقسام الموقع')+'\n'+settings.siteLinks.map(({label,href})=>label+': '+href).join('\n');
+  }
   if(!settings.shareEnabled)return mail;
-  const english=mail.direction==='ltr',url=args.shareUrl||subscriptionUrl('',true);
+  const url=args.shareUrl||subscriptionUrl('',true);
   let valid;try{const parsed=new URL(url);valid=parsed.origin==='https://www.inexctraining.com'&&parsed.pathname==='/subscribe.html';}catch{}
   if(!valid)return mail;
   const text=settings.shareText||(english?'Know someone who would enjoy these emails? Share the subscription link.':'تعرف شخصًا قد تهمّه رسائلنا؟ شاركه رابط الاشتراك.');
