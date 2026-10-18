@@ -1,0 +1,31 @@
+{
+  "server.js": [
+    {
+      "label": "deletion import",
+      "old": "import {allowsRepeatRegistration} from './registration-policy.js';",
+      "new": "import {allowsRepeatRegistration} from './registration-policy.js';\nimport {setupRegistrationDeletion,deleteRegistration} from './registration-deletion.js';"
+    },
+    {
+      "label": "safe deletion route",
+      "old": "app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {\n  try {\n    const result = await pool.query('DELETE FROM registrations WHERE id=$1 RETURNING receipt_path', [req.params.id]);\n    if (!result.rowCount) return res.status(404).json({ error: 'طلب التسجيل غير موجود.' });\n    const receipt = result.rows[0].receipt_path;\n    if (receipt) fs.unlink(path.join(uploadDir, path.basename(receipt)), () => {});\n    res.json({ ok: true });\n  } catch (error) { next(error); }\n});",
+      "new": "app.get('/api/admin/registration-capabilities',auth,(_req,res)=>res.json({safeDeletion:1,returnsCardUnits:true}));\napp.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {\n  try { res.json(await deleteRegistration(pool,req.params.id)); } catch (error) { next(error); }\n});"
+    },
+    {
+      "label": "deletion schema startup",
+      "old": ".then(() => setupMembershipPayments(pool)).then(() => { app.listen",
+      "new": ".then(() => setupMembershipPayments(pool)).then(() => setupRegistrationDeletion(pool)).then(() => { app.listen"
+    },
+    {
+      "label": "deletion health version",
+      "old": "freeCardCertificateVersion: 1 }",
+      "new": "freeCardCertificateVersion: 1, registrationDeletionVersion: 1 }"
+    }
+  ],
+  "Dockerfile": [
+    {
+      "label": "copy deletion modules",
+      "old": "COPY registration-policy.js ./",
+      "new": "COPY registration-policy.js ./\nCOPY registration-deletion.js ai-licence-reset.js run-ai-licence-reset.js ./"
+    }
+  ]
+}

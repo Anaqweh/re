@@ -1,4 +1,5 @@
 import {allowsRepeatRegistration} from './registration-policy.js';
+import {setupRegistrationDeletion,deleteRegistration} from './registration-deletion.js';
 import {membershipCardName,courseCardInput,attachCourseCardNames} from './course-card-access.js';
 import {installSeoSitemap} from './seo-sitemap.js';
 function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
@@ -926,7 +927,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, freeCardCertificateVersion: 1 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, freeCardCertificateVersion: 1, registrationDeletionVersion: 1 }));
 const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
 app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','public, max-age=10').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
@@ -1656,14 +1657,9 @@ app.delete('/api/admin/courses/:id', auth, async (req, res, next) => {
 });
 app.get('/api/admin/registrations', auth, async (_req, res, next) => { try { const result = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC'); res.json(result.rows.map(r => ({...r,plan_name:trainingPackageText(r.plan_name),total:Number(r.total)}))); } catch (error) { next(error); } });
 app.put('/api/admin/registrations/:id/status', auth, async (req, res, next) => { try { const status = clean(req.body?.status,80); const allowed=['بانتظار الدفع','بانتظار مراجعة الوصل','مدفوع','مؤكد','ملغى','مسجل','مسجل بالبطاقة','طلب مؤسسة جديد','قيد التواصل']; if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صالحة.'}); await pool.query('UPDATE registrations SET status=$1,updated_at=now() WHERE id=$2',[status,req.params.id]); res.json({ok:true}); } catch(error){next(error);} });
+app.get('/api/admin/registration-capabilities',auth,(_req,res)=>res.json({safeDeletion:1,returnsCardUnits:true}));
 app.delete('/api/admin/registrations/:id', auth, async (req, res, next) => {
-  try {
-    const result = await pool.query('DELETE FROM registrations WHERE id=$1 RETURNING receipt_path', [req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'طلب التسجيل غير موجود.' });
-    const receipt = result.rows[0].receipt_path;
-    if (receipt) fs.unlink(path.join(uploadDir, path.basename(receipt)), () => {});
-    res.json({ ok: true });
-  } catch (error) { next(error); }
+  try { res.json(await deleteRegistration(pool,req.params.id)); } catch (error) { next(error); }
 });
 installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled:!!resendApiKey});
 installMessageStudio({app,pool,auth,importUpload:messageRecipientImportUpload,resolveRecipients:resolveMessageRecipients,getPreference:getEmailPreference,sendEmail,worker:processScheduledMessageCampaigns,emailFrom,mailEnabled:!!resendApiKey,webhookEnabled:!!process.env.RESEND_WEBHOOK_SECRET,uploadDir});
@@ -1865,5 +1861,5 @@ installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:
 installServiceCatalog({app,pool,auth,uploadDir});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); const status=error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500; res.status(status).json({ error: status===500 ? 'حدث خطأ في الخادم. حاول مرة أخرى لاحقًا.' : error.message || 'تعذر تنفيذ الطلب.' }); });
 
-setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => setupRegistrationDeletion(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
 
