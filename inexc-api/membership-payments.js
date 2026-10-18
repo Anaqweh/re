@@ -74,9 +74,9 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
    const plan=(await db.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true FOR UPDATE',[data.planId])).rows[0];
    if(!plan||Number(plan.price_usd)!==0)throw fail('هذه الباقة غير متاحة للتسجيل المجاني.');
    const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];
-   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);reference=prior.reference;await db.query('COMMIT');return {ok:true,reference,email:data.email,alreadyRegistered:true}}
+   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
    const existing=(await db.query("SELECT reference FROM membership_orders WHERE plan_id=$1 AND lower(email)=$2 AND payment_method='free' AND status='مفعلة' LIMIT 1",[plan.id,data.email])).rows[0];
-   if(existing){reference=existing.reference;await db.query('COMMIT');return {ok:true,reference,email:data.email,alreadyRegistered:true}}
+   if(existing){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
    await stock(db,plan);
    reference='CARD-'+crypto.randomBytes(9).toString('hex').toUpperCase();
    const row=(await db.query("INSERT INTO membership_orders(reference,plan_id,name,email,phone,total,payment_method,status,request_key,verified_reference,verified_amount,verified_currency,verified_at) VALUES($1,$2,$3,$4,$5,0,'free','مفعلة',$6,$7,0,'USD',now()) RETURNING id",[reference,plan.id,data.name,data.email,data.phone,key,'FREE-'+reference])).rows[0];
