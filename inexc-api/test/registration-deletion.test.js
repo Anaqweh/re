@@ -64,3 +64,27 @@ test('apology is complete Arabic text with escaped recipient names and no paymen
  const message=resetMessage('<img src=x onerror=alert(1)>');assert.ok(!message.html.includes('<img src=x'));assert.ok(message.html.includes('&lt;img'));
  assert.match(message.text,/إذا كنتم مشتركين في قائمتنا البريدية/);assert.match(message.text,/التعليمات والخطوات الصحيحة للتسجيل/);
 });
+
+for(const mode of ['course reset','individual deletion'])test(mode+': deleted learners can register again with the same email/card, while active duplicates stay blocked',async t=>{
+ const h=await fixture(t);
+ const input={courseId:RESET.courseId,name:'Local learner',email:'LEARNER@example.invalid',phone:'0000',code:'INX-LOCAL',certificateRequested:true,shareConsent:true};
+ assert.equal((await createCardRegistration(h.pool,input)).alreadyRegistered,true);
+ if(mode==='course reset')await resetAiLicenceRegistrations(h.pool);else await deleteRegistration(h.pool,h.id);
+ const deliveries=(await h.query('SELECT * FROM email_deliveries ORDER BY id')).rows;
+ const campaigns=(await h.query('SELECT * FROM email_campaigns ORDER BY id')).rows;
+ assert.equal((await h.query('SELECT units_remaining FROM membership_cards WHERE id=$1',[h.card])).rows[0].units_remaining,10);
+ // Simultaneous submissions yield one new booking and one replay, not two debits.
+ const attempts=await Promise.all([createCardRegistration(h.pool,input),createCardRegistration(h.pool,input)]);
+ const booked=attempts.find(r=>!r.alreadyRegistered),replay=attempts.find(r=>r.alreadyRegistered);
+ assert.ok(booked);assert.ok(replay);assert.notEqual(booked.registrationId,h.id);
+ assert.equal(replay.registrationId,booked.registrationId);assert.equal(booked.remaining,8);assert.equal(replay.remaining,8);
+ assert.equal((await h.query('SELECT * FROM registrations')).rowCount,1);
+ assert.equal((await h.query("SELECT * FROM membership_redemptions WHERE status='used'")).rowCount,1);
+ assert.equal((await h.query("SELECT * FROM membership_redemptions WHERE status='reversed' AND registration_id IS NULL")).rowCount,1);
+ const requests=(await h.query('SELECT registration_id,amount,email_status FROM certificate_requests')).rows;
+ assert.equal(requests.length,1);assert.equal(requests[0].registration_id,booked.registrationId);assert.equal(Number(requests[0].amount),19900); // Stored in fils: 199 AED.
+ assert.equal(requests[0].email_status,'pending');
+ // Re-registration does not recreate the apology campaign or change its delivery queue.
+ assert.deepEqual((await h.query('SELECT * FROM email_deliveries ORDER BY id')).rows,deliveries);
+ assert.deepEqual((await h.query('SELECT * FROM email_campaigns ORDER BY id')).rows,campaigns);
+});
