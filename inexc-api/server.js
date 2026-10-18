@@ -362,6 +362,8 @@ function auth(req, res, next) {
 function pruneSessions() { const now = Date.now(); for (const [key, value] of sessions) if (value.expiresAt < now) sessions.delete(key); }
 
 async function setupDatabase() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS site_section_settings(id INTEGER PRIMARY KEY CHECK(id=1),value JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  await pool.query(`INSERT INTO site_section_settings(id,value) VALUES(1,'{"courses":true,"packages":true,"services":true,"links":[]}'::jsonb) ON CONFLICT(id) DO NOTHING`);
   await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
   await pool.query(`CREATE TABLE IF NOT EXISTS courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -894,6 +896,16 @@ async function processCourseAlertQueue(options = {}) {
 }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
+const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
+app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
+app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
+app.put('/api/admin/site-sections',auth,async(req,res,next)=>{try{
+ const data=req.body||{};if(['courses','packages','services'].some(key=>typeof data[key]!=='boolean')||!Array.isArray(data.links)||data.links.length>6)return res.status(400).json({error:'راجع الأقسام والروابط الإضافية.'});
+ const links=data.links.map(item=>({label:clean(item.label,45),href:clean(item.href,220),visible:item.visible===true}));
+ if(links.some(link=>!link.label||!/^\/(?!\/)[a-zA-Z0-9/_?=&%#.-]+$/.test(link.href)||/\/(?:admin-portal|api|scripts?)(?:\/|\.|$)/i.test(link.href)))return res.status(400).json({error:'استخدم اسمًا ورابطًا داخليًا صالحًا لكل قسم إضافي.'});
+ const value={courses:data.courses,packages:data.packages,services:data.services,links};
+ await pool.query('UPDATE site_section_settings SET value=$1,updated_at=now() WHERE id=1',[value]);res.set('Cache-Control','no-store').json(value);
+}catch(error){next(error)}});
 app.get('/api/settings', async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT key,value FROM app_settings WHERE key IN ('brand_logo','hero_preview_visible','testimonials_visible')");
