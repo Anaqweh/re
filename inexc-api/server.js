@@ -326,10 +326,12 @@ function sendRegistrationEmails(registration) {
   const status = escapeHtml(registration.status);
   const amount = Number(registration.total).toLocaleString('ar-AE');
   const stripePaid = registration.paymentMethod === 'stripe';
-  const confirmationTitle = stripePaid ? 'تم تأكيد دفعك وتسجيلك' : 'تم استلام طلب تسجيلك';
-  const confirmationCopy = stripePaid ? 'شكرًا لثقتك بـ INEXC Training. تم استلام الدفع عبر Stripe وتأكيد تسجيلك في الدورة.' : 'شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.';
+  const freeCourse = registration.paymentMethod === 'free' || registration.freeCourse === true;
+  const confirmationTitle = freeCourse ? 'تم تأكيد تسجيلك في الدورة المجانية' : stripePaid ? 'تم تأكيد دفعك وتسجيلك' : 'تم استلام طلب تسجيلك';
+  const confirmationCopy = freeCourse ? 'تم تأكيد تسجيلك في هذه الدورة المجانية. لا توجد أي رسوم على حضور الدورة، ولا تحتاج إلى دفع أي مبلغ للتسجيل.' : stripePaid ? 'شكرًا لثقتك بـ INEXC Training. تم استلام الدفع عبر Stripe وتأكيد تسجيلك في الدورة.' : 'شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.';
+  const certificateContact = freeCourse ? `<div style="background:#f1f8ff;border:1px solid #d4e6f8;border-radius:12px;padding:17px;margin:19px 0;color:#214b73"><strong style="color:#103b70">مهتم بالحصول على شهادة؟</strong><p style="margin:8px 0 14px">التسجيل في الدورة مجاني. إذا كنت ترغب بالاستفسار عن الشهادة وشروط إصدارها، تواصل معنا عبر واتساب. طلب الشهادة اختياري.</p><a href="https://wa.me/971543475500?text=${encodeURIComponent('مرحبًا، أرغب بالاستفسار عن شهادة دورة '+registration.courseName)}" style="display:inline-block;padding:11px 17px;border-radius:9px;background:#087e5a;color:#fff;text-decoration:none;font-weight:bold">الاستفسار عن الشهادة عبر واتساب</a></div>` : '';
   const details = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dceafb;border-radius:12px;overflow:hidden;margin:22px 0;font-size:13px"><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;width:38%">رقم الطلب</td><td style="padding:11px 14px;font-weight:800;color:#0866c6;direction:ltr;text-align:right">${referenceNumber}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الدورة</td><td style="padding:11px 14px;font-weight:700;border-top:1px solid #dceafb">${course}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الحالة</td><td style="padding:11px 14px;border-top:1px solid #dceafb"><span style="display:inline-block;background:#fff4d9;color:#9b6500;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700">${status}</span></td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">المبلغ</td><td style="padding:11px 14px;font-weight:800;border-top:1px solid #dceafb">${amount} د.إ</td></tr></table>`;
-  const userHtml = emailShell({ title: confirmationTitle, preview: `${confirmationTitle} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">${confirmationTitle} ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">${confirmationCopy}</p>${details}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
+  const userHtml = emailShell({ title: confirmationTitle, preview: `${confirmationTitle} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">${confirmationTitle} ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">${confirmationCopy}</p>${details}${certificateContact}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
   const adminHtml = emailShell({ title: 'طلب تسجيل جديد', preview: `طلب جديد من ${name} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">طلب تسجيل جديد</div><p style="margin:10px 0 0;color:#526c84;font-size:14px">تم استلام طلب جديد عبر الموقع. هذه تفاصيله:</p>${details}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px"><tr><td style="padding:8px 0;color:#6a8096;width:30%">الاسم</td><td style="padding:8px 0;font-weight:700">${name}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">البريد</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.email)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموبايل</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.phone)}</td></tr></table><div style="margin-top:22px;text-align:center"><a href="https://www.inexctraining.com/admin-portal.html" style="display:inline-block;background:#0866c6;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700">فتح لوحة الإدارة</a></div>` });
   void (async () => {
     try { await sendEmailWithRetry({ to: registration.email, subject: `${confirmationTitle} – ${registration.reference}`, html: userHtml }); }
@@ -1040,7 +1042,8 @@ app.post('/api/memberships/free-course/register',async(req,res,next)=>{try{
  const found=await getMembershipCard(code,email);
  if(!found||found.row.plan_id!==target.plan.id)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح لهذه الباقة.'});
  const result=await createCardRegistration(pool,{courseId:course.id,code,email,name:found.row.holder_name,phone:found.row.holder_phone,certificateRequested:false,shareConsent:true});
- if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:found.row.holder_name,email,phone:found.row.holder_phone,courseName:result.courseName,total:0,status:result.status});
+ if(result.alreadyRegistered)return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة. ادخل إلى صفحتك التدريبية لمتابعة التسجيل، وإذا فقدت رقم البطاقة اطلب إرساله مجددًا إلى بريدك.',alreadyRegistered:true});
+ if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:found.row.holder_name,email,phone:found.row.holder_phone,courseName:result.courseName,total:0,status:result.status,freeCourse:true});
  res.set('Cache-Control','no-store').status(result.alreadyRegistered?200:201).json(result);
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/plans',auth,async(_req,res,next)=>{try{res.json(await membershipPlans(true));}catch(error){next(error);}});
@@ -1188,7 +1191,8 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     if (clean(req.body.membership_code,80) || req.body.payment_method==='membership') {
       const result=await createCardRegistration(pool,{courseId,code:req.body.membership_code,email:req.body.email,name:req.body.name,phone:req.body.phone,certificateRequested:req.body.certificate==='yes',shareConsent:req.body.free_share_consent==='yes',expectedUnits:req.body.expected_units,expectedCertificateFee:req.body.expected_certificate_fee,receiptPath:req.file?`/uploads/${req.file.filename}`:''}).catch(error=>{if(req.file?.path)fs.unlink(req.file.path,()=>{});throw error});
       if(result.alreadyRegistered&&req.file?.path)fs.unlink(req.file.path,()=>{});
-      if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:clean(req.body.name,150),email:clean(req.body.email,180),phone:clean(req.body.phone,50),courseName:result.courseName,total:result.certificateFee,status:result.status});
+      if(result.alreadyRegistered)return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة. ادخل إلى صفحتك التدريبية لمتابعة التسجيل، ويمكنك استعادة رقم البطاقة من خيار «نسيت رقم البطاقة؟».',alreadyRegistered:true});
+      if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:clean(req.body.name,150),email:clean(req.body.email,180),phone:clean(req.body.phone,50),courseName:result.courseName,total:result.certificateFee,status:result.status,freeCourse:req.body.free_share_consent==='yes'});
       return res.status(result.alreadyRegistered?200:201).json(result);
     }
     const courseResult = await pool.query('SELECT * FROM courses WHERE id = $1 AND active = true', [courseId]);
@@ -1204,6 +1208,21 @@ app.post('/api/registrations', upload.single('receipt'), async (req, res, next) 
     if(paymentMethod==='free'&&req.body.free_share_consent!=='yes')return res.status(400).json({error:'التسجيل المجاني يتطلب الموافقة على شرط مشاركة الرابط قبل التأكيد.'});
     if (paymentMethod !== 'membership' && course.public_booking_opens_at && new Date(course.public_booking_opens_at) > new Date()) return res.status(400).json({ error: 'التسجيل العام لهذه الدورة لم يبدأ بعد.' });
     const checkout = validateCoursePayment(course,{method:paymentMethod,total:standardTotal,hasReceipt:!!req.file});
+    if(paymentMethod==='free'){
+      const db=await pool.connect();let registrationReference;
+      try{
+        await db.query('BEGIN');
+        await db.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))',[course.id,email.toLowerCase()]);
+        const existing=await db.query("SELECT id FROM registrations WHERE course_id=$1 AND lower(email)=lower($2) AND status<>'ملغى' LIMIT 1",[course.id,email]);
+        if(existing.rowCount){await db.query('COMMIT');return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة المجانية. احتفظ برسالة التأكيد وتابع دوراتك من صفحتك التدريبية.',alreadyRegistered:true});}
+        registrationReference=reference();
+        await db.query(`INSERT INTO registrations (reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,membership_redemption_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,0,'free',$8,'',NULL,NULL)`,[registrationReference,name,email,phone,course.id,course.name,certificate,checkout.status]);
+        await db.query('COMMIT');
+      }catch(error){await db.query('ROLLBACK');throw error}finally{db.release()}
+      sendRegistrationEmails({reference:registrationReference,name,email,phone,courseName:course.name,total:0,status:checkout.status,paymentMethod:'free'});
+      return res.status(201).json({ok:true,reference:registrationReference});
+    }
     const registrationReference = reference();
     const total = standardTotal;
     const status = checkout.status;
