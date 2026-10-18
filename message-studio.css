@@ -26,3 +26,5 @@
 .subscriber-list-dialog label{display:grid;gap:8px;font-size:14px;font-weight:600}
 .subscriber-list-dialog select{min-height:46px;padding:8px 12px;border:1px solid #c8dced;border-radius:9px;background:#fff;font:inherit}
 .subscriber-list-dialog .row{display:flex;gap:10px;margin-top:21px}.subscriber-list-dialog .row button{flex:1;min-height:44px}
+
+.ms-site-links{padding:16px;border:1px solid #d5e4f2;border-radius:12px;background:#f5f9fe}.ms-site-links strong{color:#173f68}.ms-site-link-options{display:flex;flex-wrap:wrap;gap:8px;color:#526c84;font-size:13px}.ms-site-link-options label{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #cbddeb;border-radius:9px;background:#fff;cursor:pointer;color:#184674}.ms-site-link-options input{accent-color:#1559d6}
