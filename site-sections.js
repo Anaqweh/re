@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const api=window.INEXC_REGISTRATION_ENDPOINT||'';
 const legacyServices=()=>fetch(api+'/services',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(data=>{if(data?.items?.some(item=>item.published===true))document.querySelectorAll('[data-site-section=services]').forEach(node=>node.hidden=false)}).catch(()=>{});
-fetch(api+'/site-sections',{cache:'no-store',signal:AbortSignal.timeout(12000)}).then(response=>response.ok?response.json():null).then(settings=>{
+fetch(api+'/site-sections',{signal:AbortSignal.timeout(12000)}).then(response=>response.ok?response.json():null).then(settings=>{
  if(!settings){legacyServices();return;}
  for(const key of ['courses','packages','services'])document.querySelectorAll('[data-site-section="'+key+'"]').forEach(node=>node.hidden=settings[key]===false);
  const courses=document.getElementById('courses');if(courses)courses.hidden=settings.courses===false;
