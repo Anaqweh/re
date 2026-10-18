@@ -9,3 +9,5 @@
 @media (min-width:801px) and (max-width:1179px){.plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .payment-methods[hidden]{display:none!important}
+
+#existingMembershipHelp{background:#f1f7ff;border:1px solid #d6e7f8;border-radius:12px;padding:15px;margin:18px 0}#existingMembershipHelp[hidden]{display:none!important}#existingMembershipHelp a{display:block;color:#0866c6;font-weight:700;margin-bottom:12px}#resendCardNumber{border:1px solid #0866c6;background:#fff;color:#075eaf;border-radius:9px;padding:11px;font:inherit;cursor:pointer}#resendCardStatus{font-size:12px;color:#315a79;margin:10px 0 0}
