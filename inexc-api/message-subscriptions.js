@@ -30,6 +30,12 @@ export async function setupMessageSubscriptions(db) {
     UPDATE message_subscription_settings SET value=value-'note' WHERE value->>'note'='سنرسل رابطًا لتأكيد بريدك أولًا. يمكنك إلغاء الاشتراك من أي رسالة.';
     CREATE INDEX IF NOT EXISTS message_subscriptions_campaign ON message_subscriptions(campaign_id);
     CREATE TABLE IF NOT EXISTS message_subscription_limits(key TEXT PRIMARY KEY,hits INTEGER NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
+    CREATE TABLE IF NOT EXISTS message_blocked_signup_attempts(
+      email TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 1,
+      first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      source_code TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS message_blocked_signup_recent ON message_blocked_signup_attempts(last_attempt_at DESC);
     CREATE TABLE IF NOT EXISTS message_subscription_group(id INTEGER PRIMARY KEY CHECK(id=1),list_id UUID REFERENCES message_recipient_lists(id) ON DELETE SET NULL);
     INSERT INTO message_subscription_group(id) VALUES(1) ON CONFLICT DO NOTHING;
     UPDATE message_recipient_lists SET name='مشتركو الرسائل' WHERE id IN (SELECT list_id FROM message_subscription_group) AND name='مشتركو الرسائل — اشتراك مؤكد';
@@ -56,6 +62,12 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
     if(r.hits>max)throw fail('طلبات كثيرة خلال وقت قصير. انتظر قليلًا ثم أعد المحاولة.',429);
   }
   async function campaign(source){return (await pool.query('SELECT id,subscription_code FROM email_campaigns WHERE subscription_code=$1',[String(source||'').slice(0,36)])).rows[0]||null;}
+  async function recordBlockedSignup(email,source){
+    const reason=(await pool.query('SELECT reason FROM message_suppressions WHERE email=$1',[email])).rows[0]?.reason||'shared';
+    await pool.query(`INSERT INTO message_blocked_signup_attempts(email,source_code,reason) VALUES($1,$2,$3)
+      ON CONFLICT(email) DO UPDATE SET attempts=message_blocked_signup_attempts.attempts+1,
+      last_attempt_at=now(),source_code=EXCLUDED.source_code,reason=EXCLUDED.reason`,[email,String(source||'').slice(0,36),reason]);
+  }
   async function activate(db,record,verified=false){
     const existed=(await db.query('SELECT id FROM message_contacts WHERE normalized_email=$1',[record.email])).rows.length>0;
     const tag=verified?'اشتراك مؤكد':'اشتراك من الموقع';
@@ -79,11 +91,14 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
     if(req.body?.website)return res.status(202).json(acknowledgement);
     await limit('ip:'+digest(String(req.ip)),120,900);
     await pool.query("DELETE FROM message_subscription_limits WHERE expires_at<now()-interval '1 day'");
-    if((await blockedEmails(pool,[email])).has(email))return res.status(202).json(acknowledgement);
+    if((await blockedEmails(pool,[email])).has(email)){
+      await recordBlockedSignup(email,req.body.source);
+      return res.status(409).json({error:'قمت بإلغاء المتابعة سابقًا، ولا يسمح لك بالتسجيل في القائمة البريدية.'});
+    }
     const source=await campaign(req.body.source);
-    await tx(async db=>{
+    const result=await tx(async db=>{
       await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',[email]);
-      if((await blockedEmails(db,[email],false)).has(email))return;
+      if((await blockedEmails(db,[email],false)).has(email))return 'blocked';
       const existing=(await db.query('SELECT * FROM message_subscriptions WHERE email=$1 FOR UPDATE',[email])).rows[0];
       if(existing?.subscribed_at)return;
       await limit('global',2000,86400,db);
@@ -93,6 +108,10 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
         requested_at=now(),token_hash=NULL,expires_at=NULL,signup_method='direct'`,[email,name,source?.id||null,config.consentLabel]);
       await activate(db,{email,full_name:name});
     });
+    if(result==='blocked'){
+      await recordBlockedSignup(email,req.body.source);
+      return res.status(409).json({error:'قمت بإلغاء المتابعة سابقًا، ولا يسمح لك بالتسجيل في القائمة البريدية.'});
+    }
     res.status(202).json(acknowledgement);
   });
   route('post','/api/message-subscriptions/confirm',async(req,res)=>{
@@ -113,6 +132,15 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
     });res.json(result);
   });
   const prefix='/api/admin/message-studio/subscriptions';
+  route('get',prefix+'/blocked-attempts',async(req,res)=>{
+    const search=String(req.query.search||'').trim().slice(0,160),page=Math.min(10000,Math.max(0,parseInt(req.query.page,10)||0));
+    const q='%'+search.replace(/[\\%_]/g,'\\$&')+'%';
+    const total=(await pool.query('SELECT count(*)::int AS n FROM message_blocked_signup_attempts WHERE email ILIKE $1',[q])).rows[0].n;
+    const rows=(await pool.query(`SELECT a.email,a.attempts,a.first_attempt_at,a.last_attempt_at,a.reason,c.subject AS campaign_subject
+      FROM message_blocked_signup_attempts a LEFT JOIN email_campaigns c ON c.subscription_code=a.source_code
+      WHERE a.email ILIKE $1 ORDER BY a.last_attempt_at DESC,a.email LIMIT 50 OFFSET $2`,[q,page*50])).rows;
+    res.json({rows,total,page});
+  },true);
   const active="s.subscribed_at IS NOT NULL AND b.email IS NULL";
   route('get',prefix,async(_req,res)=>{
     const config=await settings();
