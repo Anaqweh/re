@@ -129,7 +129,7 @@ function renderDesignMail(args){
 
 // Opt-in per message: historical campaigns keep their exact previous content.
 export function renderMail(args){
-  const mail=renderDesignMail(args),settings=mailSettings(args.settings||{});
+  const mail=renderDesignMail({...args,unsubscribeUrl:''}),settings=mailSettings(args.settings||{});
   const english=mail.direction==='ltr';
   const selectedLinks=[...settings.siteLinks,...settings.customSiteLinks];
   if(selectedLinks.length){
