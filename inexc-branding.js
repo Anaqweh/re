@@ -1,6 +1,13 @@
 /* هوية بصرية وخط عربي رسمي موحّد. */
+const inexcFontUrl = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap';
+if (!document.querySelector('link[href*="fonts.googleapis.com/css2?family=Noto+Sans+Arabic"]')) {
+  const fontLink = document.createElement('link');
+  fontLink.rel = 'stylesheet';
+  fontLink.href = inexcFontUrl;
+  document.head.appendChild(fontLink);
+}
 const inexcFont = document.createElement('style');
-inexcFont.textContent = "@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');body,button,input,select,textarea{font-family:'Noto Sans Arabic',Arial,sans-serif!important}";
+inexcFont.textContent = "body,button,input,select,textarea{font-family:'Noto Sans Arabic',Arial,sans-serif!important}";
 document.head.appendChild(inexcFont);
 
 /* أيقونة INEXC الظاهرة في تبويب المتصفح. */
