@@ -4,7 +4,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const endpoint = window.INEXC_REGISTRATION_ENDPOINT || '';
   if (!grid || !endpoint) return;
   try {
-    const response = await fetch(`${endpoint}/courses`, {cache:'no-store'});
+    const response = await fetch(`${endpoint}/courses`);
     if (!response.ok) throw new Error('Courses are unavailable');
     const courses = await response.json();
     if (!courses.length) return;
@@ -19,8 +19,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       return (headings.length ? headings : axes).slice(0,3).map(line => line.replace(/^(?:المحور\s+[^:：]+[:：]\s*|##\s*)/,''));
     };
     const courseMedia = course => course.imageUrl
-      ? `<div class="course-media"><img src="${esc(`${apiOrigin}${course.imageUrl}`)}" alt="${esc(course.name)}" loading="lazy"></div>`
-      : '<div class="course-media fallback"><img src="assets/inexc-logo-official-source.png" alt="INEXC Training" loading="lazy"></div>';
+      ? `<div class="course-media"><img src="${esc(`${apiOrigin}${course.imageUrl}`)}" alt="${esc(course.name)}" loading="lazy" decoding="async" width="640" height="360"></div>`
+      : '<div class="course-media fallback"><img src="assets/inexc-logo-official-source.png" alt="INEXC Training" loading="lazy" decoding="async" width="640" height="360"></div>';
     grid.innerHTML = courses.map(course => `<article class="course${course.featured?' is-featured':''}">
       ${courseMedia(course)}
       ${course.featured?'<span class="course-featured-badge">★ مميّزة</span>':''}
