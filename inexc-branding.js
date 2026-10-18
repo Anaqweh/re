@@ -12,7 +12,7 @@ if (!inexcFavicon.parentNode) document.head.appendChild(inexcFavicon);
 
 /* إضافة اسم البنك كحقل مستقل في لوحة الإدارة، مع حفظه وعرضه للمتدرب. */
 const inexcFetch = window.fetch.bind(window);
-window.fetch = (input, options = {}) => {
+if (document.getElementById('courseForm')) window.fetch = (input, options = {}) => {
   const url = String(input);
   if (url.includes('/admin/courses') && options.body && typeof options.body === 'string') {
     try {
@@ -55,19 +55,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     }).observe(preview, { attributes: true, attributeFilter: ['src'] });
   }
   images.forEach(image => {
+    // Keep a real, static logo visible while the optional uploaded logo loads.
+    if (image.getAttribute('src')) return;
     image.hidden = true;
-    image.style.display = 'none';
-    new MutationObserver(() => {
-      if (image.getAttribute('src')?.includes('/uploads/')) {
-        image.hidden = false;
-        image.style.display = 'block';
-      }
+    if (preview) new MutationObserver(() => {
+      if (image.getAttribute('src')?.includes('/uploads/')) image.hidden = false;
     }).observe(image, { attributes: true, attributeFilter: ['src'] });
   });
   try {
     const response = await fetch(`${api}/settings`);
-    const settings = await response.json();
     if (!response.ok) return;
+    const settings = await response.json();
     const heroPreview = document.querySelector('[data-hero-preview]');
     if (heroPreview && settings.heroPreviewVisible === false) heroPreview.hidden = true;
     if (!settings.logoUrl) return;
@@ -77,10 +75,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!favicon.parentNode) document.head.appendChild(favicon);
     if (preview) { preview.src = url; preview.style.visibility = 'visible'; }
     images.forEach(image => {
+      const fallback = image.getAttribute('src');
       image.src = url;
       image.hidden = false;
       image.style.display = 'block';
-      image.onerror = () => { image.hidden = true; image.style.display = 'none'; };
+      image.onerror = () => {
+        image.onerror = null;
+        if (fallback) image.src = fallback;
+        else { image.hidden = true; image.style.display = 'none'; }
+      };
     });
   } catch (_) { /* تستخدم الصفحة الشعار الافتراضي عند تعذر الاتصال. */ }
 });
