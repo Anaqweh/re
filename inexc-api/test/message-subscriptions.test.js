@@ -5,7 +5,7 @@ import {createHarness} from './studio-harness.js';
 import {suppressEmail} from '../message-suppression.js';
 import {renderMail,mailSettings} from '../message-mail.js';
 import {subscriptionUrl} from '../message-subscription-links.js';
-import {setupMessageSubscriptions} from '../message-subscriptions.js';
+import {setupMessageSubscriptions,recordBlockedAttempt} from '../message-subscriptions.js';
 const request=async(h,path,body)=>{const r=await fetch(h.url+'/api/message-subscriptions/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,data:await r.json()};};
 const signup=(h,email,extra={})=>request(h,'request',{email,name:'أحمد',consent:true,...extra});
 const hash=t=>crypto.createHash('sha256').update(t).digest('hex');
@@ -49,6 +49,9 @@ test('immediate subscription joins existing contacts, tracks new signups and pre
   const refused=await signup(h,'FIRST@example.com',{source:campaign.subscription_code});assert.equal(refused.status,409);assert.match(refused.data.error,/إلغاء المتابعة/);
   assert.equal((await signup(h,'first@example.com')).status,409);
   const attempts=await h.request('/subscriptions/blocked-attempts?search=FIRST');assert.equal(attempts.data.total,1);assert.equal(attempts.data.rows[0].attempts,2);assert.equal(attempts.data.rows[0].reason,'unsubscribe');
+  await recordBlockedAttempt(h.pool,'first@example.com',{channel:'course',course:'الرخصة الدولية للذكاء الاصطناعي'});
+  const courseAttempt=(await h.request('/subscriptions/blocked-attempts?search=FIRST')).data.rows[0];
+  assert.equal(courseAttempt.attempts,3);assert.equal(courseAttempt.last_channel,'course');assert.equal(courseAttempt.last_course,'الرخصة الدولية للذكاء الاصطناعي');
   assert.equal(h.sent.length,before);assert.doesNotMatch((await h.request('/contacts-export')).data,/first@example.com/);
   await h.query("DELETE FROM message_contacts WHERE email='first@example.com'");await signup(h,'first@example.com');assert.equal((await h.query("SELECT * FROM message_contacts WHERE email='first@example.com'")).rows.length,0);
   assert.equal((await h.request('/import/inspect','POST',{rows:[{email:'first@example.com'}]})).data.counts.suppressed,1);assert.equal((await h.request('/subscriptions/new?search=first@example.com')).data.rows[0].status,'blocked');
