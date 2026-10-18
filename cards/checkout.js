@@ -30,16 +30,18 @@ function render() {
     const items = description(p).map(x => '<li>' + esc(x) + '</li>').join('');
     return '<article class="plan ' + ((p.featured ?? (p.slug === 'mastery')) ? 'featured' : '') + '">' +
       ((p.badgeText ?? (p.slug === 'mastery' ? 'الأكثر توازنًا' : '')) ? '<span class="ribbon">'+esc(p.badgeText ?? 'الأكثر توازنًا')+'</span>' : '') +
-      '<h2>' + esc(p.name) + '</h2><div class="price">$ ' + Number(p.priceUsd).toLocaleString('en-US') + '</div>' +
+      '<h2>' + esc(p.name) + '</h2><div class="price">' + (Number(p.priceUsd)===0?'مجاني':'$ '+Number(p.priceUsd).toLocaleString('en-US')) + '</div>' +
       availability(p) +
       '<ul class="features">' + items + '</ul>' +
-      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت الباقات' : 'احصل على الباقة') + '</button></article>';
+      '<button class="buy" data-plan="' + p.id + '"' + (soldOut ? ' disabled' : '') + '>' + (soldOut ? 'نفدت الباقات' : Number(p.priceUsd)===0?'اشترك مجانًا':'احصل على الباقة') + '</button></article>';
   }).join('');
   host.querySelectorAll('[data-plan]').forEach(button => button.onclick = () => openPlan(button.dataset.plan));
 }
 let paymentOptions={electronicEnabled:false,bankConfigured:false,bank:{}},busy=false,currentPlan;
 const el=id=>document.getElementById(id),selectedMethod=()=>document.querySelector('[name=method]:checked')?.value;
 function syncMethod(){
+ const free=Number(currentPlan?.priceUsd)===0;
+ if(free){el('bankDetails').hidden=true;el('receipt').required=false;el('submitText').textContent=busy?'جارٍ إصدار البطاقة…':'تأكيد الاشتراك المجاني';el('submit').disabled=busy;el('paymentAssurance').textContent='لا توجد رسوم أو خطوة دفع لهذه الباقة.';el('orderForm').setAttribute('aria-busy',String(busy));el('close').disabled=busy;return}
  const bank=selectedMethod()==='bank';el('bankDetails').hidden=!bank;el('receipt').required=bank;
  el('submitText').textContent=busy?'جارٍ تجهيز الطلب…':bank?'إرسال الطلب ورفع الإيصال':'المتابعة إلى الدفع الآمن';el('submit').disabled=busy||!selectedMethod();
  el('paymentAssurance').textContent=bank?'تُراجع بيانات التحويل قبل تفعيل باقتك.':'تُستكمل بيانات البطاقة البنكية على صفحة الدفع الآمنة.';
@@ -48,6 +50,8 @@ function syncMethod(){
 function openPlan(id){
  const p=plans.find(x=>x.id===id);if(!p||busy)return;currentPlan=p;el('planId').value=id;el('modalTitle').textContent='إتمام شراء الباقة';
  el('modalInfo').textContent='أكمل بياناتك واختر طريقة الدفع المناسبة لك.';
+ const free=Number(p.priceUsd)===0;el('modalTitle').textContent=free?'الاشتراك في الباقة المجانية':'إتمام شراء الباقة';el('modalInfo').textContent=free?'أكمل بياناتك لتصلك البطاقة ورابط الدورة على بريدك الإلكتروني.':'أكمل بياناتك واختر طريقة الدفع المناسبة لك.';
+ document.querySelector('.payment-methods').hidden=free;
  el('summaryPlan').textContent=p.name;el('summaryPrice').textContent=Number(p.priceUsd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  el('summaryDuration').textContent=Number(p.validMonths)+(Number(p.validMonths)>=3&&Number(p.validMonths)<=10?' أشهر':' شهرًا');el('durationRow').hidden=!Number(p.validMonths);
  const enabled=p.paymentMethods||['bank'];document.querySelectorAll('[name=method]').forEach(input=>{const available=enabled.includes(input.value)&&(input.value==='stripe'?paymentOptions.electronicEnabled:paymentOptions.bankConfigured);input.closest('label').hidden=!available;input.disabled=!available;input.checked=false});
@@ -55,7 +59,7 @@ function openPlan(id){
  const bank=paymentOptions.bank||{};for(const [id,key]of [['bankTitle','title'],['bankName','name'],['bankAccount','account'],['bankIban','iban']])el(id).textContent=bank[key]||'—';el('bankTitleRow').hidden=!bank.title;
  document.querySelectorAll('[data-copy]').forEach(button=>button.disabled=!bank[button.dataset.copy==='bankAccount'?'account':'iban']);
  el('bankAmount').textContent='قيمة الباقة: '+Number(p.priceUsd).toLocaleString('ar-AE')+' USD';el('copyStatus').textContent='';
- el('message').textContent=first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه الباقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
+ el('message').textContent=free||first?'':'لا توجد وسيلة دفع متاحة حاليًا لهذه الباقة. حاول لاحقًا أو تواصل معنا.';el('formView').style.display='block';el('success').classList.remove('show');syncMethod();el('dialog').setAttribute('aria-labelledby','modalTitle summaryPlan');el('dialog').showModal();el('dialog').scrollTop=0;
 }
 el('receipt').addEventListener('change',()=>{el('receiptName').textContent=el('receipt').files[0]?.name||'لم يُرفق ملف بعد'});
 el('close').onclick=()=>{if(!busy)el('dialog').close()};el('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault()});document.querySelectorAll('[name=method]').forEach(input=>input.onchange=()=>{el('message').textContent='';syncMethod()});
@@ -66,20 +70,21 @@ function requestKey(data,file){
  const key=crypto.randomUUID();sessionStorage.setItem('inexc_membership_payment_attempt',JSON.stringify({fingerprint,key,createdAt:Date.now()}));return key;
 }
 el('orderForm').onsubmit=async event=>{
- event.preventDefault();if(busy)return;const method=selectedMethod();if(!method)return;if(!el('orderForm').reportValidity())return;
+ event.preventDefault();if(busy)return;const free=Number(currentPlan?.priceUsd)===0,method=free?'free':selectedMethod();if(!method)return;if(!el('orderForm').reportValidity())return;
  const data={plan_id:el('planId').value,name:el('name').value.trim(),email:el('email').value.trim(),phone:el('phone').value.trim(),payment_method:method},file=el('receipt').files[0];
  if(method==='bank'&&(!file||file.size>5*1024*1024||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))){el('message').textContent='أرفق PDF أو صورة JPG أو PNG أو WEBP، بحد أقصى 5 MB.';return;}
  busy=true;syncMethod();el('message').textContent='';
  try{
   data.request_key=requestKey(data,file);sessionStorage.setItem('inexc_membership_purchase_draft',JSON.stringify({...data,createdAt:Date.now()}));
   let response;
-  if(method==='stripe')response=await fetch(API+'/memberships/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(method==='free')response=await fetch(API+'/memberships/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  else if(method==='stripe')response=await fetch(API+'/memberships/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   else{const body=new FormData();for(const [key,value]of Object.entries(data))body.append(key,value);body.append('receipt',file);response=await fetch(API+'/memberships/orders',{method:'POST',body});}
   const result=await response.json();if(!response.ok){if([409,410].includes(response.status))sessionStorage.removeItem('inexc_membership_payment_attempt');throw Error(result.error||'تعذّر تجهيز الطلب. أعد المحاولة.');}
   if(method==='stripe'){
    const url=new URL(result.paymentLink);if(url.protocol!=='https:'||(url.hostname!=='checkout.stripe.com'&&!(url.origin===location.origin&&url.pathname==='/cards/payment-status.html')))throw Error('تعذّر التحقق من رابط الدفع.');location.href=url.href;return;
   }
-  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent='تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر باقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;el('dialog').setAttribute('aria-labelledby','successHeading');el('successHeading').focus();
+  sessionStorage.removeItem('inexc_membership_payment_attempt');sessionStorage.removeItem('inexc_membership_purchase_draft');el('formView').style.display='none';el('success').classList.add('show');el('successText').textContent=free?'تم إصدار بطاقتك المجانية. ستصلك رسالة على بريدك الإلكتروني فيها رقم البطاقة ورابط الدورات المجانية المتاحة لهذه الباقة. افتح الرابط وأدخل رقم البطاقة والبريد لإكمال حجز الدورة.':'تم استلام وصل التحويل. بعد مراجعته وتأكيد وصول المبلغ ستصدر باقتك الرقمية وترتبط ببريدك الإلكتروني. رقم الطلب: '+result.reference;el('dialog').setAttribute('aria-labelledby','successHeading');el('successHeading').focus();
  }catch(error){el('message').textContent=error.message}finally{busy=false;syncMethod()}
 };
 async function loadPaymentOptions(){
