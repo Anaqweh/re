@@ -70,6 +70,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (registrationPending) return;
     const institutional = document.getElementById('requestType')?.value === 'institution';
     if (!institutional && !selectedCourse) return alert('يرجى اختيار الدورة.');
+    if (!institutional && Number(selectedCourse.price) === 0) return alert('التسجيل في هذه الدورة المجانية متاح باستخدام بطاقة INEXC فقط. أدخل رقم بطاقتك وتحقّق من الرصيد.');
     const file = !institutional && selectedPayment === 'bank' ? document.getElementById('receipt').files[0] : null;
     if (!institutional && selectedPayment === 'bank') {
       const receiptError = window.INEXCReceiptError(file, true);

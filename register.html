@@ -34,9 +34,9 @@
     function renderCourse(){selectedCourse=COURSES.find(c=>c.id===$('course').value);const area=$('certificateArea');if(!selectedCourse){selectedCertificate=false;selectedPayment='';area.style.display='none';$('paymentArea').classList.remove('show');$('bankBox').classList.remove('show');$('receipt').required=false;$('summaryCourse').textContent='—';$('summaryCertRow').style.display='none';$('total').textContent='—';$('submitButton').textContent='إرسال طلب التسجيل';return}selectedCertificate=selectedCourse.certificate?.mode==='included';const cert=selectedCourse.certificate||{mode:'none'};if(cert.mode==='none'){area.style.display='none'}else{area.style.display='block';$('certificateTitle').textContent=cert.mode==='included'?'الشهادة المشمولة':'هل ترغب بالحصول على الشهادة؟';$('certificateChoices').innerHTML=cert.mode==='included'?`<label class="choice"><input type="radio" checked><b>${cert.name}</b><small>مشمولة في سعر الدورة</small></label>`:`<label class="choice"><input type="radio" name="certificate" value="yes"><b>نعم، أريد الشهادة</b><small>${cert.name} — ${money(cert.price)}</small></label><label class="choice"><input type="radio" name="certificate" value="no" checked><b>لا أريد الشهادة</b><small>التسجيل في الدورة فقط</small></label>`;document.querySelectorAll('[name=certificate]').forEach(i=>i.onchange=()=>{selectedCertificate=i.value==='yes';renderPayments();updateSummary()})}renderPayments();updateSummary()}
     function configuredPaymentLink(value){try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password}catch{return false}}
     function renderPayments(){
-      const paid=selectedCourse.price+(selectedCertificate?(selectedCourse.certificate?.price||0):0)>0;
+      const paid=Number(selectedCourse.price)>0;
       $('paymentArea').classList.toggle('show',paid);
-      if(!paid){selectedPayment='';toggleBank();return}
+      if(!paid){selectedPayment='';$('paymentChoices').replaceChildren();toggleBank();return}
       const methods=[...new Set([...(selectedCourse.payments||[]),...(window.INEXCStripeEnabled&&!selectedCourse.paymentsManaged?['stripe']:[])])].filter(type=>type==='bank'||(type==='stripe'&&window.INEXCStripeEnabled)||(type==='link'&&configuredPaymentLink(selectedCourse.paymentLink)));
       selectedPayment=methods.includes(selectedPayment)?selectedPayment:methods.includes('bank')?'bank':methods[0]||'';
       $('paymentChoices').innerHTML=methods.length?methods.map(type=>`<label class="choice"><input type="radio" name="payment" value="${type}" ${type===selectedPayment?'checked':''}><b>${type==='stripe'?'الدفع الإلكتروني':type==='link'?'الدفع عبر الرابط':'تحويل بنكي'}</b><small>${type==='stripe'?'ادفع ببطاقتك البنكية عبر صفحة دفع آمنة؛ يُؤكّد التسجيل بعد نجاح الدفع.':type==='link'?'انتقل إلى صفحة الدفع بعد تسجيل بياناتك، دون رفع وصل.':'ارفع وصل التحويل للمراجعة وتأكيد التسجيل.'}</small></label>`).join(''):'<p class="hint">لا توجد طريقة دفع نقدية مفعّلة لهذه الدورة حاليًا. استخدم باقة INEXC إن كانت متاحة أدناه، أو تواصل مع الإدارة.</p>';
@@ -48,8 +48,8 @@
     $('course').onchange=renderCourse;
     $('registrationForm').onsubmit=e=>{e.preventDefault();alert('انتظر اكتمال تحميل بيانات التسجيل، ثم حاول مجددًا.');};renderCourses();
   </script>
-  <script src="clean-routes.js"></script><script src="inexc-do-registration.js?v=20261017-cardnames1"></script>
+  <script src="clean-routes.js"></script><script src="inexc-do-registration.js?v=20261018-freecard1"></script>
   <script src="/inexc-whatsapp.js"></script>
   <script src="/inexc-site-assistant.js"></script>
-<script src="/register/inexc-membership-registration.js?v=20261018-cert1"></script></body></html>
+<script src="/register/inexc-membership-registration.js?v=20261018-freecard1"></script></body></html>
 

@@ -13,10 +13,10 @@ async function harness(page,{unavailable=false,stripeEnabled=false}={}){
  Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async value=>copied.push(value)}});
  w.fetch=async(url,opt={})=>{
   requests.push({url,opt});let data;
-  if(url.endsWith('/courses')){if(unavailable)throw Error('OFFLINE');data=[course,{...course,id:'other',membershipEnabled:false,bank:{...course.bank,account:'654321'}}]}
+  if(url.endsWith('/courses')){if(unavailable)throw Error('OFFLINE');data=[course,{...course,id:'other',membershipEnabled:false,bank:{...course.bank,account:'654321'}},{...course,id:'free',price:0},{...course,id:'free-unavailable',price:0,membershipEnabled:false}]}
   else if(url.endsWith('/capabilities'))data={cardCheckout:2,enabled:stripeEnabled};
-  else if(url.endsWith('/verify'))data={cost:2,remainingBefore:6,remainingAfter:4,certificateFee:90};
-  else if(url.endsWith('/registrations'))data={reference:'LOCAL-REFERENCE'};
+  else if(url.endsWith('/verify'))data={cost:2,remainingBefore:6,remainingAfter:4,certificateFee:90,...(JSON.parse(opt.body).course_id==='free'?{certificateDeferred:true}:{} )};
+  else if(url.endsWith('/registrations'))data={reference:'LOCAL-REFERENCE',remaining:4,certificateFee:90,...(opt.body?.get('course_id')==='free'?{certificateRequestId:'LOCAL-CERTIFICATE'}:{})};
   else throw Error('Unexpected request '+url);
   return {ok:true,json:async()=>data};
  };
@@ -26,6 +26,29 @@ async function harness(page,{unavailable=false,stripeEnabled=false}={}){
  return {dom,w,el,change,requests,alerts,copied};
 }
 for(const page of ['register.html','register/index.html']){
+ test(page+': free courses show only INEXC card with or without certificate and restore paid course methods',async t=>{
+  const h=await harness(page,{stripeEnabled:true});t.after(()=>h.dom.window.close());const {w,el,change,requests}=h;
+  const chooseCertificate=value=>{const input=w.document.querySelector('[name=certificate][value='+value+']');input.checked=true;input.dispatchEvent(new w.Event('change',{bubbles:true}));};
+  const assertCardOnly=()=>{
+   assert.equal(el('useMembershipCard').checked,true);assert.equal(el('useMembershipCard').disabled,true);assert.equal(el('membershipFields').hidden,false);
+   assert.equal(el('changePaymentMethod').hidden,true);assert.equal(el('paymentArea').style.display,'none');assert.equal(w.document.querySelectorAll('[name=payment]').length,0);
+   assert.equal(el('bankBox').classList.contains('show'),false);assert.equal(el('receipt').required,false);
+  };
+  el('course').value=course.id;change('course');assert.equal(el('receipt').required,true);
+  el('course').value='free';change('course');assertCardOnly();
+  for(const choice of ['yes','no','yes']){chooseCertificate(choice);assertCardOnly();}
+  el('changePaymentMethod').click();assertCardOnly();
+  el('course').value=course.id;change('course');assert.equal(el('useMembershipCard').checked,false);assert.equal(el('useMembershipCard').disabled,false);assert.equal(el('changePaymentMethod').hidden,false);assert.equal(el('receipt').required,true);assert.equal(w.document.querySelectorAll('[name=payment]').length,3);
+  el('course').value='free';change('course');el('requestType').value='institution';change('requestType');assert.equal(el('membershipPayment').hidden,true);assert.equal(el('useMembershipCard').checked,false);
+  el('requestType').value='individual';change('requestType');assertCardOnly();
+  el('course').value='free-unavailable';change('course');assert.equal(el('membershipPayment').hidden,false);assert.equal(el('useMembershipCard').disabled,true);assert.equal(el('membershipFields').hidden,true);assert.equal(el('submitButton').disabled,true);assert.equal(w.document.querySelectorAll('[name=payment]').length,0);assert.match(el('membershipEligibility').textContent,/غير متاح/);
+  el('registrationForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(requests.filter(r=>r.opt.method==='POST').length,0);
+  el('course').value='free';change('course');chooseCertificate('yes');assert.equal(el('submitButton').disabled,false);
+  el('name').value='LOCAL';el('email').value='local@example.invalid';el('phone').value='000000';el('membershipCode').value='INX-LOCAL';
+  el('verifyMembership').click();await tick();await tick();assertCardOnly();assert.match(el('total').textContent,/لاحقًا/);
+  el('registrationForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();
+  const posted=requests.filter(r=>r.url.endsWith('/registrations'));assert.equal(posted.length,1);assert.equal(posted[0].opt.body.get('payment_method'),'membership');assert.equal(posted[0].opt.body.get('certificate'),'yes');assert.equal(posted[0].opt.body.has('receipt'),false);assert.match(el('successText').textContent,/3 دقائق/);assert.equal(requests.some(r=>r.url.endsWith('/checkout')),false);
+ });
  test(page+': explicit return from INEXC card restores each payment method and keeps registration details',async t=>{
   const h=await harness(page,{stripeEnabled:true});t.after(()=>h.dom.window.close());const {w,el,change,requests}=h;
   el('course').value=course.id;change('course');el('name').value='LOCAL';el('email').value='local@example.invalid';el('phone').value='000000';el('membershipCode').value='INX-LOCAL';
