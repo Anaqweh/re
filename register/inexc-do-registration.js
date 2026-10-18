@@ -65,6 +65,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   let registrationPending = false;
   let stripeAttempt = null;
+  function freeCourseConsent(){return new Promise(resolve=>{
+    const dialog=document.createElement('dialog');dialog.className='free-course-consent';
+    dialog.innerHTML='<div style="padding:25px;max-width:470px;line-height:1.9;font-family:Alexandria,Arial"><h2 style="color:#103b70;margin:0 0 10px">تذكير بشرط التسجيل المجاني</h2><p>هل توافق على مشاركة رابط هذه الدورة المجانية على إحدى وسائل التواصل الاجتماعي؟ يمكنك نسخ الرابط قبل تأكيد تسجيلك.</p><a class="free-course-link" target="_blank" rel="noopener" style="color:#0866c6;font-weight:700" href="#">فتح رابط الدورة للمشاركة ↗</a><div style="display:flex;gap:10px;margin-top:20px"><button type="button" data-agree style="flex:1;padding:12px;border:0;border-radius:9px;background:#0866c6;color:white;cursor:pointer">موافق</button><button type="button" data-decline style="flex:1;padding:12px;border:1px solid #cbdced;border-radius:9px;background:white;cursor:pointer">غير موافق</button></div></div>';
+    dialog.querySelector('a').href='/course.html?id='+encodeURIComponent(selectedCourse.id);
+    document.body.append(dialog);
+    const finish=value=>{dialog.close();dialog.remove();resolve(value)};
+    dialog.querySelector('[data-agree]').onclick=()=>finish(true);
+    dialog.querySelector('[data-decline]').onclick=()=>finish(false);
+    dialog.oncancel=event=>{event.preventDefault();finish(false)};
+    dialog.showModal();
+  })}
   form.onsubmit = async event => {
     event.preventDefault();
     if (registrationPending) return;
@@ -77,6 +88,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     const total = institutional ? 0 : selectedCourse.price + (selectedCertificate ? (selectedCourse.certificate?.price || 0) : 0);
     if (!institutional && total > 0 && !['bank','link','stripe'].includes(selectedPayment)) return alert('اختر وسيلة دفع متاحة أو استخدم باقتك التدريبية.');
+    if(!institutional&&total===0&&!await freeCourseConsent())return alert('لا يمكن تأكيد التسجيل في الدورة المجانية لعدم موافقتك على شرط مشاركة الرابط.');
     registrationPending = true;
     const button = document.getElementById('submitButton');
     button.disabled = true;
@@ -123,6 +135,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       data.append('course_id', selectedCourse.id);
       data.append('certificate', selectedCertificate ? 'yes' : 'no');
       data.append('payment_method', total === 0 ? 'free' : selectedPayment);
+      if(total===0)data.append('free_share_consent','yes');
       if (file) data.append('receipt', file);
       const response = await fetch(`${endpoint}/registrations`, { method: 'POST', body: data });
       const result = await response.json();
