@@ -19,3 +19,10 @@
 @media(max-width:500px){.ms .button-design-options{grid-template-columns:1fr 1fr}.ms .mc-font-controls label:first-child{flex:1;min-width:140px}.ms .mc-font-controls select[data-font]{width:100%}.ms .mc-button-panel{padding:12px}}
 
 .ms .nav button[data-nav="new-subscribers"]{display:inline-flex;align-items:center;gap:7px}.ms [data-new-subscriber-count]{background:#0868ce;color:white;border-radius:20px;padding:0 7px;font-size:12px}.ms [data-new-subscriber-count][hidden]{display:none!important}
+.subscriber-list-dialog{border:1px solid #d7e7f6;border-radius:18px;padding:24px;width:min(440px,calc(100% - 28px));box-shadow:0 22px 65px #103b7040;color:#173d60;font-family:inherit;direction:rtl}
+.subscriber-list-dialog::backdrop{background:#102f50a6}
+.subscriber-list-dialog h3{margin:0 0 5px;font-size:20px;color:#103b70}
+.subscriber-list-dialog p{margin:0 0 17px;color:#60788f;font-size:13px;text-align:right}
+.subscriber-list-dialog label{display:grid;gap:8px;font-size:14px;font-weight:600}
+.subscriber-list-dialog select{min-height:46px;padding:8px 12px;border:1px solid #c8dced;border-radius:9px;background:#fff;font:inherit}
+.subscriber-list-dialog .row{display:flex;gap:10px;margin-top:21px}.subscriber-list-dialog .row button{flex:1;min-height:44px}
