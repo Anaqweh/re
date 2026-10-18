@@ -68,7 +68,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   function freeCourseConsent(){return new Promise(resolve=>{
     const dialog=document.createElement('dialog');dialog.className='free-course-consent';
     dialog.innerHTML='<div style="padding:25px;max-width:470px;line-height:1.9;font-family:Alexandria,Arial"><h2 style="color:#103b70;margin:0 0 10px">تذكير بشرط التسجيل المجاني</h2><p>هل توافق على مشاركة رابط هذه الدورة المجانية على إحدى وسائل التواصل الاجتماعي؟ يمكنك نسخ الرابط قبل تأكيد تسجيلك.</p><a class="free-course-link" target="_blank" rel="noopener" style="color:#0866c6;font-weight:700" href="#">فتح رابط الدورة للمشاركة ↗</a><div style="display:flex;gap:10px;margin-top:20px"><button type="button" data-agree style="flex:1;padding:12px;border:0;border-radius:9px;background:#0866c6;color:white;cursor:pointer">موافق</button><button type="button" data-decline style="flex:1;padding:12px;border:1px solid #cbdced;border-radius:9px;background:white;cursor:pointer">غير موافق</button></div></div>';
-    dialog.querySelector('a').href='/course.html?id='+encodeURIComponent(selectedCourse.id);
+    dialog.querySelector('a').href='/course/?id='+encodeURIComponent(selectedCourse.id);
     document.body.append(dialog);
     const finish=value=>{dialog.close();dialog.remove();resolve(value)};
     dialog.querySelector('[data-agree]').onclick=()=>finish(true);
