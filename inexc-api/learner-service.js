@@ -1,4 +1,5 @@
 import {membershipCardName,cardAllowedForCourse} from './course-card-access.js';
+import {setupCertificateRequests,enqueueCertificateRequest} from './certificate-requests.js';
 // Learner records, card checkout and explicitly requested card recovery. No mail workers.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -25,6 +26,7 @@ export async function setupLearnerService(db){
  await db.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS certificate_fee_status TEXT NOT NULL DEFAULT 'not_required'`);
  await db.query('CREATE INDEX IF NOT EXISTS learner_registration_email ON registrations(lower(email))');
  await db.query('CREATE INDEX IF NOT EXISTS learner_redemption_card_course ON membership_redemptions(card_id,course_id)');
+ await setupCertificateRequests(db);
 }
 
 export function cardQuote(card,course,certificateRequested=false,now=new Date()){
@@ -38,8 +40,9 @@ export function cardQuote(card,course,certificateRequested=false,now=new Date())
  if(Number(card.units_remaining)<cost)throw fail('الرصيد المتبقي في البطاقة لا يكفي لحجز هذه الدورة.');
  const discount=Math.max(0,Math.min(100,Number(card.certificate_discount)||0));
  const certificateFee=course.certificate_mode==='optional'&&certificateRequested?Math.round(positive(course.certificate_price)*(100-discount))/100:0;
- if(certificateFee>0&&!course.payment_methods?.includes('bank'))throw fail('رسوم الشهادة الاختيارية مع بطاقة INEXC تحتاج تحويلًا بنكيًا، وهو غير مفعّل لهذه الدورة. اختر التسجيل دون الشهادة أو استخدم طريقة دفع أخرى متاحة.');
- return {cost,kind,remainingBefore:Number(card.units_remaining),remainingAfter:Number(card.units_remaining)-cost,certificateFee,certificateDiscount:discount};
+ const certificateDeferred=Number(course.price)===0;
+ if(certificateFee>0&&!certificateDeferred&&!course.payment_methods?.includes('bank'))throw fail('رسوم الشهادة الاختيارية مع بطاقة INEXC تحتاج تحويلًا بنكيًا، وهو غير مفعّل لهذه الدورة. اختر التسجيل دون الشهادة أو استخدم طريقة دفع أخرى متاحة.');
+ return {cost,kind,remainingBefore:Number(card.units_remaining),remainingAfter:Number(card.units_remaining)-cost,certificateFee,certificateDiscount:discount,certificateDeferred};
 }
 
 // The card row is locked on ONE transaction connection until both booking and debit commit.
@@ -59,16 +62,17 @@ export async function createCardRegistration(pool,input){
   if(Number(card.price_usd)===0&&Number(course.price)!==0)throw fail('الباقة المجانية مخصصة للدورات المجانية المتاحة لها.');
   const quote=cardQuote(card,course,input.certificateRequested);
   if((input.expectedUnits!=null&&Number(input.expectedUnits)!==quote.cost)||(input.expectedCertificateFee!=null&&Number(input.expectedCertificateFee)!==quote.certificateFee))throw fail('تغيّرت تكلفة الحجز. تحقّق من الرصيد والرسوم مجددًا قبل التأكيد.',409);
-  if(quote.certificateFee>0&&!input.receiptPath)throw fail('الحجز بالبطاقة يغطي الدورة. أرفق وصل رسوم الشهادة الاختيارية بعد الخصم، أو اختر التسجيل دونها.');
+  if(quote.certificateFee>0&&!quote.certificateDeferred&&!input.receiptPath)throw fail('الحجز بالبطاقة يغطي الدورة. أرفق وصل رسوم الشهادة الاختيارية بعد الخصم، أو اختر التسجيل دونها.');
   const certificate=course.certificate_mode==='none'?'لا':course.certificate_mode==='included'||input.certificateRequested?course.certificate_name:'لا';
   const reference='INX-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomBytes(5).toString('hex').toUpperCase();
-  const registration=(await client.query(`INSERT INTO registrations(reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,certificate_fee_amount,certificate_fee_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'membership','مسجل بالبطاقة',$9,$10,$8,$11) RETURNING id`,[reference,text(input.name,150),email(input.email),text(input.phone,50),course.id,course.name,certificate,quote.certificateFee,input.receiptPath||'',card.id,quote.certificateFee>0?'pending':'not_required'])).rows[0];
+  const registration=(await client.query(`INSERT INTO registrations(reference,name,email,phone,course_id,course_name,certificate,total,payment_method,status,receipt_path,membership_card_id,certificate_fee_amount,certificate_fee_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'membership','مسجل بالبطاقة',$9,$10,$8,$11) RETURNING id`,[reference,text(input.name,150),email(input.email),text(input.phone,50),course.id,course.name,certificate,quote.certificateFee,input.receiptPath||'',card.id,quote.certificateFee>0?(quote.certificateDeferred?'awaiting_payment':'pending'):'not_required'])).rows[0];
+  const certificateRequestId=quote.certificateDeferred&&certificate!=='لا'?await enqueueCertificateRequest(client,{registrationId:registration.id,amount:quote.certificateFee}):null;
   const redemption=(await client.query(`INSERT INTO membership_redemptions(card_id,course_id,registration_id,units_used,course_kind) VALUES($1,$2,$3,$4,$5) RETURNING id`,[card.id,course.id,registration.id,quote.cost,quote.kind])).rows[0];
   await client.query('UPDATE registrations SET membership_redemption_id=$1 WHERE id=$2',[redemption.id,registration.id]);
   const debited=await client.query('UPDATE membership_cards SET units_remaining=units_remaining-$1,updated_at=now() WHERE id=$2 AND units_remaining>=$1 RETURNING units_remaining',[quote.cost,card.id]);
   if(!debited.rowCount)throw fail('تغيّر رصيد البطاقة. تحقق منه مجددًا.',409);
   await client.query('COMMIT');
-  return {ok:true,reference,status:'مسجل بالبطاقة',registrationId:registration.id,unitsUsed:quote.cost,remaining:Number(debited.rows[0].units_remaining),certificateFee:quote.certificateFee,courseName:course.name};
+  return {ok:true,reference,status:'مسجل بالبطاقة',registrationId:registration.id,unitsUsed:quote.cost,remaining:Number(debited.rows[0].units_remaining),certificateFee:quote.certificateFee,courseName:course.name,freeCourse:Number(course.price)===0,certificateDeferred:quote.certificateDeferred,certificateRequestId};
  }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
 }
 
@@ -93,7 +97,7 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
   req.learnerEmail=session.email;req.learnerTokenHash=hash(token);next();
  });
  app.use('/api/admin/learner-records',(_req,res,next)=>{res.set('Cache-Control','no-store');next()});
- app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:2,courseCardAccess:1,certificates:true,cardRecovery:true,coursePaymentLinks:true}));
+ app.get('/api/learner/capabilities',(_req,res)=>res.json({version:1,cardCheckout:3,certificateRequests:1,courseCardAccess:1,certificates:true,cardRecovery:true,coursePaymentLinks:true}));
  app.post('/api/learner/card-recovery',asyncRoute(async(req,res)=>{
   res.set('Cache-Control','no-store');
   const raw=req.body?.email,address=typeof raw==='string'?raw.trim().toLowerCase():'';
@@ -153,7 +157,7 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
  }));
  app.get('/api/admin/learner-records/:id',auth,asyncRoute(async(req,res)=>{
   if(!uuid(req.params.id))throw fail('التسجيل غير موجود.',404);
-  const r=(await pool.query('SELECT id,name,email,course_name,certificate_fee_amount,certificate_fee_status FROM registrations WHERE id=$1',[req.params.id])).rows[0];if(!r)throw fail('التسجيل غير موجود.',404);
+  const r=(await pool.query('SELECT id,name,email,course_name,certificate_fee_amount,certificate_fee_status,EXISTS(SELECT 1 FROM certificate_requests q WHERE q.registration_id=registrations.id) AS certificate_payment_managed FROM registrations WHERE id=$1',[req.params.id])).rows[0];if(!r)throw fail('التسجيل غير موجود.',404);
   const progress=(await pool.query('SELECT * FROM learner_progress WHERE registration_id=$1',[r.id])).rows[0]||{state:'not_started',progress_percent:0,attended_hours:0};
   const certificates=(await pool.query('SELECT id,title,certificate_number,issued_on FROM learner_certificates WHERE registration_id=$1 ORDER BY created_at DESC',[r.id])).rows;
   res.json({registration:r,progress,certificates});
@@ -164,7 +168,7 @@ export function installLearnerService({app,pool,auth,uploadDir,sendEmail,emailSh
   if(!['not_started','in_progress','completed'].includes(state)||!Number.isInteger(progress)||progress<0||progress>100||!Number.isFinite(hours)||hours<0||hours>100000)throw fail('راجع حالة الدورة ونسبة التقدم والساعات.');
   if(!(await pool.query('SELECT id FROM registrations WHERE id=$1',[req.params.id])).rowCount)throw fail('التسجيل غير موجود.',404);
   await pool.query(`INSERT INTO learner_progress(registration_id,state,progress_percent,attended_hours,completed_at) VALUES($1,$2,$3,$4,CASE WHEN $2='completed' THEN now() ELSE NULL END) ON CONFLICT(registration_id) DO UPDATE SET state=EXCLUDED.state,progress_percent=EXCLUDED.progress_percent,attended_hours=EXCLUDED.attended_hours,completed_at=CASE WHEN EXCLUDED.state='completed' THEN COALESCE(learner_progress.completed_at,now()) ELSE NULL END,updated_at=now()`,[req.params.id,state,state==='completed'?100:state==='not_started'?0:progress,hours]);
-  if(['paid','pending'].includes(req.body?.certificateFeeStatus))await pool.query('UPDATE registrations SET certificate_fee_status=$1 WHERE id=$2 AND certificate_fee_amount>0',[req.body.certificateFeeStatus,req.params.id]);
+  if(['paid','pending'].includes(req.body?.certificateFeeStatus))await pool.query('UPDATE registrations SET certificate_fee_status=$1 WHERE id=$2 AND certificate_fee_amount>0 AND NOT EXISTS(SELECT 1 FROM certificate_requests q WHERE q.registration_id=registrations.id)',[req.body.certificateFeeStatus,req.params.id]);
   res.json({ok:true});
  }));
  app.post('/api/admin/learner-records/:id/access',auth,asyncRoute(async(req,res)=>{

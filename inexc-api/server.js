@@ -2,6 +2,7 @@ import {membershipCardName,courseCardInput,attachCourseCardNames} from './course
 import {installSeoSitemap} from './seo-sitemap.js';
 function trainingPackageText(value){return String(value??'').replaceAll('بطاق','باق');}
 import {setupServiceCatalog, installServiceCatalog} from './service-catalog.js';
+import {createCertificateRequests} from './certificate-requests.js';
 import {setupMembershipPayments, createMembershipPayments} from './membership-payments.js';
 import {setupStripePayments, createStripePayments} from './stripe-payments.js';
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
@@ -56,7 +57,8 @@ app.use(cors({ origin(origin, callback) {
   return callback(new Error('Origin not allowed'));
 }}));
 const membershipPayments=createMembershipPayments({pool,notify:sendMembershipActivationEmail});
-const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails,handleOtherCheckout:membershipPayments.handleWebhook});
+const certificateRequests=createCertificateRequests({pool,sendEmail,emailShell,mailEnabled:!!resendApiKey,mailAllowed:async email=>!(await blockedEmails(pool,[email])).has(email)});
+const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails,handleOtherCheckout:async event=>{await membershipPayments.handleWebhook(event);await certificateRequests.handleWebhook(event)}});
 stripePayments.installWebhook(app);
 app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
   try {
@@ -117,6 +119,7 @@ app.post('/api/payments/stripe/checkout',rejectSuppressedCourse);
 app.post('/api/memberships/free-course/register',rejectSuppressedCourse);
 stripePayments.installRoutes(app);
 membershipPayments.install(app,auth);
+certificateRequests.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
 app.use('/uploads', (req,res,next)=>{
   res.set('X-Content-Type-Options','nosniff');
@@ -355,7 +358,7 @@ function sendRegistrationEmails(registration) {
   const freeCourse = registration.paymentMethod === 'free' || registration.freeCourse === true;
   const confirmationTitle = freeCourse ? 'تم تأكيد تسجيلك في الدورة المجانية' : stripePaid ? 'تم تأكيد دفعك وتسجيلك' : 'تم استلام طلب تسجيلك';
   const confirmationCopy = freeCourse ? 'تم تأكيد تسجيلك في هذه الدورة المجانية. لا توجد أي رسوم على حضور الدورة، ولا تحتاج إلى دفع أي مبلغ للتسجيل.' : stripePaid ? 'شكرًا لثقتك بـ INEXC Training. تم استلام الدفع عبر Stripe وتأكيد تسجيلك في الدورة.' : 'شكرًا لثقتك بـ INEXC Training. تم تسجيل طلبك بنجاح، وستتم مراجعته والتواصل معك عند تأكيد التسجيل أو الدفع.';
-  const certificateContact = freeCourse ? `<div style="background:#f1f8ff;border:1px solid #d4e6f8;border-radius:12px;padding:17px;margin:19px 0;color:#214b73"><strong style="color:#103b70">مهتم بالحصول على شهادة؟</strong><p style="margin:8px 0 14px">التسجيل في الدورة مجاني. إذا كنت ترغب بالاستفسار عن الشهادة وشروط إصدارها، تواصل معنا عبر واتساب. طلب الشهادة اختياري.</p><a href="https://wa.me/971543475500?text=${encodeURIComponent('مرحبًا، أرغب بالاستفسار عن شهادة دورة '+registration.courseName)}" style="display:inline-block;padding:11px 17px;border-radius:9px;background:#087e5a;color:#fff;text-decoration:none;font-weight:bold">الاستفسار عن الشهادة عبر واتساب</a></div>` : '';
+  const certificateContact = registration.certificateRequestId ? `<div style="background:#f1f8ff;border:1px solid #d4e6f8;border-radius:12px;padding:17px;margin:19px 0;color:#214b73"><strong>تم تسجيل طلب شهادتك</strong><p>سيصلك خلال دقائق رابط خاص لتأكيد الاسم بالعربية والإنجليزية${Number(registration.total)>0?' وسداد رسوم الشهادة الاختيارية':''}. تسجيلك في الدورة المجانية مؤكد.</p></div>` : freeCourse ? `<div style="background:#f1f8ff;border:1px solid #d4e6f8;border-radius:12px;padding:17px;margin:19px 0;color:#214b73"><strong style="color:#103b70">مهتم بالحصول على شهادة؟</strong><p style="margin:8px 0 14px">التسجيل في الدورة مجاني. إذا كنت ترغب بالاستفسار عن الشهادة وشروط إصدارها، تواصل معنا عبر واتساب. طلب الشهادة اختياري.</p><a href="https://wa.me/971543475500?text=${encodeURIComponent('مرحبًا، أرغب بالاستفسار عن شهادة دورة '+registration.courseName)}" style="display:inline-block;padding:11px 17px;border-radius:9px;background:#087e5a;color:#fff;text-decoration:none;font-weight:bold">الاستفسار عن الشهادة عبر واتساب</a></div>` : '';
   const details = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dceafb;border-radius:12px;overflow:hidden;margin:22px 0;font-size:13px"><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;width:38%">رقم الطلب</td><td style="padding:11px 14px;font-weight:800;color:#0866c6;direction:ltr;text-align:right">${referenceNumber}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الدورة</td><td style="padding:11px 14px;font-weight:700;border-top:1px solid #dceafb">${course}</td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">الحالة</td><td style="padding:11px 14px;border-top:1px solid #dceafb"><span style="display:inline-block;background:#fff4d9;color:#9b6500;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700">${status}</span></td></tr><tr><td style="padding:11px 14px;background:#f7fbff;color:#627b93;border-top:1px solid #dceafb">المبلغ</td><td style="padding:11px 14px;font-weight:800;border-top:1px solid #dceafb">${amount} د.إ</td></tr></table>`;
   const userHtml = emailShell({ title: confirmationTitle, preview: `${confirmationTitle} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">${confirmationTitle} ✓</div><p style="margin:13px 0 0;font-size:15px">مرحبًا <strong>${name}</strong>،</p><p style="margin:7px 0;color:#526c84;font-size:14px">${confirmationCopy}</p>${details}${certificateContact}<div style="background:#eaf6ff;border-right:4px solid #0866c6;border-radius:8px;padding:12px 14px;color:#315a79;font-size:12px">احتفظ برقم الطلب للرجوع إليه عند التواصل مع فريقنا.</div><p style="margin:25px 0 0;font-size:14px">مع خالص التحية،<br><strong style="color:#103b70">فريق INEXC Training</strong></p>` });
   const adminHtml = emailShell({ title: 'طلب تسجيل جديد', preview: `طلب جديد من ${name} في دورة ${course}`, content: `<div style="font-size:23px;font-weight:800;color:#103b70">طلب تسجيل جديد</div><p style="margin:10px 0 0;color:#526c84;font-size:14px">تم استلام طلب جديد عبر الموقع. هذه تفاصيله:</p>${details}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px"><tr><td style="padding:8px 0;color:#6a8096;width:30%">الاسم</td><td style="padding:8px 0;font-weight:700">${name}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">البريد</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.email)}</td></tr><tr><td style="padding:8px 0;color:#6a8096;border-top:1px solid #e5eef6">الموبايل</td><td style="padding:8px 0;border-top:1px solid #e5eef6;direction:ltr;text-align:right">${escapeHtml(registration.phone)}</td></tr></table><div style="margin-top:22px;text-align:center"><a href="https://www.inexctraining.com/admin-portal.html" style="display:inline-block;background:#0866c6;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700">فتح لوحة الإدارة</a></div>` });
@@ -921,7 +924,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1 }));
 const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
 app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','public, max-age=10').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
@@ -1084,7 +1087,7 @@ app.post('/api/memberships/free-course/register',async(req,res,next)=>{try{
  if(!found||found.row.plan_id!==target.plan.id)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح لهذه الباقة.'});
  const result=await createCardRegistration(pool,{courseId:course.id,code,email,name:found.row.holder_name,phone:found.row.holder_phone,certificateRequested:false,shareConsent:true});
  if(result.alreadyRegistered)return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة. ادخل إلى صفحتك التدريبية لمتابعة التسجيل، وإذا فقدت رقم البطاقة اطلب إرساله مجددًا إلى بريدك.',alreadyRegistered:true});
- if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:found.row.holder_name,email,phone:found.row.holder_phone,courseName:result.courseName,total:0,status:result.status,freeCourse:true});
+ if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:found.row.holder_name,email,phone:found.row.holder_phone,courseName:result.courseName,total:0,status:result.status,freeCourse:true,certificateRequestId:result.certificateRequestId});
  res.set('Cache-Control','no-store').status(result.alreadyRegistered?200:201).json(result);
 }catch(error){next(error);}});
 app.get('/api/admin/memberships/plans',auth,async(_req,res,next)=>{try{res.json(await membershipPlans(true));}catch(error){next(error);}});
@@ -1239,7 +1242,7 @@ app.post('/api/registrations', upload.single('receipt'), rejectSuppressedCourse,
       const result=await createCardRegistration(pool,{courseId,code:req.body.membership_code,email:req.body.email,name:req.body.name,phone:req.body.phone,certificateRequested:req.body.certificate==='yes',shareConsent:req.body.free_share_consent==='yes',expectedUnits:req.body.expected_units,expectedCertificateFee:req.body.expected_certificate_fee,receiptPath:req.file?`/uploads/${req.file.filename}`:''}).catch(error=>{if(req.file?.path)fs.unlink(req.file.path,()=>{});throw error});
       if(result.alreadyRegistered&&req.file?.path)fs.unlink(req.file.path,()=>{});
       if(result.alreadyRegistered)return res.status(409).json({error:'أنت مسجل مسبقًا في هذه الدورة. ادخل إلى صفحتك التدريبية لمتابعة التسجيل، ويمكنك استعادة رقم البطاقة من خيار «نسيت رقم البطاقة؟».',alreadyRegistered:true});
-      if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:clean(req.body.name,150),email:clean(req.body.email,180),phone:clean(req.body.phone,50),courseName:result.courseName,total:result.certificateFee,status:result.status,freeCourse:req.body.free_share_consent==='yes'});
+      if(!result.alreadyRegistered)sendRegistrationEmails({reference:result.reference,name:clean(req.body.name,150),email:clean(req.body.email,180),phone:clean(req.body.phone,50),courseName:result.courseName,total:result.certificateFee,status:result.status,freeCourse:result.freeCourse,certificateRequestId:result.certificateRequestId});
       return res.status(result.alreadyRegistered?200:201).json(result);
     }
     const courseResult = await pool.query('SELECT * FROM courses WHERE id = $1 AND active = true', [courseId]);
@@ -1859,5 +1862,5 @@ installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:
 installServiceCatalog({app,pool,auth,uploadDir});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); const status=error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500; res.status(status).json({ error: status===500 ? 'حدث خطأ في الخادم. حاول مرة أخرى لاحقًا.' : error.message || 'تعذر تنفيذ الطلب.' }); });
 
-setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
 

@@ -41,7 +41,15 @@ test('card booking is atomic, concurrent retries debit once, and concurrent book
  const results=await Promise.allSettled([createCardRegistration(h.pool,{...h.input,courseId:h.courses[1]}),createCardRegistration(h.pool,{...h.input,courseId:h.courses[2]})]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal((await h.query('SELECT units_remaining FROM membership_cards WHERE id=$1',[h.card])).rows[0].units_remaining,0);
  const replay=await createCardRegistration(h.pool,h.input);assert.equal(replay.alreadyRegistered,true);assert.equal(replay.remaining,0);
 });
-test('eligibility and certificate fees preserve balance on rejection',async t=>{const h=await harness();t.after(()=>h.close());
+test('managed certificate payment cannot be confirmed by the old progress selector',async t=>{const h=await harness();t.after(()=>h.close());
+ const booked=await createCardRegistration(h.pool,{...h.input,certificateRequested:true});
+ const route='/api/admin/learner-records/'+booked.registrationId;
+ assert.equal((await h.request(route,{token:'LOCAL-ADMIN'})).data.registration.certificate_payment_managed,true);
+ assert.equal((await h.request(route,{method:'PUT',token:'LOCAL-ADMIN',body:{state:'in_progress',progress:50,hours:3,certificateFeeStatus:'paid'}})).status,200);
+ assert.equal((await h.query('SELECT certificate_fee_status FROM registrations WHERE id=$1',[booked.registrationId])).rows[0].certificate_fee_status,'awaiting_payment');
+});
+test('eligibility and paid-course certificate fees preserve balance on rejection',async t=>{const h=await harness();t.after(()=>h.close());
+ await h.query('UPDATE courses SET price=150');
  await assert.rejects(createCardRegistration(h.pool,{...h.input,email:'other@example.invalid'}),/غير صحيح/);
  await assert.rejects(createCardRegistration(h.pool,{...h.input,certificateRequested:true}),/وصل/);
  await assert.rejects(createCardRegistration(h.pool,{...h.input,expectedUnits:1,expectedCertificateFee:0}),e=>e.status===409);

@@ -28,3 +28,5 @@ body{font-family:AdminPlex,Arial,sans-serif;font-synthesis:none;background:#f0f4
 @media(prefers-reduced-motion:reduce){.as-sidebar,.as-shortcuts>button,.as-nav-item{transition:none}}
 
 body:has(#app.as-nav-open){overflow:hidden}
+
+.as-nav-item[data-view="certificate-requests"]{--as-dark-tint:#453e25;--as-dark-icon:#f1d383}
