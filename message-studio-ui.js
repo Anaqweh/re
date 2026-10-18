@@ -1,5 +1,5 @@
 import {mountMembershipEmail} from './message-memberships.js?v=20261017-packages1';
-import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberNoticeRevision,updateSubscriberNotice} from './message-subscriptions-ui.js?v=20261018-lists1';
+import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberNoticeRevision,updateSubscriberNotice} from './message-subscriptions-ui.js?v=20261018-lists2';
 import {emailFonts,fontStack,fontCSS} from './inexc-api/message-design.js?v=20261015-studio5';
 import {createButtonDesigner} from './message-button-editor.js?v=20261015-studio5';
 import { messagePresets as presets } from './message-presets.js?v=20261015-studio5';
