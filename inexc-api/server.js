@@ -99,6 +99,7 @@ async function applyMessageEvent(emailId, type) {
   }
 }
 app.use(express.json({ limit: '1mb' }));
+app.use('/api/admin', (_req,res,next)=>{ res.set('Cache-Control','no-store'); next(); });
 stripePayments.installRoutes(app);
 membershipPayments.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
@@ -987,6 +988,7 @@ app.post('/api/memberships/orders', upload.single('receipt'), async (req,res)=>{
   try {res.status(201).json(await membershipPayments.offlineOrder(req.body||{},req.file?`/uploads/${req.file.filename}`:''));}catch(error){membershipPaymentError(res,error);}
 });
 app.get('/api/memberships/card',async(req,res,next)=>{try{
+  res.set('Cache-Control','no-store');
   const found=await getMembershipCard(clean(req.query.code,80),clean(String(req.query.email||'').toLowerCase(),190),clean(req.query.token,100));
   if(!found)return res.status(404).json({error:'لم نجد بطاقة مطابقة لهذه البيانات.'});
   res.json(found.snapshot);
@@ -1038,6 +1040,7 @@ app.get('/api/memberships/card/shared',async(req,res,next)=>{try{
   res.set('Cache-Control','no-store').json({holderName:row.holder_name,status:row.status,publicStatus:Number(row.units_remaining)===0?'الرصيد مستنفد':'',expiresAt:row.expires_at,cardName:membershipCardName(row.name),plan:{name:trainingPackageText(row.name)},offer:{free:row.active===true&&Number(row.price_usd)===0,planId:row.active===true&&Number(row.price_usd)===0?row.plan_id:null}});
 }catch(error){next(error);}});
 app.post('/api/memberships/verify',async(req,res,next)=>{try{
+  res.set('Cache-Control','no-store');
   const code=clean(req.body?.code,80),email=clean(String(req.body?.email||'').toLowerCase(),190),courseId=clean(req.body?.course_id,80);
   const found=await getMembershipCard(code,email); if(!found)return res.status(404).json({error:'رقم البطاقة أو البريد الإلكتروني غير صحيح.'});
   const course=await pool.query('SELECT * FROM courses WHERE id=$1 AND active=true',[courseId]);if(!course.rowCount)return res.status(400).json({error:'الدورة غير متاحة.'});
@@ -1836,7 +1839,7 @@ app.post('/api/admin/campaigns/:id/cancel', auth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (error) { next(error); }
 });
-app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>'"'+String(v ?? '').replaceAll('"','""')+'"'; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,trainingPackageText(r.status),r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
+app.get('/api/admin/export.csv', auth, async (_req, res, next) => { try { const result=await pool.query('SELECT reference,name,email,phone,course_name,certificate,total,payment_method,status,request_kind,organization,request_details,audience_size,preferred_timing,certificate_interest,created_at,receipt_path FROM registrations ORDER BY created_at DESC'); const blocked=await blockedEmails(pool,result.rows.map(r=>r.email)); const header=['رقم الطلب','الاسم','البريد الإلكتروني','الموبايل','الدورة','الشهادة','المبلغ','طريقة الدفع','الحالة','نوع الطلب','المؤسسة','تفاصيل الاحتياج','عدد المشاركين','الموعد المفضل','رغبة الشهادات','تاريخ التسجيل','وصل التحويل']; const quote=v=>{const value=String(v ?? '');return '"'+(/^[\s\uFEFF]*[=+\-@]/.test(value)?"'":'')+value.replaceAll('"','""')+'"'}; const csv='\ufeff'+[header,...result.rows.map(r=>[r.reference,r.name,blocked.has(normalizeEmail(r.email))?'':r.email,r.phone,r.course_name,r.certificate,r.total,r.payment_method,trainingPackageText(r.status),r.request_kind,r.organization,r.request_details,r.audience_size,r.preferred_timing,r.certificate_interest,r.created_at,r.receipt_path])].map(row=>row.map(quote).join(',')).join('\n'); res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="inexc-registrations.csv"'}).send(csv); } catch(error){next(error);} });
 installLearnerService({app,pool,auth,uploadDir,sendEmail,emailShell,mailEnabled:!!resendApiKey});
 installServiceCatalog({app,pool,auth,uploadDir});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); const status=error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500; res.status(status).json({ error: status===500 ? 'حدث خطأ في الخادم. حاول مرة أخرى لاحقًا.' : error.message || 'تعذر تنفيذ الطلب.' }); });
