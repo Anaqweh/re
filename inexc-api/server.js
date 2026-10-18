@@ -6,7 +6,7 @@ import {setupMembershipPayments, createMembershipPayments} from './membership-pa
 import {setupStripePayments, createStripePayments} from './stripe-payments.js';
 import {setupLearnerService, installLearnerService, createCardRegistration, cardQuote} from './learner-service.js';
 import {validateCoursePayment, setupCoursePaymentControls, coursePaymentInput, createCoursePaymentControls} from './course-payment.js';
-import {setupMessageSubscriptions, installMessageSubscriptions} from './message-subscriptions.js';
+import {setupMessageSubscriptions, installMessageSubscriptions, recordBlockedAttempt} from './message-subscriptions.js';
 import {subscriptionUrl} from './message-subscription-links.js';
 import { normalizeEmail, assertMailAllowed, blockedEmails, suppressEmail, installSuppressionRoutes, deliveryUnsubscribeUrl } from './message-suppression.js';
 import crypto from 'node:crypto';
@@ -100,6 +100,21 @@ async function applyMessageEvent(emailId, type) {
 }
 app.use(express.json({ limit: '1mb' }));
 app.use('/api/admin', (_req,res,next)=>{ res.set('Cache-Control','no-store'); next(); });
+async function rejectSuppressedCourse(req,res,next){
+  try{
+    const email=normalizeEmail(req.body?.email);
+    if(!email||!/^\S+@\S+\.\S+$/.test(email))return next();
+    if(!(await blockedEmails(pool,[email])).has(email))return next();
+    const courseId=String(req.body?.courseId||req.body?.course_id||'').slice(0,80);
+    const course=/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(courseId)
+      ? (await pool.query('SELECT name FROM courses WHERE id=$1',[courseId])).rows[0]?.name||'' : '';
+    await recordBlockedAttempt(pool,email,{channel:'course',course});
+    if(req.file?.path)fs.unlink(req.file.path,()=>{});
+    return res.set('Cache-Control','no-store').status(409).json({error:'قمت بإلغاء المتابعة سابقًا، ولا يسمح لك بالتسجيل في الدورات.'});
+  }catch(error){if(req.file?.path)fs.unlink(req.file.path,()=>{});next(error)}
+}
+app.post('/api/payments/stripe/checkout',rejectSuppressedCourse);
+app.post('/api/memberships/free-course/register',rejectSuppressedCourse);
 stripePayments.installRoutes(app);
 membershipPayments.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
@@ -1217,7 +1232,7 @@ app.get('/:shareSlug', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 installSeoSitemap(app, {pool});
-app.post('/api/registrations', upload.single('receipt'), async (req, res, next) => {
+app.post('/api/registrations', upload.single('receipt'), rejectSuppressedCourse, async (req, res, next) => {
   try {
     const courseId = clean(req.body.course_id, 80);
     if (clean(req.body.membership_code,80) || req.body.payment_method==='membership') {
