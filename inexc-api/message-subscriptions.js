@@ -35,6 +35,8 @@ export async function setupMessageSubscriptions(db) {
       first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       source_code TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT ''
     );
+    ALTER TABLE message_blocked_signup_attempts ADD COLUMN IF NOT EXISTS last_channel TEXT NOT NULL DEFAULT 'newsletter';
+    ALTER TABLE message_blocked_signup_attempts ADD COLUMN IF NOT EXISTS last_course TEXT NOT NULL DEFAULT '';
     CREATE INDEX IF NOT EXISTS message_blocked_signup_recent ON message_blocked_signup_attempts(last_attempt_at DESC);
     CREATE TABLE IF NOT EXISTS message_subscription_group(id INTEGER PRIMARY KEY CHECK(id=1),list_id UUID REFERENCES message_recipient_lists(id) ON DELETE SET NULL);
     INSERT INTO message_subscription_group(id) VALUES(1) ON CONFLICT DO NOTHING;
@@ -62,12 +64,7 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
     if(r.hits>max)throw fail('طلبات كثيرة خلال وقت قصير. انتظر قليلًا ثم أعد المحاولة.',429);
   }
   async function campaign(source){return (await pool.query('SELECT id,subscription_code FROM email_campaigns WHERE subscription_code=$1',[String(source||'').slice(0,36)])).rows[0]||null;}
-  async function recordBlockedSignup(email,source){
-    const reason=(await pool.query('SELECT reason FROM message_suppressions WHERE email=$1',[email])).rows[0]?.reason||'shared';
-    await pool.query(`INSERT INTO message_blocked_signup_attempts(email,source_code,reason) VALUES($1,$2,$3)
-      ON CONFLICT(email) DO UPDATE SET attempts=message_blocked_signup_attempts.attempts+1,
-      last_attempt_at=now(),source_code=EXCLUDED.source_code,reason=EXCLUDED.reason`,[email,String(source||'').slice(0,36),reason]);
-  }
+  async function recordBlockedSignup(email,source){await recordBlockedAttempt(pool,email,{source});}
   async function activate(db,record,verified=false){
     const existed=(await db.query('SELECT id FROM message_contacts WHERE normalized_email=$1',[record.email])).rows.length>0;
     const tag=verified?'اشتراك مؤكد':'اشتراك من الموقع';
@@ -136,7 +133,7 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
     const search=String(req.query.search||'').trim().slice(0,160),page=Math.min(10000,Math.max(0,parseInt(req.query.page,10)||0));
     const q='%'+search.replace(/[\\%_]/g,'\\$&')+'%';
     const total=(await pool.query('SELECT count(*)::int AS n FROM message_blocked_signup_attempts WHERE email ILIKE $1',[q])).rows[0].n;
-    const rows=(await pool.query(`SELECT a.email,a.attempts,a.first_attempt_at,a.last_attempt_at,a.reason,c.subject AS campaign_subject
+    const rows=(await pool.query(`SELECT a.email,a.attempts,a.first_attempt_at,a.last_attempt_at,a.reason,a.last_channel,a.last_course,c.subject AS campaign_subject
       FROM message_blocked_signup_attempts a LEFT JOIN email_campaigns c ON c.subscription_code=a.source_code
       WHERE a.email ILIKE $1 ORDER BY a.last_attempt_at DESC,a.email LIMIT 50 OFFSET $2`,[q,page*50])).rows;
     res.json({rows,total,page});
@@ -177,4 +174,14 @@ export function installMessageSubscriptions({app,pool,auth,sendEmail,mailEnabled
   },true);
   route('put',prefix+'/settings',async(req,res)=>{const config=subscriptionSettings(req.body);await pool.query('UPDATE message_subscription_settings SET value=$1 WHERE id=1',[config]);res.json({settings:config});},true);
   route('get',prefix+'/qr',async(req,res)=>{const c=await campaign(req.query.source);const url=subscriptionUrl(c?.subscription_code||'',false,publicOrigin);res.set({'Content-Type':'image/svg+xml','Content-Disposition':'attachment; filename="inexc-subscribe-qr.svg"'}).send(await QRCode.toString(url,{type:'svg',errorCorrectionLevel:'M',margin:4,width:600,color:{dark:'#0868ce',light:'#ffffff'}}));},true);
+}
+
+export async function recordBlockedAttempt(db,email,{source='',channel='newsletter',course=''}={}){
+  email=normalizeEmail(email);
+  const reason=(await db.query('SELECT reason FROM message_suppressions WHERE email=$1',[email])).rows[0]?.reason||'shared';
+  await db.query(`INSERT INTO message_blocked_signup_attempts(email,source_code,reason,last_channel,last_course) VALUES($1,$2,$3,$4,$5)
+    ON CONFLICT(email) DO UPDATE SET attempts=message_blocked_signup_attempts.attempts+1,
+    last_attempt_at=now(),source_code=EXCLUDED.source_code,reason=EXCLUDED.reason,
+    last_channel=EXCLUDED.last_channel,last_course=EXCLUDED.last_course`,
+    [email,String(source||'').slice(0,36),reason,channel,String(course||'').slice(0,160)]);
 }
