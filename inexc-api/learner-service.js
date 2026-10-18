@@ -51,10 +51,12 @@ export async function createCardRegistration(pool,input){
   await client.query('BEGIN');
   const card=(await client.query(cardQuery+' WHERE upper(c.card_number)=upper($1) AND lower(c.holder_email)=$2 FOR UPDATE OF c',[text(input.code,80),email(input.email)])).rows[0];
   if(!card)throw fail('رقم البطاقة أو البريد الإلكتروني غير صحيح.',404);
+  if(Number(card.price_usd)===0&&input.shareConsent!==true)throw fail('يلزم قبول شرط مشاركة رابط البطاقة قبل تأكيد حجز الباقة المجانية.');
   const previous=(await client.query(`SELECT r.id,r.reference,r.status,r.total,r.certificate_fee_amount,d.units_used FROM membership_redemptions d JOIN registrations r ON r.id=d.registration_id WHERE d.card_id=$1 AND d.course_id=$2 AND d.status='used' AND r.status<>'ملغى' ORDER BY d.created_at LIMIT 1`,[card.id,input.courseId])).rows[0];
   if(previous){await client.query('COMMIT');return {ok:true,reference:previous.reference,status:previous.status,alreadyRegistered:true,unitsUsed:Number(previous.units_used),remaining:Number(card.units_remaining),certificateFee:Number(previous.certificate_fee_amount),registrationId:previous.id};}
   const course=(await client.query('SELECT * FROM courses WHERE id=$1 FOR SHARE',[input.courseId])).rows[0];
   if(!course)throw fail('الدورة غير متاحة للتسجيل.');
+  if(Number(card.price_usd)===0&&Number(course.price)!==0)throw fail('الباقة المجانية مخصصة للدورات المجانية المتاحة لها.');
   const quote=cardQuote(card,course,input.certificateRequested);
   if((input.expectedUnits!=null&&Number(input.expectedUnits)!==quote.cost)||(input.expectedCertificateFee!=null&&Number(input.expectedCertificateFee)!==quote.certificateFee))throw fail('تغيّرت تكلفة الحجز. تحقّق من الرصيد والرسوم مجددًا قبل التأكيد.',409);
   if(quote.certificateFee>0&&!input.receiptPath)throw fail('الحجز بالبطاقة يغطي الدورة. أرفق وصل رسوم الشهادة الاختيارية بعد الخصم، أو اختر التسجيل دونها.');
