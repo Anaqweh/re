@@ -6,6 +6,6 @@ fetch(api+'/site-sections',{cache:'no-store',signal:AbortSignal.timeout(12000)})
  for(const key of ['courses','packages','services'])document.querySelectorAll('[data-site-section="'+key+'"]').forEach(node=>node.hidden=settings[key]===false);
  const courses=document.getElementById('courses');if(courses)courses.hidden=settings.courses===false;
  const nav=document.querySelector('.topbar nav');if(!nav)return;
- for(const item of Array.isArray(settings.links)?settings.links.slice(0,6):[]){if(item.visible!==true||typeof item.href!=='string'||!/^\/(?!\/)[a-zA-Z0-9/_?=&%#.-]+$/.test(item.href)||!item.label)continue;const link=document.createElement('a');link.href=item.href;link.textContent=String(item.label).slice(0,45);nav.insertBefore(link,nav.querySelector('.nav-cta'))}
+ for(const item of Array.isArray(settings.links)?settings.links.slice(0,6):[]){if(item.visible!==true||typeof item.href!=='string'||!/^\/(?!\/)/.test(item.href)||!item.label)continue;const link=document.createElement('a');link.href=item.href;link.textContent=String(item.label).slice(0,45);nav.insertBefore(link,nav.querySelector('.nav-cta'))}
 }).catch(legacyServices);
 })();
