@@ -1,5 +1,5 @@
 import {mountMembershipEmail} from './message-memberships.js?v=20261017-packages1';
-import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberNoticeRevision,updateSubscriberNotice} from './message-subscriptions-ui.js?v=20261018-lists2';
+import {loadSubscriptionManager,loadNewSubscribers,newSubscriberIcon,subscriberNoticeRevision,updateSubscriberNotice} from './message-subscriptions-ui.js?v=20261018-lists3';
 import {emailFonts,fontStack,fontCSS} from './inexc-api/message-design.js?v=20261015-studio5';
 import {createButtonDesigner} from './message-button-editor.js?v=20261015-studio5';
 import { messagePresets as presets } from './message-presets.js?v=20261015-studio5';
@@ -15,7 +15,7 @@ const statuses={draft:'مسودة',scheduled:'مجدولة',queued:'في قائ�
 const badge=status=>`<span class="badge ${['sent','delivered'].includes(status)?'good':['failed','bounced','complained'].includes(status)?'bad':['queued','scheduled','sending','partial'].includes(status)?'warn':''}">${esc(statuses[status]||status)}</span>`;
 const rich = blocks => richTextPrefix+JSON.stringify({direction:'auto',blocks:blocks.map(b=>typeof b==='string'?{type:'paragraph',runs:[{text:b}]}:b)});
 export async function mountMessageStudio(mainButton) {
- const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./message-studio.css?v=20261018-save4',import.meta.url).href;document.head.append(link);
+ const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./message-studio.css?v=20261018-lists3',import.meta.url).href;document.head.append(link);
  const root=document.createElement('section');root.id='message-center';root.className='view ms';root.dir='rtl';document.querySelector('.wrap').append(root);
  const $=s=>root.querySelector(s), $$=s=>[...root.querySelectorAll(s)];
  const state={siteSections:null,buttonDesigners:[],view:'overview',settings:{},config:{},lists:[],courses:[],drafts:[],campaigns:[],templates:[],blocks:[],contacts:[],contactTotal:0,page:0,selected:new Set(),selectAll:false,importData:null,draft:null,seq:0,savedSeq:0,saving:null,timer:null,previewTimer:null,previewSeq:0,loaded:false,editCampaign:null};
