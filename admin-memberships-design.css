@@ -108,3 +108,13 @@
 #memberships .membership-orders-empty{margin:0;padding:20px;background:#f7fbff;border:1px dashed #c7dcea;border-radius:12px;color:#526f88;font-size:14px}
 @media(max-width:850px){#memberships .membership-order-facts{grid-template-columns:repeat(2,minmax(0,1fr))}#memberships .membership-order-fields{grid-template-columns:1fr}}
 @media(max-width:520px){#memberships .membership-order-head{padding:16px;flex-direction:column;gap:10px}#memberships .membership-order-status{max-width:100%}#memberships .membership-order-facts>div{padding:11px 13px}#memberships .membership-order-footer,#memberships .membership-order-issued,#memberships .membership-order-action,#memberships .membership-order-review-body{padding-inline:16px}#memberships .membership-order-review summary{padding-inline:16px}#memberships .membership-order-buttons button{width:100%}}
+#memberships .membership-orders-tools{display:flex;align-items:end;gap:16px;flex-wrap:wrap;margin:0 0 15px;padding:15px 17px;background:#f4f9ff;border:1px solid #dce8f3;border-radius:14px}
+#memberships .membership-orders-tools label{display:grid;gap:6px;min-width:min(290px,100%);font-size:14px;font-weight:600;color:#2a4c6b}
+#memberships .membership-orders-tools select{min-height:44px;border:1px solid #bfd5e9;border-radius:9px;background:white;color:#173d60;font:inherit;padding:8px 12px}
+#memberships #membershipOrderCount{margin-inline-start:auto;color:#526d85;font-size:14px}
+#memberships .membership-manual-review{margin-top:18px;border:1px solid #dae7f3;border-radius:13px;background:#fbfdff;overflow:hidden}
+#memberships .membership-manual-review[hidden]{display:none!important}
+#memberships .membership-manual-review>summary{padding:13px 17px;color:#365c7a;font-size:14px;font-weight:700;cursor:pointer}
+#memberships .membership-manual-review>p{padding:0 17px;margin:0 0 12px;color:#667e93;font-size:13px;line-height:1.8}
+#memberships #membershipPendingOrders{padding:0 14px 14px;display:grid;gap:12px}
+@media(max-width:520px){#memberships .membership-orders-tools{align-items:stretch;flex-direction:column}#memberships .membership-orders-tools label,#memberships .membership-orders-tools select{width:100%}#memberships #membershipOrderCount{margin-inline-start:0}}
