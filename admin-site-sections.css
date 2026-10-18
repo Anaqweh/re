@@ -1,0 +1,13 @@
+#siteSectionsAdmin .site-sections-panel{padding:28px;max-width:1060px;margin:auto;border-radius:20px}
+#siteSectionsAdmin .site-sections-head{display:flex;gap:15px;align-items:center;border-bottom:1px solid #dce8f3;padding-bottom:20px}
+#siteSectionsAdmin .site-sections-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:13px;background:#e8f3ff;color:#0866c6;font-size:26px}
+#siteSectionsAdmin h2{font-size:23px;color:#103b70;margin:0}#siteSectionsAdmin p{color:#617991;line-height:1.8;margin:5px 0;font-size:14px}
+#siteSectionsStatus:not(:empty){padding:10px 13px;background:#f1f8ff;border-radius:9px;margin-top:16px;color:#20527e}
+#siteSectionsAdmin form{margin-top:20px}#siteSectionsAdmin .site-sections-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+#siteSectionsAdmin .site-sections-grid label{display:flex;align-items:flex-start;gap:11px;padding:18px;border:1px solid #dce8f3;border-radius:13px;background:#f8fbff;cursor:pointer}
+#siteSectionsAdmin .site-sections-grid input{width:20px;height:20px;flex:none}#siteSectionsAdmin .site-sections-grid strong,#siteSectionsAdmin .site-sections-grid small{display:block}#siteSectionsAdmin .site-sections-grid strong{font-size:16px;color:#143f68}#siteSectionsAdmin .site-sections-grid small{font-size:13px;color:#627e97;line-height:1.7;margin-top:5px}
+#siteSectionsAdmin .site-extra-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-top:28px}#siteSectionsAdmin h3{font-size:17px;color:#103b70;margin:0}
+#siteSectionsAdmin .site-extra-row{display:grid;grid-template-columns:1fr 1.3fr auto auto;gap:10px;align-items:end;margin:10px 0;padding:14px;border:1px solid #e0eaf4;border-radius:12px}
+#siteSectionsAdmin .site-extra-row label{font-size:13px;color:#3a5875;display:grid;gap:5px}#siteSectionsAdmin .site-extra-row input:not([type=checkbox]){min-height:43px;width:100%;border:1px solid #caddec;border-radius:8px;padding:9px;font:inherit}
+#siteSectionsAdmin .site-extra-show{display:flex!important;align-items:center;white-space:nowrap;min-height:43px}#siteSectionsAdmin .site-extra-row button{min-height:43px}#siteSectionsAdmin form>.primary{margin-top:18px;min-height:46px}
+@media(max-width:700px){#siteSectionsAdmin .site-sections-panel{padding:16px}#siteSectionsAdmin .site-sections-grid{grid-template-columns:1fr}#siteSectionsAdmin .site-extra-head{align-items:stretch;flex-direction:column}#siteSectionsAdmin .site-extra-row{grid-template-columns:1fr 1fr}#siteSectionsAdmin .site-extra-row label:nth-child(-n+2){grid-column:1/-1}}
