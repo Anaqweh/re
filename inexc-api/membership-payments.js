@@ -11,7 +11,7 @@ export async function setupMembershipPayments(pool){
  const db=await pool.connect();try{
   await db.query('BEGIN');
   await db.query("ALTER TABLE membership_orders DROP CONSTRAINT IF EXISTS membership_orders_payment_method_check");
-  await db.query("ALTER TABLE membership_orders ADD CONSTRAINT membership_orders_payment_method_check CHECK(payment_method IN ('bank','link','stripe'))");
+  await db.query("ALTER TABLE membership_orders ADD CONSTRAINT membership_orders_payment_method_check CHECK(payment_method IN ('bank','link','stripe','free'))");
   await db.query('ALTER TABLE membership_orders ADD COLUMN IF NOT EXISTS request_key UUID');
   await db.query('CREATE UNIQUE INDEX IF NOT EXISTS membership_order_request_unique ON membership_orders(request_key)');
   await db.query(`CREATE TABLE IF NOT EXISTS membership_stripe_checkouts(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),request_key UUID UNIQUE NOT NULL,request_hash TEXT NOT NULL,order_id UUID UNIQUE REFERENCES membership_orders(id),amount INTEGER NOT NULL DEFAULT 0,currency TEXT NOT NULL DEFAULT 'usd',params JSONB,plan_snapshot JSONB,stripe_session_id TEXT UNIQUE,checkout_url TEXT NOT NULL DEFAULT '',state TEXT NOT NULL DEFAULT 'creating',payment_intent TEXT NOT NULL DEFAULT '',paid_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
@@ -64,6 +64,27 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
    const row=(await db.query('INSERT INTO membership_orders(reference,plan_id,name,email,phone,total,payment_method,status,receipt_path,request_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',[reference,plan.id,data.name,data.email,data.phone,plan.price_usd,method,status,receiptPath||'',key])).rows[0];
    await db.query('COMMIT');return {ok:true,reference,status,orderId:row.id,paymentLink:method==='link'?plan.payment_link:''};
   }catch(error){await db.query('ROLLBACK');throw error}finally{db.release()}
+ }
+ async function freeOrder(input){
+  const data=identity(input),key=text(input.request_key,80);
+  if(!uuid(key))throw fail('أعد فتح طلب الباقة المجانية ثم حاول مجددًا.');
+  const db=await pool.connect();let issued,reference;
+  try{
+   await db.query('BEGIN');
+   const plan=(await db.query('SELECT * FROM membership_plans WHERE id=$1 AND active=true FOR UPDATE',[data.planId])).rows[0];
+   if(!plan||Number(plan.price_usd)!==0)throw fail('هذه الباقة غير متاحة للتسجيل المجاني.');
+   const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];
+   if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);reference=prior.reference;await db.query('COMMIT');return {ok:true,reference,email:data.email,alreadyRegistered:true}}
+   const existing=(await db.query("SELECT reference FROM membership_orders WHERE plan_id=$1 AND lower(email)=$2 AND payment_method='free' AND status='مفعلة' LIMIT 1",[plan.id,data.email])).rows[0];
+   if(existing){reference=existing.reference;await db.query('COMMIT');return {ok:true,reference,email:data.email,alreadyRegistered:true}}
+   await stock(db,plan);
+   reference='CARD-'+crypto.randomBytes(9).toString('hex').toUpperCase();
+   const row=(await db.query("INSERT INTO membership_orders(reference,plan_id,name,email,phone,total,payment_method,status,request_key,verified_reference,verified_amount,verified_currency,verified_at) VALUES($1,$2,$3,$4,$5,0,'free','مفعلة',$6,$7,0,'USD',now()) RETURNING id",[reference,plan.id,data.name,data.email,data.phone,key,'FREE-'+reference])).rows[0];
+   issued=await issueMembershipCard(db,row.id,plan);
+   await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error}finally{db.release()}
+  await send(issued);
+  return {ok:true,reference,email:data.email};
  }
  async function checkout(input){
   if(!enabled())throw fail('الدفع الإلكتروني غير متاح حاليًا. اختر التحويل البنكي.',503);
@@ -151,8 +172,9 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
  function install(app,auth){
   app.get('/api/memberships/payment-options',route(()=>options()));
   app.post('/api/memberships/checkout',route(req=>{limited(req,'checkout',60);return checkout(req.body||{})}));
+  app.post('/api/memberships/free',route(req=>{limited(req,'free',20);return freeOrder(req.body||{})}));
   app.post('/api/memberships/payment-status',route(req=>{limited(req,'status',180);return status(req.body||{})}));
   app.post('/api/admin/memberships/orders/:id/refresh-payment',auth,route(req=>review(req.params.id)));
  }
- return {options,checkout,offlineOrder,reconcile,handleWebhook,status,review,approveOffline,install};
+ return {options,checkout,freeOrder,offlineOrder,reconcile,handleWebhook,status,review,approveOffline,install};
 }
