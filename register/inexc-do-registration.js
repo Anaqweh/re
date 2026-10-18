@@ -147,7 +147,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       form.style.display = 'none';
       document.getElementById('success').classList.add('show');
       document.getElementById('reference').textContent = `رقم طلبك: ${result.reference}`;
-      document.getElementById('successText').textContent = selectedPayment === 'bank'
+      document.getElementById('successText').textContent = total === 0 ? 'تم تأكيد تسجيلك في الدورة المجانية. لا توجد رسوم على حضورها، وستصلك رسالة التأكيد عبر البريد الإلكتروني.' : selectedPayment === 'bank'
         ? 'تم استلام طلب التسجيل ووصل التحويل. سنراجع العملية ونؤكد التسجيل عبر البريد الإلكتروني.'
         : 'تم استلام طلب التسجيل. سنرسل لك تفاصيل التأكيد عبر البريد الإلكتروني.';
     } catch (error) {
