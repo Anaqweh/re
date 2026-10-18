@@ -15,7 +15,7 @@ test('immediate subscription joins existing contacts, tracks new signups and pre
  const campaign=(await h.query("INSERT INTO email_campaigns(subject,body,audience) VALUES('حملة المعرفة','body','custom') RETURNING id,subscription_code")).rows[0];
  await t.test('public config states instant mode and admin endpoints require authentication',async()=>{
   const config=await request(h,'config');assert.equal(config.data.version,2);assert.equal(config.data.mode,'instant');assert.equal(config.data.available,true);
-  for(const suffix of ['/subscriptions','/subscriptions/qr','/subscriptions/new'])assert.equal((await fetch(h.url+'/api/admin/message-studio'+suffix)).status,401);
+  for(const suffix of ['/subscriptions','/subscriptions/qr','/subscriptions/new','/subscriptions/blocked-attempts'])assert.equal((await fetch(h.url+'/api/admin/message-studio'+suffix)).status,401);
   assert.equal((await fetch(h.url+'/api/admin/message-studio/subscriptions/new/seen',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"emails":[]}'})).status,401);
  });
  await t.test('invalid addresses, missing consent and honeypots add no contacts or mail',async()=>{
@@ -45,7 +45,11 @@ test('immediate subscription joins existing contacts, tracks new signups and pre
   const responses=await Promise.all([signup(h,'repeat@example.com'),signup(h,'REPEAT@example.com')]);assert.ok(responses.every(r=>r.status===202));assert.equal((await h.query("SELECT * FROM message_contacts WHERE email='repeat@example.com'")).rows.length,1);assert.equal((await h.query("SELECT * FROM message_recipient_list_members m JOIN message_contacts c ON c.id=m.contact_id WHERE c.email='repeat@example.com'")).rows.length,1);
  });
  await t.test('an opted-out address cannot rejoin even after contact deletion and import',async()=>{
-  await suppressEmail(h.pool,'first@example.com');const before=h.sent.length;assert.equal((await signup(h,'FIRST@example.com')).status,202);assert.equal(h.sent.length,before);assert.doesNotMatch((await h.request('/contacts-export')).data,/first@example.com/);
+  await suppressEmail(h.pool,'first@example.com');const before=h.sent.length;
+  const refused=await signup(h,'FIRST@example.com',{source:campaign.subscription_code});assert.equal(refused.status,409);assert.match(refused.data.error,/إلغاء المتابعة/);
+  assert.equal((await signup(h,'first@example.com')).status,409);
+  const attempts=await h.request('/subscriptions/blocked-attempts?search=FIRST');assert.equal(attempts.data.total,1);assert.equal(attempts.data.rows[0].attempts,2);assert.equal(attempts.data.rows[0].reason,'unsubscribe');
+  assert.equal(h.sent.length,before);assert.doesNotMatch((await h.request('/contacts-export')).data,/first@example.com/);
   await h.query("DELETE FROM message_contacts WHERE email='first@example.com'");await signup(h,'first@example.com');assert.equal((await h.query("SELECT * FROM message_contacts WHERE email='first@example.com'")).rows.length,0);
   assert.equal((await h.request('/import/inspect','POST',{rows:[{email:'first@example.com'}]})).data.counts.suppressed,1);assert.equal((await h.request('/subscriptions/new?search=first@example.com')).data.rows[0].status,'blocked');
  });
