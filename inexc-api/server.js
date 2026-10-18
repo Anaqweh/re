@@ -417,6 +417,7 @@ async function setupDatabase() {
     expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_token TEXT');
+  await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_image BYTEA');
   await pool.query('ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS share_image_version INTEGER NOT NULL DEFAULT 0');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS membership_cards_share_token_unique ON membership_cards(share_token) WHERE share_token IS NOT NULL');
@@ -1081,7 +1082,13 @@ app.delete('/api/admin/memberships/plans/:id',auth,async(req,res,next)=>{try{
 app.get('/api/admin/memberships/orders',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT o.*,p.name AS plan_name,p.slug AS plan_slug,c.card_number FROM membership_orders o JOIN membership_plans p ON p.id=o.plan_id LEFT JOIN membership_cards c ON c.id=o.card_id ORDER BY o.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:trainingPackageText(r.plan_name),total:Number(r.total)})));}catch(error){next(error);}});
 app.post('/api/admin/memberships/orders/:id/approve',auth,async(req,res)=>{try{res.json(await membershipPayments.approveOffline(req.params.id,req.body||{}));}catch(error){membershipPaymentError(res,error);}});
 app.post('/api/admin/memberships/orders/:id/reject',auth,async(req,res,next)=>{try{const result=await pool.query(`UPDATE membership_orders SET status='مرفوض',updated_at=now() WHERE id=$1 AND card_id IS NULL RETURNING id`,[req.params.id]);if(!result.rowCount)return res.status(400).json({error:'لا يمكن رفض طلب تم تفعيل باقته.'});res.json({ok:true});}catch(error){next(error);}});
-app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.*,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:membershipCardName(r.plan_name),units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
+app.get('/api/admin/memberships/cards',auth,async(_req,res,next)=>{try{const result=await pool.query(`SELECT c.id,c.card_number,c.holder_name,c.holder_email,c.holder_phone,c.plan_id,c.status,c.units_total,c.units_remaining,c.activated_at,c.expires_at,c.created_at,p.name AS plan_name,p.slug AS plan_slug FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.deleted_at IS NULL ORDER BY c.created_at DESC`);res.json(result.rows.map(r=>({...r,plan_name:membershipCardName(r.plan_name),units_total:Number(r.units_total),units_remaining:Number(r.units_remaining)})));}catch(error){next(error);}});
+app.delete('/api/admin/memberships/cards/:id',auth,async(req,res,next)=>{try{
+  if(!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(req.params.id))return res.status(400).json({error:'البطاقة غير صالحة.'});
+  const result=await pool.query("UPDATE membership_cards SET deleted_at=now(),status='suspended',share_token=NULL,share_image=NULL,updated_at=now() WHERE id=$1 AND deleted_at IS NULL RETURNING id",[req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'لم نجد هذه البطاقة، أو حُذفت مسبقًا.'});
+  res.set('Cache-Control','no-store').json({ok:true});
+}catch(error){next(error);}});
 app.put('/api/admin/memberships/courses/:id',auth,async(req,res,next)=>{try{const b=req.body||{};const result=await pool.query(`UPDATE courses SET membership_enabled=$1,membership_kind=$2,member_booking_opens_at=$3,public_booking_opens_at=$4,updated_at=now() WHERE id=$5 RETURNING id`,[b.enabled!==false,b.kind==='diploma'?'diploma':'course',b.memberBookingOpensAt||null,b.publicBookingOpensAt||null,req.params.id]);if(!result.rowCount)return res.status(404).json({error:'الدورة غير موجودة.'});res.json({ok:true});}catch(error){next(error);}});
 app.get('/api/courses', async (_req, res, next) => {
   try { const result = await pool.query('SELECT * FROM courses WHERE active = true ORDER BY created_at DESC'); res.json((await attachCourseCardNames(pool,result.rows)).map(publicCourse)); } catch (error) { next(error); }
