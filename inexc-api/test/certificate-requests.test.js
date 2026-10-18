@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import express from 'express';
 import {PGlite} from '@electric-sql/pglite';
 import {setupLearnerService,createCardRegistration,cardQuote} from '../learner-service.js';
-import {createCertificateRequests,certificateNames,certificateEmail} from '../certificate-requests.js';
+import {createCertificateRequests,certificateNames,certificateEmail,repairRequestedCertificate} from '../certificate-requests.js';
 import {setupStripePayments,createStripePayments} from '../stripe-payments.js';
 const env={STRIPE_SECRET_KEY:'sk_live_LOCAL_FIXTURE',STRIPE_WEBHOOK_SECRET:'whsec_LOCAL_FIXTURE',STRIPE_CHECKOUT_ENABLED:'1'};
 async function harness(options={}){
@@ -26,11 +26,18 @@ async function harness(options={}){
  const service=createCertificateRequests({pool,env,client,now:()=>clock,mailEnabled:options.mailEnabled??true,emailShell:({content})=>'<html dir="rtl">'+content+'</html>',sendEmail:async message=>{emails.push(message);if(mailFailure){mailFailure=false;throw Object.assign(Error('LOCAL MAIL FAILED'),{status:503})}return {id:'email_local_'+emails.length}},mailAllowed:async()=>allowed,logger:{error:(...args)=>logs.push(args)}});
  const payments=createStripePayments({pool,env,client,handleOtherCheckout:service.handleWebhook});
  const app=express();payments.installWebhook(app);app.use(express.json());service.install(app,(req,res,next)=>req.headers.authorization==='Bearer LOCAL_ADMIN'?next():res.sendStatus(401));
+ const registrationNotifications=[];
+ if(options.freeRoutes){
+  const start=source.indexOf('async function freeMembershipCourse('),end=source.indexOf("app.get('/api/admin/memberships/plans'",start);
+  const getCard=async(code,email)=>{const row=(await query('SELECT p.*,c.*,p.id AS plan_id FROM membership_cards c JOIN membership_plans p ON p.id=c.plan_id WHERE c.card_number=$1 AND c.holder_email=$2',[code,email])).rows[0];return row?{row}:null};
+  new Function('app','pool','trainingPackageText','clean','getMembershipCard','createCardRegistration','sendRegistrationEmails',source.slice(start,end))(app,pool,v=>v,v=>String(v??'').trim(),getCard,createCardRegistration,data=>registrationNotifications.push(data));
+  app.use((error,req,res,next)=>res.status(error.status||500).json({error:error.message}));
+ }
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
  const call=async(path,{body,token,headers={}}={})=>{const r=await fetch('http://127.0.0.1:'+server.address().port+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...headers},...(body===undefined?{}:{body:typeof body==='string'?body:JSON.stringify(body)})});const text=await r.text();let data;try{data=JSON.parse(text)}catch{data=text}return {status:r.status,data,headers:r.headers}};
  const request=async()=>{const registration=await createCardRegistration(pool,input),q=(await query('SELECT * FROM certificate_requests WHERE registration_id=$1',[registration.registrationId])).rows[0];return {registration,q,credentials:{request:q.id,token:q.access_token},names:{arabicName:'أحمد محمد عناقوة',englishName:'Ahmad Mohammad Anakwa'}}};
  const sign=(session,type='checkout.session.completed')=>{const body=JSON.stringify({id:'evt_LOCALCERT',type,livemode:true,data:{object:session}}),at=Math.floor(Date.now()/1000);return {body,headers:{'Stripe-Signature':'t='+at+',v1='+crypto.createHmac('sha256',env.STRIPE_WEBHOOK_SECRET).update(at+'.'+body).digest('hex')}}};
- return {query,pool,service,course,card,plan,input,request,sessions,requests,emails,logs,call,sign,loseNext(){lose=true},failMail(){mailFailure=true},suppress(){allowed=false},advance(ms){clock+=ms},failDebit(){failDebit=true},async close(){await new Promise(r=>server.close(r));await db.close()}};
+ return {query,pool,service,course,card,plan,input,registrationNotifications,request,sessions,requests,emails,logs,call,sign,loseNext(){lose=true},failMail(){mailFailure=true},suppress(){allowed=false},advance(ms){clock+=ms},failDebit(){failDebit=true},async close(){await new Promise(r=>server.close(r));await db.close()}};
 }
 test('free-course card registration defers optional fees, with atomic outbox and no duplicate debit',async t=>{
  const h=await harness();t.after(()=>h.close());const {registration,q}=await h.request();
@@ -87,4 +94,49 @@ test('suppressed/cancelled recipients and disabled mail do not send; course and 
  const h=await harness();t.after(()=>h.close());await h.request();await h.query("UPDATE certificate_requests SET email_due_at=now()-interval '1 minute'");h.suppress();await h.service.processEmailQueue();assert.equal(h.emails.length,0);assert.equal((await h.query('SELECT email_status FROM certificate_requests')).rows[0].email_status,'skipped');
  assert.equal((await h.service.list({search:'not found'})).summary.total,0);assert.equal((await h.service.list({course:crypto.randomUUID()})).summary.total,0);assert.equal((await h.service.list({search:'learner@'})).summary.total,1);
  const offline=await harness({mailEnabled:false});t.after(()=>offline.close());await offline.request();await offline.query("UPDATE certificate_requests SET email_due_at=now()-interval '1 minute'");await offline.service.processEmailQueue();assert.equal(offline.emails.length,0);assert.equal((await offline.query('SELECT email_status FROM certificate_requests')).rows[0].email_status,'pending');
+});
+
+
+test('free-card booking route preserves selected certificate, validates quote and queues the configured 199 AED fee',async t=>{
+ const h=await harness({freeRoutes:true});t.after(()=>h.close());
+ await h.query('UPDATE membership_plans SET price_usd=0,certificate_discount=0');await h.query('UPDATE courses SET certificate_price=199');
+ const listing=await h.call('/api/memberships/free-course?plan='+h.plan);
+ assert.equal(listing.data.certificateSelectionVersion,1);assert.deepEqual(listing.data.courses[0].certificate,{mode:'optional',name:'LOCAL CERTIFICATE',price:199});
+ const body={planId:h.plan,courseId:h.course,code:h.input.code,email:h.input.email,shareConsent:true,certificateRequested:true,expectedUnits:2,expectedCertificateFee:199};
+ assert.equal((await h.call('/api/memberships/free-course/register',{body:{...body,certificateRequested:'yes'}})).status,400);
+ assert.equal((await h.call('/api/memberships/free-course/register',{body:{...body,expectedCertificateFee:1}})).status,409);
+ assert.equal((await h.query('SELECT count(*)::int AS n FROM registrations')).rows[0].n,0);
+ const saved=await h.call('/api/memberships/free-course/register',{body});assert.equal(saved.status,201);assert.equal(saved.data.certificateFee,199);assert.ok(saved.data.certificateRequestId);
+ assert.equal(h.registrationNotifications[0].total,199);assert.equal(h.registrationNotifications[0].certificateRequestId,saved.data.certificateRequestId);
+ await h.query("UPDATE certificate_requests SET email_due_at=now()-interval '1 minute'");await h.service.processEmailQueue();
+ assert.equal(h.emails.length,1);assert.match(h.emails[0].text,/199 د.إ/);assert.doesNotMatch(h.emails[0].text,/واتساب/);
+ assert.equal((await h.call('/api/memberships/free-course/register',{body})).status,409);assert.equal(h.registrationNotifications.length,1);
+});
+test('free-card route without a certificate keeps zero fees and no certificate mail',async t=>{
+ const h=await harness({freeRoutes:true});t.after(()=>h.close());await h.query('UPDATE membership_plans SET price_usd=0');
+ const saved=await h.call('/api/memberships/free-course/register',{body:{planId:h.plan,courseId:h.course,code:h.input.code,email:h.input.email,shareConsent:true,certificateRequested:false}});
+ assert.equal(saved.status,201);assert.equal(saved.data.certificateFee,0);assert.equal(saved.data.certificateRequestId,null);await h.service.processEmailQueue();assert.equal(h.emails.length,0);
+});
+test('targeted certificate repair preserves booking/debit, queues once at reviewed price, and respects suppression',async t=>{
+ const h=await harness();t.after(()=>h.close());await h.query('UPDATE membership_plans SET certificate_discount=0');await h.query('UPDATE courses SET certificate_price=199');
+ const registration=await createCardRegistration(h.pool,{...h.input,certificateRequested:false});
+ const input={reference:registration.reference,email:h.input.email,courseId:h.course,expectedAmount:199};
+ for(const change of [{email:'wrong@example.invalid'},{courseId:crypto.randomUUID()},{expectedAmount:1}])await assert.rejects(repairRequestedCertificate(h.pool,{...input,...change}));
+ assert.equal((await h.query('SELECT certificate FROM registrations')).rows[0].certificate,'لا');
+ const first=await repairRequestedCertificate(h.pool,input);assert.equal(first.created,true);assert.equal(first.amount,199);
+ const replay=await repairRequestedCertificate(h.pool,input);assert.equal(replay.created,false);
+ for(const table of ['registrations','membership_redemptions','certificate_requests'])assert.equal((await h.query('SELECT count(*)::int AS n FROM '+table)).rows[0].n,1);
+ assert.equal((await h.query('SELECT units_remaining FROM membership_cards')).rows[0].units_remaining,registration.remaining);
+ await h.service.processEmailQueue();assert.equal(h.emails.length,1);assert.match(h.emails[0].text,/199 د.إ/);
+ await repairRequestedCertificate(h.pool,input);await h.service.processEmailQueue();assert.equal(h.emails.length,1);
+ await h.query("UPDATE certificate_requests SET state='paid'");assert.equal((await repairRequestedCertificate(h.pool,input)).state,'paid');
+ const suppressed=await harness();t.after(()=>suppressed.close());const other=await createCardRegistration(suppressed.pool,{...suppressed.input,certificateRequested:false});
+ await repairRequestedCertificate(suppressed.pool,{reference:other.reference,email:suppressed.input.email,courseId:suppressed.course,expectedAmount:90});suppressed.suppress();await suppressed.service.processEmailQueue();assert.equal(suppressed.emails.length,0);
+});
+test('registration confirmation removes certificate WhatsApp inquiry and explains the selected fee',async()=>{
+ const source=await fs.readFile(new URL('../server.js',import.meta.url),'utf8'),start=source.indexOf('function sendRegistrationEmails('),end=source.indexOf('\n}\n',start)+2;
+ const emails=[];const send=new Function('resendApiKey','escapeHtml','emailShell','sendEmailWithRetry','adminNotificationEmail',source.slice(start,end)+';return sendRegistrationEmails;')('LOCAL',v=>String(v),({content})=>content,async m=>emails.push(m),'local-admin@example.invalid');
+ const base={name:'LOCAL',email:'local@example.invalid',reference:'LOCAL',courseName:'LOCAL COURSE',status:'مسجل بالبطاقة',total:0,freeCourse:true};
+ send(base);await new Promise(r=>setImmediate(r));assert.doesNotMatch(emails[0].html,/الاستفسار|wa.me|واتساب/);
+ emails.length=0;send({...base,total:199,certificateRequestId:'LOCAL'});await new Promise(r=>setImmediate(r));assert.match(emails[0].html,/رسوم الشهادة/);assert.match(emails[0].html,/بريد إلكتروني/);assert.ok(emails[0].html.includes((199).toLocaleString('ar-AE')));assert.doesNotMatch(emails[0].html,/واتساب/);
 });

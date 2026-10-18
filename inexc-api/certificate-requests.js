@@ -40,6 +40,32 @@ export async function enqueueCertificateRequest(db,{registrationId,amount}){
  return row?.id||null;
 }
 
+// Operator-only repair of one explicitly requested certificate. Never books or debits a card.
+// The CLI must supply the registration, recipient, course and reviewed fee; it is not a public route.
+export async function repairRequestedCertificate(pool,{reference,email,courseId,expectedAmount}){
+ if(!clean(reference)||!clean(email)||!uuid(courseId)||!Number.isFinite(expectedAmount)||expectedAmount<0)throw fail('Incomplete certificate repair parameters.');
+ const db=await pool.connect();
+ try{
+  await db.query('BEGIN');
+  const row=(await db.query(`SELECT r.*,c.price AS course_price,c.certificate_mode,c.certificate_name,c.certificate_price,p.certificate_discount
+   FROM registrations r JOIN courses c ON c.id=r.course_id
+   JOIN membership_cards m ON m.id=r.membership_card_id JOIN membership_plans p ON p.id=m.plan_id
+   WHERE r.reference=$1 AND lower(r.email)=$2 AND r.course_id=$3 FOR UPDATE OF r`,[reference,email.trim().toLowerCase(),courseId])).rows[0];
+  if(!row||row.status!=='مسجل بالبطاقة'||row.payment_method!=='membership'||Number(row.course_price)!==0||row.certificate_mode!=='optional')throw fail('Registration does not match an eligible confirmed free-course booking.',409);
+  const existing=(await db.query('SELECT id,amount,state,email_status FROM certificate_requests WHERE registration_id=$1 FOR UPDATE',[row.id])).rows[0];
+  if(existing){await db.query('COMMIT');return {created:false,amount:existing.amount/100,state:existing.state,emailStatus:existing.email_status}}
+  if(row.certificate_fee_status==='paid'||Number(row.certificate_fee_amount)!==0||Number(row.total)!==0||row.certificate!=='لا')throw fail('Existing certificate or fee requires review; no data changed.',409);
+  const discount=Math.max(0,Math.min(100,Number(row.certificate_discount)||0));
+  const amount=Math.round(Number(row.certificate_price)*(100-discount))/100;
+  if(!Number.isFinite(amount)||amount<0||amount!==expectedAmount)throw fail('Certificate price differs from the reviewed amount; no data changed.',409);
+  await db.query("UPDATE registrations SET certificate=$1,total=$2,certificate_fee_amount=$2,certificate_fee_status=$3,updated_at=now() WHERE id=$4",[row.certificate_name,amount,amount>0?'awaiting_payment':'not_required',row.id]);
+  const id=await enqueueCertificateRequest(db,{registrationId:row.id,amount});
+  await db.query('UPDATE certificate_requests SET email_due_at=now() WHERE id=$1',[id]);
+  await db.query('COMMIT');
+  return {created:true,amount,state:'requested',emailStatus:'pending'};
+ }catch(error){await db.query('ROLLBACK');throw error}finally{db.release()}
+}
+
 export function certificateNames(input){
  const normalize=v=>String(v??'').trim().replace(/\s+/g,' ');
  const arabic=normalize(input.arabicName),english=normalize(input.englishName);
