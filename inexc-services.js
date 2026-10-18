@@ -3,7 +3,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function href(value,image=false){if(!value)return '';try{const u=new URL(value,image?new URL(base).origin:location.origin);if(u.username||u.password)return '';return (image?['https:']:['https:','mailto:','tel:']).includes(u.protocol)?u.href:''}catch{return ''}}
  async function get(){const response=await fetch(base+'/services',{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('تعذر تحميل الخدمات الآن.');const data=await response.json();if(data.version!==1||!Array.isArray(data.items))throw Error('تعذر تحميل الخدمات الآن.');return data.items.filter(r=>r.published===true)}
- if(!grid){get().then(items=>{document.querySelectorAll('[data-service-nav]').forEach(n=>n.hidden=!items.length)}).catch(()=>{});return}
+ if(!grid)return
  let records=[],lastFocus;const search=document.getElementById('serviceSearch'),category=document.getElementById('serviceCategory'),status=document.getElementById('serviceStatus'),dialog=document.getElementById('serviceDetails');
  const imageURL=r=>r.image_url||(r.link_image_source===r.action_url?r.link_image_url:'');
  const action=r=>{const url=href(r.action_url||('/service-request.html?service='+encodeURIComponent(r.id)));return url?`<a class="sc-request" href="${esc(url)}" rel="noopener noreferrer">${esc(r.action_label||'اطلب الخدمة')} ←</a>`:''};
