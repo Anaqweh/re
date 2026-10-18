@@ -14,7 +14,7 @@ stage="$(mktemp -d)"
 backup="$(mktemp -d "$api_dir/.site-sections-mail-backup-XXXXXXXX")"
 installed=0
 started=0
-files=(server.js seo-sitemap.js service-catalog.js message-mail.js message-studio.js membership-payments.js learner-service.js)
+files=(server.js seo-sitemap.js service-catalog.js message-mail.js message-studio.js message-subscriptions.js membership-payments.js learner-service.js)
 cleanup(){
   exit_status=$?
   trap - EXIT
