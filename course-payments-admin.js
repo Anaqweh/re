@@ -34,7 +34,7 @@
  function clearDraft(){window.INEXCAdminDrafts?.clear(panel)}
  async function update(input,button){
   if(!ready)return message('انتظر تحميل إعدادات الدفع أو حدّث الخادم أولًا.',true);button.disabled=true;const current=generation;
-  try{const result=await request('/admin/course-payments',{method:'PUT',body:JSON.stringify(input)});if(current!==generation)return;rowDrafts.clear();clearDraft();setData(result);message('تم حفظ طرق الدفع لـ '+result.updated+' دورة. تظهر الاختيارات الجديدة في صفحة التسجيل.');void window.loadCourses?.();}
+  try{const result=await request('/admin/course-payments',{method:'PUT',body:JSON.stringify(input)});if(current!==generation)return;rowDrafts.clear();clearDraft();setData(result);message('تم حفظ طرق الدفع لـ '+result.updated+' دورة. تظهر الاختيارات الجديدة في صفحة التسجيل.');void window.loadCourses?.({force:true});}
   catch(error){message(error.message,true)}finally{button.disabled=false}
  }
  $('enableStripeEverywhere').onclick=()=>update({scope:'all',action:'enable-stripe',applyToNew:true},$('enableStripeEverywhere'));
@@ -45,7 +45,7 @@
  $('paymentCourseRows').onchange=event=>{const row=event.target.closest('[data-payment-course]');if(!row)return;rowDrafts.set(row.dataset.paymentCourse,rowChoices(row));row.querySelector('[data-row-message]').textContent='تغييرات غير محفوظة'};
  $('paymentCourseRows').onclick=async event=>{
   const button=event.target.closest('[data-save-payment]');if(!button)return;const row=button.closest('tr'),out=row.querySelector('[data-row-message]');button.disabled=true;out.textContent='جارٍ الحفظ…';const current=generation;
-  try{const result=await request('/admin/course-payments',{method:'PUT',body:JSON.stringify({courseId:button.dataset.savePayment,...rowChoices(row)})});if(current!==generation)return;rowDrafts.delete(button.dataset.savePayment);data=result;out.dataset.error='false';out.textContent='تم الحفظ';void window.loadCourses?.();}catch(error){out.dataset.error='true';out.textContent=error.message;}finally{button.disabled=false}
+  try{const result=await request('/admin/course-payments',{method:'PUT',body:JSON.stringify({courseId:button.dataset.savePayment,...rowChoices(row)})});if(current!==generation)return;rowDrafts.delete(button.dataset.savePayment);data=result;out.dataset.error='false';out.textContent='تم الحفظ';void window.loadCourses?.({force:true});}catch(error){out.dataset.error='true';out.textContent=error.message;}finally{button.disabled=false}
  };
  $('checkStripeNow').onclick=async()=>{const button=$('checkStripeNow');button.disabled=true;status({message:'جارٍ إنشاء جلسة فحص وإغلاقها…'});const current=generation;try{const result=await request('/admin/course-payments/stripe-check',{method:'POST',body:'{}'});if(current===generation)status(result);}catch(error){if(current===generation)status({ready:false,message:error.message})}finally{button.disabled=false}};
  form.addEventListener('submit',event=>{if(ready)return;event.preventDefault();event.stopImmediatePropagation();$('courseError').textContent='إعدادات الدفع لم تُحمّل بعد. افتح «طرق الدفع» واضغط تحديث، أو حدّث خادم الموقع.';void load();},true);

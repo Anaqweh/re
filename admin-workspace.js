@@ -59,23 +59,47 @@
     snapshots[key] = {at:Date.now(), fields}; persist();
   }
   const restored = new WeakMap(), activeScopes = new WeakSet();
+  function captureField(field) {
+    const scope = scopeOf(field), key = scopeKey(scope), name = fieldKey(field);
+    if (!key || !name) return;
+    // Take one complete snapshot, then update only the field being edited.
+    if (!snapshots[key]?.fields) { captureScope(scope); return; }
+    activeScopes.add(scope);
+    const snapshot = snapshots[key]; snapshot.at = Date.now();
+    snapshot.fields[name] = field.type === 'checkbox' || field.type === 'radio' ? {checked:field.checked} :
+      field.multiple ? {values:[...field.selectedOptions].map(option => option.value)} : {value:field.value};
+    // A radio choice also clears the previous choice in its group.
+    if (field.type === 'radio' && field.checked && field.name) {
+      scope.querySelectorAll('input[type="radio"]').forEach(other => {
+        if (other.name === field.name && scopeOf(other) === scope && eligible(other)) snapshot.fields[fieldKey(other)] = {checked:other.checked};
+      });
+    }
+    persist();
+  }
+  function restoreField(field, scope, snapshot, force = false) {
+    if (!eligible(field)) return;
+    const data = snapshot.fields[fieldKey(field)]; if (!data) return;
+    if (!force && restored.get(field) === snapshot.at) return;
+    if ('checked' in data) field.checked = data.checked === true;
+    else if (data.values && field.multiple) [...field.options].forEach(option => { option.selected = data.values.includes(option.value); });
+    else if ('value' in data) {
+      if (field.tagName === 'SELECT' && ![...field.options].some(option => option.value === data.value)) return;
+      field.value = data.value;
+    }
+    restored.set(field, snapshot.at);
+    activeScopes.add(scope);
+  }
+  function restoreScopeState(scope) {
+    if (scope.id === 'courseForm' && q('courseId')?.value && q('courseTitle').textContent !== 'تعديل الدورة') q('courseTitle').textContent = 'تعديل الدورة';
+    if (scope.id === 'registrations' && q('courseWrap')) q('courseWrap').hidden = q('audience').value !== 'course';
+  }
   function restoreScope(scope, force = false) {
     const snapshot = snapshots[scopeKey(scope)]; if (!snapshot?.fields) return;
     activeScopes.add(scope);
     scope.querySelectorAll('input,textarea,select').forEach(field => {
-      if (!eligible(field) || scopeOf(field) !== scope) return;
-      const data = snapshot.fields[fieldKey(field)]; if (!data) return;
-      if (!force && restored.get(field) === snapshot.at) return;
-      if ('checked' in data) field.checked = data.checked === true;
-      else if (data.values && field.multiple) [...field.options].forEach(option => { option.selected = data.values.includes(option.value); });
-      else if ('value' in data) {
-        if (field.tagName === 'SELECT' && ![...field.options].some(option => option.value === data.value)) return;
-        field.value = data.value;
-      }
-      restored.set(field, snapshot.at);
+      if (scopeOf(field) === scope) restoreField(field, scope, snapshot, force);
     });
-    if (scope.id === 'courseForm' && q('courseId')?.value) { if (q('courseTitle').textContent !== 'تعديل الدورة') q('courseTitle').textContent = 'تعديل الدورة'; }
-    if (scope.id === 'registrations' && q('courseWrap')) q('courseWrap').hidden = q('audience').value !== 'course';
+    restoreScopeState(scope);
   }
   function clear(scope) { activeScopes.delete(scope); delete snapshots[scopeKey(scope)]; persist(); }
   function restore() {
@@ -151,10 +175,10 @@
     return response;
   };
   document.addEventListener('input', event => {
-    if (event.target.closest?.('#app') && eligible(event.target)) captureScope(scopeOf(event.target));
+    if (event.target.closest?.('#app') && eligible(event.target)) captureField(event.target);
   });
   document.addEventListener('change', event => {
-    if (event.target.closest?.('#app') && eligible(event.target)) captureScope(scopeOf(event.target));
+    if (event.target.closest?.('#app') && eligible(event.target)) captureField(event.target);
   });
   document.addEventListener('reset', event => { if (event.target.closest?.('#app')) clear(event.target); });
   document.addEventListener('click', event => {
@@ -176,10 +200,28 @@
       bar.insertBefore(note, q('logout'));
     }
     restore(); restoreNavigation();
-    let queued = false;
-    new MutationObserver(() => {
-      if (queued) return; queued = true;
-      queueMicrotask(() => { queued = false; restore(); restoreNavigation(); });
+    new MutationObserver(records => {
+      if (!read(TOKEN) || locked) return;
+      const fields = new Set(), scopes = new Set();
+      // Restore only new controls (or a select whose options just arrived).
+      // Labels, counters and navigation must not rescan every hidden form.
+      for (const record of records) {
+        const select = record.target.closest?.('select');
+        if (select) fields.add(select);
+        for (const node of record.addedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (node.matches('input,textarea,select')) fields.add(node);
+          node.querySelectorAll('input,textarea,select').forEach(field => fields.add(field));
+        }
+      }
+      for (const field of fields) {
+        if (!field.isConnected) continue;
+        const scope = scopeOf(field), snapshot = snapshots[scopeKey(scope)];
+        if (!snapshot?.fields) continue;
+        restoreField(field, scope, snapshot, field.tagName === 'SELECT'); scopes.add(scope);
+      }
+      scopes.forEach(restoreScopeState);
+      if (!navigationRestored) restoreNavigation();
     }).observe(q('app') || document.body, {childList:true,subtree:true});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
