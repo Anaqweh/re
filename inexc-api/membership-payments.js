@@ -75,7 +75,7 @@ export function createMembershipPayments({pool,env=process.env,client,notify=()=
    if(!plan||Number(plan.price_usd)!==0)throw fail('هذه الباقة غير متاحة للتسجيل المجاني.');
    const prior=(await db.query('SELECT * FROM membership_orders WHERE request_key=$1',[key])).rows[0];
    if(prior){if(prior.plan_id!==data.planId||prior.email!==data.email||prior.name!==data.name||prior.phone!==data.phone||prior.payment_method!=='free')throw fail('تغيّرت بيانات طلبك. أعد المحاولة.',409);await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
-   const existing=(await db.query("SELECT reference FROM membership_orders WHERE plan_id=$1 AND lower(email)=$2 AND payment_method='free' AND status='مفعلة' LIMIT 1",[plan.id,data.email])).rows[0];
+   const existing=(await db.query("SELECT o.reference FROM membership_orders o JOIN membership_cards c ON c.id=o.card_id WHERE o.plan_id=$1 AND lower(o.email)=$2 AND o.payment_method='free' AND o.status='مفعلة' AND c.deleted_at IS NULL LIMIT 1",[plan.id,data.email])).rows[0];
    if(existing){await db.query('COMMIT');return {ok:false,alreadyRegistered:true,message:'أنت مشترك مسبقًا في هذه الباقة. استخدم رقم بطاقتك لحجز دورة متاحة، أو اطلب إرسال الرقم مرة أخرى إلى بريدك.'}}
    await stock(db,plan);
    reference='CARD-'+crypto.randomBytes(9).toString('hex').toUpperCase();
