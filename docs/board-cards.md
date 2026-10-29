@@ -1,9 +1,11 @@
 # Course board cards
 
-Independent per-course offer settings: name, description, AED display price, HTTPS payment link, sample upload/URL, enabled status. The admin section lists active and archived courses; enabling an offer never republishes the course. Public page: `/board-card.html?course=COURSE_UUID`. Disabled offers return 404. Only authenticated administrators may list or save settings or upload samples.
+Admin: select any current or archived course, enter the AED price, upload the card sample, enable and save. The server creates a Stripe Payment Link automatically using the existing live Stripe credentials. Payment URL is read-only in the admin form. No customer messages are sent by saving.
 
-This feature stores a merchant-provided payment link. It does not create Stripe prices, charge a customer, synchronize payment receipts, or mark a registration paid. Operators must check that the linked checkout matches the displayed amount and AED currency. Offers remain disabled without a payment URL. Existing certificate requests and membership cards are unchanged. No new email jobs or payments are created.
+The server creates a fixed AED Price and Payment Link with course metadata. A price/name change creates a replacement and deactivates the previous link. Disabling a card deactivates its managed link. Repeated identical saves reuse the same link. Buyer details and payments are available in the Stripe dashboard; this feature does not mark certificate requests paid or issue cards automatically.
 
-Deploy the frontend from this repository and run `scripts/deploy-board-cards.sh FULL_COMMIT_SHA` on the existing API host. The installer patches the host's existing server and Dockerfile instead of replacing other deployed code. It backs up files and the running image, performs syntax and health checks, and restores the previous application on failure. The additive offer table remains if rollback is required. Scheduled workers continue normal existing behavior after restart.
+Requires STRIPE_CHECKOUT_ENABLED=1 and the existing live STRIPE_SECRET_KEY with write permissions for Products, Prices and Payment Links. No keys belong in the browser. Provider errors are sanitized. Live payments were not made in automated tests.
 
-Validation: `node --test test/board-card-offers.test.js test/board-card-ui.test.js test/certificate-requests.test.js test/course-payment-controls.test.js test/course-card-access.test.js` from `inexc-api`.
+Run scripts/deploy-board-cards.sh with the full commit SHA on the API host. It patches the current server, backs up files and restores the previous image on a failed health check. Version 2 of /api/board-cards/capabilities indicates automatic links support.
+
+Tests: node --test test/board-card-auto-payment.test.js test/board-card-offers.test.js test/board-card-ui.test.js

@@ -52,7 +52,7 @@ docker compose build api
 started=1
 docker compose up -d --no-build --no-deps api
 for attempt in {1..25}; do
- if curl -fsS --max-time 3 http://127.0.0.1:3000/api/board-cards/capabilities | python3 -c 'import json,sys;sys.exit(0 if json.load(sys.stdin).get("version")==1 else 1)' 2>/dev/null; then
+ if curl -fsS --max-time 3 http://127.0.0.1:3000/api/board-cards/capabilities | python3 -c 'import json,sys;sys.exit(0 if json.load(sys.stdin).get("version")==2 else 1)' 2>/dev/null; then
   changed=0
   echo "Course cards ready. Backup: $backup"
   echo 'No email or payment was initiated by this update. Existing scheduled workers retain their normal behavior.'

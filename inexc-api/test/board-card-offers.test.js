@@ -8,7 +8,7 @@ const input={name:'بطاقة البورد',description:'نموذج',price:149,p
 test('URL and money validation protects all public links',()=>{
  for(const url of ['javascript:alert(1)','http://example.com','https://name:secret@example.com','//example.com'])assert.throws(()=>safeCardUrl(url));
  for(const price of ['',null,-1,0,1.234,'NaN',Infinity])assert.throws(()=>cardOfferInput({...input,price}));
- assert.throws(()=>cardOfferInput({...input,paymentUrl:''}));
+ assert.equal(cardOfferInput({...input,paymentUrl:''}).enabled,true);
  assert.equal(cardOfferInput({...input,paymentUrl:'',enabled:false}).enabled,false);
  assert.equal(cardOfferInput(input).price,149);
 });
