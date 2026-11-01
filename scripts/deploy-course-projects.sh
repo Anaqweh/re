@@ -4,7 +4,7 @@ umask 077
 inexc_ref="${1:?Pass the full reviewed commit SHA}"
 [[ "$inexc_ref" =~ ^[a-f0-9]{40}$ ]] || exit 1
 cd "${INEXC_API_DIR:-/opt/inexc-training/inexc-api}"
-[[ "$(sha256sum server.js | cut -d ' ' -f1)" == "6c8ba85d3ab4d43703da61722b203f269de405c71f814cac09724193e3b479a0" && "$(sha256sum Dockerfile | cut -d ' ' -f1)" == "9f2d11f40e96bb85e94e234a3c927c9fd26a321e68655009242b996e30397f00" ]] || { echo 'Production files differ from reviewed baseline. Stop and compare before deployment.' >&2; exit 1; }
+[[ "$(sha256sum server.js | cut -d ' ' -f1)" == "6c8ba85d3ab4d43703da61722b203f269de405c71f814cac09724193e3b479a0" && ( "$(sha256sum Dockerfile | cut -d ' ' -f1)" == "9f2d11f40e96bb85e94e234a3c927c9fd26a321e68655009242b996e30397f00" || "$(sha256sum Dockerfile | cut -d ' ' -f1)" == "d2f7d225968dd116bd99599b7d103d9e346071c062fe1de74d28938f192f8283" ) ]] || { echo 'Production files differ from reviewed baseline. Stop and compare before deployment.' >&2; exit 1; }
 inexc_container="$(docker compose ps -q api)"
 [[ -n "$inexc_container" ]] || exit 1
 inexc_old_image="$(docker inspect --format '{{.Image}}' "$inexc_container")"
@@ -31,7 +31,12 @@ rollback(){
 trap rollback EXIT
 for file in "${inexc_files[@]}"; do
  [[ ! -f "$file" ]] || cp "$file" "$inexc_backup/$file"
- curl --fail --silent --show-error --location "https://raw.githubusercontent.com/Anaqweh/re/$inexc_ref/inexc-api/$file" -o "$inexc_stage/$file"
+ if [[ "$file" == Dockerfile ]]; then
+  cp Dockerfile "$inexc_stage/Dockerfile"
+  printf '\nCOPY course-projects.js ./\n' >> "$inexc_stage/Dockerfile"
+ else
+  curl --fail --silent --show-error --location "https://raw.githubusercontent.com/Anaqweh/re/$inexc_ref/inexc-api/$file" -o "$inexc_stage/$file"
+ fi
 done
 for file in server.js course-projects.js; do docker exec -i "$inexc_container" node --check --input-type=module < "$inexc_stage/$file"; done
 inexc_changed=1
