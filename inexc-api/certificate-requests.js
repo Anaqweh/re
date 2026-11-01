@@ -95,7 +95,7 @@ export function createCertificateRequests({pool,env=process.env,client,sendEmail
   const cancelled=row.registration_status==='ملغى',paid=row.state==='paid',noFee=row.amount===0;
   return {id:row.id,reference:row.reference,email:row.email||'',phone:row.phone||'',courseName:row.course_name,certificateName:row.certificate,amount:row.amount/100,currency:'AED',arabicName:row.arabic_name,englishName:row.english_name,namesConfirmed:!!row.names_confirmed_at,
    state:cancelled?'cancelled':row.state,paidAt:row.paid_at,canPay:!cancelled&&!paid&&!noFee&&enabled()&&row.payment_methods?.includes('stripe')===true,
-   namesLocked:!!attempt&&!['expired','failed'].includes(attempt.state)&&(!!attempt.stripe_session_id||new Date(attempt.expires_at).getTime()>now())||paid,processing:attempt?.state==='processing',paymentLink:!cancelled&&!paid&&enabled()&&row.payment_methods?.includes('stripe')&&attempt?.state==='open'?attempt.checkout_url:''};
+   needsNames:!cancelled&&paid&&!row.names_confirmed_at,namesLocked:paid?!!row.names_confirmed_at:!!attempt&&!['expired','failed'].includes(attempt.state)&&(!!attempt.stripe_session_id||new Date(attempt.expires_at).getTime()>now()),processing:attempt?.state==='processing',paymentLink:!cancelled&&!paid&&enabled()&&row.payment_methods?.includes('stripe')&&attempt?.state==='open'?attempt.checkout_url:''};
  }
  async function reconcile(session,failed=false){
   const meta=session.metadata||{};if(meta.source!==SOURCE||!uuid(meta.request_id)||!uuid(meta.attempt_id))return;
@@ -131,7 +131,11 @@ export function createCertificateRequests({pool,env=process.env,client,sendEmail
    await db.query('BEGIN');row=await find(input,db,true);
    if(row.registration_status==='ملغى')throw fail('أُلغي تسجيل الدورة. تواصل مع الإدارة قبل طلب الشهادة.',409);
    attempt=await latest(db,row.id);
-   if(row.state==='paid'){await db.query('COMMIT');return {state:'paid',paymentLink:''}}
+   if(row.state==='paid'){
+    // A generic Payment Link can settle before the trainee confirms certificate names.
+    if(!row.names_confirmed_at)await db.query('UPDATE certificate_requests SET arabic_name=$1,english_name=$2,names_confirmed_at=now(),updated_at=now() WHERE id=$3',[names.arabic,names.english,row.id]);
+    await db.query('COMMIT');return {state:'paid',paymentLink:'',needsNames:false}
+   }
    const active=attempt&&!['expired','failed'].includes(attempt.state)&&(attempt.stripe_session_id||new Date(attempt.expires_at).getTime()>now());
    if(active&&(row.arabic_name!==names.arabic||row.english_name!==names.english))throw fail('توجد صفحة دفع مفتوحة بهذه الأسماء. أكملها أو انتظر انتهاء صلاحيتها قبل تعديل الاسم.',409);
    row=(await db.query('UPDATE certificate_requests SET arabic_name=$1,english_name=$2,names_confirmed_at=now(),updated_at=now() WHERE id=$3 RETURNING *',[names.arabic,names.english,row.id])).rows[0];

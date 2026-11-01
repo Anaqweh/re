@@ -85,6 +85,15 @@ test('zero-price certificate collects names without Stripe; free course works wh
  const h=await harness();t.after(()=>h.close());await h.query('UPDATE courses SET certificate_price=0,payment_methods=ARRAY[]::text[]');const {credentials,names}=await h.request();
  assert.equal((await h.service.checkout({...credentials,...names})).state,'no_fee');assert.equal(h.requests.length,0);assert.equal((await h.service.list()).summary.no_fee,1);
 });
+test('externally paid certificate can confirm missing names once without another payment or email',async t=>{
+ const h=await harness();t.after(()=>h.close());const {q,credentials,names}=await h.request();
+ await h.query("UPDATE certificate_requests SET state='paid',payment_intent='pi_LOCAL_EXTERNAL',paid_at=now() WHERE id=$1",[q.id]);
+ const before=await h.service.status(credentials);assert.equal(before.needsNames,true);assert.equal(before.namesLocked,false);assert.equal(before.canPay,false);
+ const saved=await h.service.checkout({...credentials,...names});assert.equal(saved.state,'paid');assert.equal(saved.needsNames,false);
+ const after=await h.service.status(credentials);assert.equal(after.needsNames,false);assert.equal(after.namesLocked,true);assert.equal(after.arabicName,names.arabicName);assert.equal(after.englishName,names.englishName);
+ await h.service.checkout({...credentials,arabicName:'اسم آخر مختلف',englishName:'Another Different Name'});
+ assert.equal((await h.service.status(credentials)).englishName,names.englishName);assert.equal(h.sessions.size,0);assert.equal(h.requests.length,0);assert.equal(h.emails.length,0);
+});
 test('persisted mail queue waits three minutes, retries safely, respects suppression and sends only requested certificates',async t=>{
  const h=await harness();t.after(()=>h.close());const {q}=await h.request();await h.service.processEmailQueue();assert.equal(h.emails.length,0);
  await h.query("UPDATE certificate_requests SET email_due_at=now()-interval '1 minute'");h.failMail();await h.service.processEmailQueue();assert.equal((await h.query('SELECT email_status FROM certificate_requests')).rows[0].email_status,'pending');

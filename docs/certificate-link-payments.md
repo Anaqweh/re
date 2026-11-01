@@ -1,0 +1,19 @@
+# Certificate Payment Link reconciliation
+
+The existing certificate flow requires `source=inexc-certificates-v1`, a request ID and an attempt ID. Generic Payment Link sessions carry none of these identifiers. The signed webhook dispatcher previously acknowledged those sessions without updating certificate requests.
+
+The new handler accepts paid live Checkout events only for the explicitly reviewed link in `CERTIFICATE_LINKS`. It records a unique receipt by session and PaymentIntent. It matches an existing certificate request only when the course, unique normalized email, stored request fee, registration fee and AED currency agree. Payer names never overwrite trainee or certificate names. Cancelled bookings, duplicate emails, missing requests, changed fees, another payment or an active payment attempt remain in the review ledger. No enrolment, card debit, certificate issuance, Stripe write or email is performed.
+
+Webhook inputs reach this module only after the existing raw-body HMAC and live-mode checks. A signed `completed` event must be paid; delayed methods settle through `async_payment_succeeded`. Existing course and membership handlers are unchanged. Repeat deliveries cannot reassign a matched payment. A failed transaction rolls back both the receipt and payment status. Matched receipts retain the original status fields for operator audit.
+
+The operator CLI verifies every supplied Checkout session and expanded PaymentIntent/latest charge through Stripe before it writes any batch record. Refunded, disputed, unpaid, test or mismatched charges stop the batch. The CLI defaults to dry run; `--apply` records each result transactionally and prints each committed result immediately. Rerunning the same IDs is safe. If a database failure occurs after earlier commits, those commits remain and subsequent execution resumes safely. Permission failures identify the failed GET operation, request ID and any Stripe permission names without printing keys or raw provider responses. There is no offline or unverified fallback.
+
+Required server key reads for operator recovery: Checkout Sessions plus PaymentIntents and the expanded charge. The automatic webhook handler uses verified Stripe event snapshots and requires no additional GET permission. A snapshot receipt records the Checkout event timestamp; the recovery CLI records the successful charge timestamp. Later refunds or disputes require a separate financial review; this change does not implement refund/dispute lifecycle management.
+
+## Deployment
+
+Run `scripts/deploy-certificate-link-payments.sh FULL_REVIEWED_COMMIT_SHA [cs_live_...]` on the existing API host. It accepts only the reviewed baseline (or identical installed target), preserves the current Dockerfile while adding one COPY, backs up code and the image reference, builds the API service, then checks health and admin authentication. A deployment failure restores code/image; additive tables remain. The optional session IDs trigger verified reconciliation only after successful deployment. If that recovery fails, the working API update remains installed. Existing workers resume their prior schedules.
+
+Publish frontend after backend health and recovery output are checked. The existing “طالبو الشهادات” page gains a separate Payment Link ledger with matched/review counts, course filtering, pagination, Stripe links and logout cleanup. Ordinary certificate request statistics still count registrations, not unmatched payers. Requests paid before names were supplied allow one authenticated-by-private-token name confirmation without another Checkout session.
+
+Validation uses disposable PGlite databases, mocked Stripe objects and signed local webhook requests. No production fixtures, payer addresses or individual transaction IDs are included in the repository.
