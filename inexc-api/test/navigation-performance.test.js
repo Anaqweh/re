@@ -10,6 +10,7 @@ test('large registration lists stay bounded, retain selection across pages and d
  const rows=Array.from({length:1000},(_,i)=>({id:'r'+i,name:'متدرب '+i,email:'learner'+i+'@example.invalid',course_id:'c',course_name:'دورة',created_at:'2026-10-18',total:0,status:'مسجل بالبطاقة',payment_method:'membership'}));
  const requests=[];w.INEXC_REGISTRATION_ENDPOINT='https://local.invalid/api';w.sessionStorage.setItem('inexc_do_admin','LOCAL');w.INEXCAdminSession={valid:()=>true};w.INEXCAdminDrafts={restore(){},captureScope(){}};
  w.fetch=async url=>{requests.push(url);await tick();return {ok:true,json:async()=>url.endsWith('/registrations')?rows:[{id:'c',name:'دورة',price:0,active:true,certificate:{mode:'none'},payments:[]}]}};
+ w.eval(await read('admin-income.js'));
  w.eval(w.document.querySelector('script:not([src])').textContent);await tick();await tick();
  const q=s=>w.document.querySelector(s);assert.equal(q('#total').textContent,'1000');assert.equal(w.document.querySelectorAll('#table tbody tr').length,50);
  assert.equal(requests.filter(u=>u.endsWith('/courses')).length,1);
@@ -47,6 +48,31 @@ test('draft recovery ignores unrelated mutations, saves the last keystroke and r
 class LocalResources extends ResourceLoader {
  fetch(url){const parsed=new URL(url);if(parsed.origin!=='https://local.invalid'||!parsed.pathname.endsWith('.js'))return null;return fs.readFile(new URL('.'+parsed.pathname,root));}
 }
+test('actual admin script order restores each main section on refresh without writes or external requests',async t=>{
+ const html=await read('admin-portal.html');
+ async function page(storage={},hash=''){
+  const errors=[],requests=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+  const dom=new JSDOM(html,{url:'https://local.invalid/admin-portal.html?v=reload'+hash,resources:new LocalResources(),runScripts:'dangerously',virtualConsole:vc,beforeParse(w){
+   w.AbortSignal=AbortSignal;w.Response=Response;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:false});
+   for(const [key,value]of Object.entries({inexc_do_admin:'LOCAL',inexc_admin_deadline_v1:String(Date.now()+3600000),...storage}))w.sessionStorage.setItem(key,value);
+   w.fetch=async(url,options={})=>{requests.push({url:String(url),method:options.method||'GET'});return new Response(JSON.stringify([]),{status:200,headers:{'Content-Type':'application/json'}})};
+  }});
+  if(dom.window.document.readyState!=='complete')await new Promise(r=>dom.window.addEventListener('load',r,{once:true}));await tick();await tick();
+  return {w:dom.window,errors,requests};
+ }
+ const a=await page();t.after(()=>a.w.close());
+ for(const view of ['courses','certificate-requests','course-projects','memberships','services','registrations','overview']){
+  a.w.document.querySelector('[data-view="'+view+'"]').click();await tick();a.w.dispatchEvent(new a.w.Event('beforeunload'));
+  const b=await page(Object.fromEntries(Object.entries(a.w.sessionStorage)),a.w.location.hash);
+  try{
+   assert.equal(b.w.document.querySelector('.tabs button.active')?.dataset.view,view);
+   assert.equal(b.w.document.querySelector('#'+view).classList.contains('active'),true);
+   assert.equal(b.w.location.hash,'#'+view);assert.equal(b.w.location.search,'?v=reload');
+   assert.deepEqual(b.errors,[]);assert.ok(b.requests.every(r=>r.method==='GET'));
+  }finally{b.w.close()}
+ }
+ assert.deepEqual(a.errors,[]);assert.ok(a.requests.every(r=>r.method==='GET'));
+});
 for(const file of ['index.html','course/index.html','course.html','register/index.html','register.html'])test(file+': actual deferred script order loads courses and keeps public controls usable',async t=>{
  const errors=[],requests=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
  const course={id:'c',name:'دورة الاختبار',description:'وصف',price:0,axes:['محور'],outcomes:['نتيجة'],certificate:{mode:'optional',name:'شهادة',price:199},payments:[],membershipEnabled:true,active:true};
