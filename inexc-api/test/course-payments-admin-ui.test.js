@@ -18,6 +18,7 @@ async function fixture(t,{oldServer=false,issuerSupported=true}={}){
   else if(url.includes('/admin/courses/'))result={id:state.courses[0].id,shareUrl:'https://local.invalid/course/local'};
   return {ok:true,status:200,json:async()=>structuredClone(result)};
  };
+ w.eval(await read('admin-income.js'));
  const inline=[...w.document.querySelectorAll('script:not([src])')].map(s=>s.textContent);w.eval(inline[0]);w.eval(inline[1]);w.eval(await read('course-payments-admin.js'));await tick();await tick();
  const el=id=>w.document.getElementById(id),row=id=>w.document.querySelector('[data-payment-course="'+id+'"]');
  return {w,requests,state,el,row,lock(){valid=false;w.sessionStorage.removeItem('inexc_do_admin');w.dispatchEvent(new w.Event('inexc:locked'))}};

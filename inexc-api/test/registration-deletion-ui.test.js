@@ -16,6 +16,7 @@ test('delete is beside the registrant, confirms identity, uses the safe server a
   if(opt.method==='DELETE'){deleted=true;await tick();return {ok:true,json:async()=>({ok:true,deleted:1,restoredUnits:2})};}
   return {ok:true,json:async()=>url.endsWith('/admin/registrations')&&!deleted?[row]:[]};
  };
+ w.eval(await fs.readFile(new URL('../../admin-income.js',import.meta.url),'utf8'));
  w.eval([...w.document.querySelectorAll('script:not([src])')][0].textContent);await tick();await tick();
  const button=w.document.querySelector('.registration-person [data-delete-registration]');assert.ok(button);assert.equal(button.closest('td').querySelector('img'),null);
  await w.delReg(id);assert.equal(confirms,1);assert.equal(requests.some(r=>r.opt.method==='DELETE'),false);

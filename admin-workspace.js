@@ -11,7 +11,7 @@
   const remove = key => { try { sessionStorage.removeItem(key); } catch {} };
   const q = id => document.getElementById(id);
   let expiry = Number(read(DEADLINE)) || 0, timer, locked = false;
-  let snapshots = {}, navigationRestored = false;
+  let snapshots = {}, navigationRestored = false, navigationTarget = '';
   try { snapshots = JSON.parse(read(DRAFTS) || '{}'); } catch {}
   if (!snapshots || typeof snapshots !== 'object' || Array.isArray(snapshots)) snapshots = {};
   for (const [key, snapshot] of Object.entries(snapshots)) {
@@ -112,11 +112,25 @@
       if (activeScopes.has(scope)) captureScope(scope);
     });
   }
+  const hashView = () => /^[a-z][a-z0-9-]{0,63}$/.test(location.hash.slice(1)) ? location.hash.slice(1) : '';
+  function rememberView(view) {
+    write(VIEW, view);
+    // replaceState keeps navigation inside the admin page and preserves its query.
+    if (location.hash !== '#' + view) history.replaceState(history.state, '', location.pathname + location.search + '#' + view);
+  }
   function restoreNavigation() {
     if (navigationRestored || !read(TOKEN) || locked) return;
-    const view = read(VIEW); if (!view) { navigationRestored = true; return; }
-    const tab = [...document.querySelectorAll('.tabs button[data-view]')].find(button => button.dataset.view === view);
-    if (tab) { navigationRestored = true; tab.click(); }
+    const view = hashView() || read(VIEW); if (!view) { navigationRestored = true; return; }
+    const tab = [...document.querySelectorAll('#app .tabs button[data-view]')].find(button => button.dataset.view === view);
+    // Some sections mount later. Keep the target until its own handler exists.
+    if (tab && typeof tab.onclick === 'function') { navigationRestored = true; rememberView(view); tab.click(); }
+  }
+  function rememberActiveView() {
+    if (!navigationRestored || !read(TOKEN) || locked) return;
+    const tab = document.querySelector('#app .tabs button[data-view].active');
+    if (navigationTarget && tab?.dataset.view !== navigationTarget) return;
+    navigationTarget = '';
+    if (tab) rememberView(tab.dataset.view);
   }
   window.INEXCAdminDrafts = {capture, captureScope, restore, restoreScope, clear, restoreNavigation,
     get lastView() { return read(VIEW) || ''; }};
@@ -183,10 +197,17 @@
   document.addEventListener('reset', event => { if (event.target.closest?.('#app')) clear(event.target); });
   document.addEventListener('click', event => {
     const tab = event.target.closest?.('.tabs button[data-view]');
-    if (tab && read(TOKEN)) { write(VIEW, tab.dataset.view); navigationRestored = true; }
+    if (tab && valid()) { navigationTarget = tab.dataset.view; rememberView(navigationTarget); navigationRestored = true; }
   }, true);
-  window.addEventListener('pagehide', capture);
-  window.addEventListener('beforeunload', capture);
+  const saveWorkspace = () => { rememberActiveView(); capture(); };
+  window.addEventListener('pagehide', saveWorkspace);
+  window.addEventListener('beforeunload', saveWorkspace);
+  window.addEventListener('hashchange', () => {
+    if (!hashView()) return;
+    const active = document.querySelector('#app .tabs button[data-view].active');
+    if (active?.dataset.view === hashView()) { rememberView(hashView()); return; }
+    navigationRestored = false; restoreNavigation();
+  });
   window.addEventListener('focus', () => { if (read(TOKEN)) valid(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && read(TOKEN)) valid(); });
   window.addEventListener('inexc:unlocked', () => { restore(); restoreNavigation(); });
@@ -200,6 +221,11 @@
       bar.insertBefore(note, q('logout'));
     }
     restore(); restoreNavigation();
+    const tabs = document.querySelector('#app .tabs');
+    if (tabs) new MutationObserver(() => {
+      if (!navigationRestored) restoreNavigation();
+      else rememberActiveView();
+    }).observe(tabs, {childList:true,subtree:true,attributes:true,attributeFilter:['class']});
     new MutationObserver(records => {
       if (!read(TOKEN) || locked) return;
       const fields = new Set(), scopes = new Set();
