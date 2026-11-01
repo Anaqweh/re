@@ -9,6 +9,7 @@ COPY course-card-access.js service-catalog.js service-link-images.js seo-sitemap
 RUN mkdir -p /app/uploads
 COPY board-card-offers.js registration-policy.js ./
 COPY registration-deletion.js ai-licence-reset.js run-ai-licence-reset.js ./
+COPY course-projects.js ./
 EXPOSE 3000
 CMD ["npm", "start"]
 
