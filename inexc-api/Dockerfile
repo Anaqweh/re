@@ -17,3 +17,5 @@ CMD ["npm", "start"]
 COPY project-receipt.js ./
 
 COPY certificate-link-payments.js ./
+
+COPY admin-registration-income.js ./
