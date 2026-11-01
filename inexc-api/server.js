@@ -492,6 +492,9 @@ async function setupDatabase() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query("ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS course_ids UUID[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS source_course_id UUID REFERENCES courses(id) ON DELETE SET NULL");
+  await pool.query("ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS submission_key UUID, ADD COLUMN IF NOT EXISTS submitted_ip_hash TEXT NOT NULL DEFAULT ''");
+  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS testimonials_submission_key_unique ON testimonials(submission_key) WHERE submission_key IS NOT NULL");
+  await pool.query("CREATE INDEX IF NOT EXISTS testimonials_submission_rate ON testimonials(submitted_ip_hash,created_at) WHERE submission_key IS NOT NULL");
   await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_subscribers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT UNIQUE NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE, suppressed BOOLEAN NOT NULL DEFAULT FALSE, unsubscribe_token TEXT UNIQUE NOT NULL,
@@ -1175,6 +1178,39 @@ for (const [route,table] of [['/api/course-alerts/unsubscribe','course_alert_sub
   });
 }
 // Course placement is explicit: existing homepage reviews are never published to all courses.
+// Visitor opinions are always drafts. Public input cannot set visibility or verification.
+app.get('/api/course-feedback/:id', async (req,res,next)=>{
+  try {
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) return res.status(404).json({error:'رابط التقييم غير صالح.'});
+    const result=await pool.query('SELECT id,name FROM courses WHERE id=$1 AND active=true',[req.params.id]);
+    if(!result.rowCount)return res.status(404).json({error:'التقييم غير متاح لهذه الدورة حاليًا.'});
+    res.set('Cache-Control','no-store').json(result.rows[0]);
+  }catch(error){next(error)}
+});
+app.post('/api/course-feedback/:id', async (req,res,next)=>{
+  const b=req.body||{},uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if(!uuid.test(req.params.id)||typeof b.requestKey!=='string'||!uuid.test(b.requestKey))return res.status(400).json({error:'رابط أو طلب غير صالح. أعد تحميل الصفحة.'});
+  if(typeof b.name!=='string'||b.name.trim().length<2||b.name.length>120||typeof b.content!=='string'||b.content.trim().length<10||b.content.length>2000||!Number.isInteger(b.rating)||b.rating<1||b.rating>5||b.consent!==true||b.website)return res.status(400).json({error:'أكمل الاسم والرأي والتقييم والموافقة على النشر بعد المراجعة.'});
+  const name=b.name.trim(),content=b.content.trim(),ipHash=crypto.createHash('sha256').update(String(req.ip)).digest('hex');
+  let client;
+  try{
+    client=await pool.connect(); await client.query('BEGIN');
+    // Serialize this network's submissions and retries across all API instances.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['feedback:'+ipHash]);
+    const existing=await client.query('SELECT source_course_id,name,content,rating FROM testimonials WHERE submission_key=$1',[b.requestKey]);
+    if(existing.rowCount){
+      const old=existing.rows[0];await client.query('ROLLBACK');
+      if(old.source_course_id!==req.params.id||old.name!==name||old.content!==content||Number(old.rating)!==b.rating)return res.status(409).json({error:'هذا الطلب أُرسل سابقًا ببيانات مختلفة. أعد تحميل الصفحة.'});
+      return res.json({ok:true,status:'pending'});
+    }
+    const course=await client.query('SELECT id FROM courses WHERE id=$1 AND active=true',[req.params.id]);
+    if(!course.rowCount){await client.query('ROLLBACK');return res.status(404).json({error:'التقييم غير متاح لهذه الدورة حاليًا.'})}
+    const count=await client.query("SELECT count(*)::int AS total FROM testimonials WHERE submitted_ip_hash=$1 AND submission_key IS NOT NULL AND created_at>now()-interval '1 hour'",[ipHash]);
+    if(count.rows[0].total>=100){await client.query('ROLLBACK');return res.status(429).json({error:'وصل عدد الطلبات من هذه الشبكة إلى الحد المسموح. حاول لاحقًا.'})}
+    await client.query("INSERT INTO testimonials(name,content,rating,status,verified,source_course_id,course_ids,submission_key,submitted_ip_hash) VALUES($1,$2,$3,'draft',false,$4,ARRAY[$4::uuid],$5,$6)",[name,content,b.rating,req.params.id,b.requestKey,ipHash]);
+    await client.query('COMMIT');res.status(201).json({ok:true,status:'pending'});
+  }catch(error){if(client)await client.query('ROLLBACK').catch(()=>{});if(error.code==='23505')return res.status(409).json({error:'الطلب قيد المعالجة. أعد المحاولة بنفس البيانات.'});next(error)}finally{client?.release()}
+});
 app.get('/api/courses/:id/testimonials', async (req, res, next) => {
   try {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) return res.status(400).json({error:'معرّف الدورة غير صالح.'});
