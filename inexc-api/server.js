@@ -933,7 +933,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, freeCardCertificateVersion: 1, registrationDeletionVersion: 1, courseProjectsVersion: 2 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, freeCardCertificateVersion: 1, registrationDeletionVersion: 1, courseProjectsVersion: 3 }));
 const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
 app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','public, max-age=10').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
