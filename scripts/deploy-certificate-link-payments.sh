@@ -4,7 +4,7 @@ umask 077
 inexc_ref="${1:?Pass the full reviewed commit SHA, optionally followed by live Checkout session IDs}"
 [[ "$inexc_ref" =~ ^[a-f0-9]{40}$ ]] || exit 1
 shift
-for inexc_session in "$@"; do [[ "$inexc_session" =~ ^cs_live_[a-zA-Z0-9]+$ ]] || exit 1; done
+for inexc_session in "$@"; do [[ "$inexc_session" =~ ^cs_live_[a-zA-Z0-9]+$ || "$inexc_session" == --reviewed-match=* ]] || exit 1; done
 cd "${INEXC_API_DIR:-/opt/inexc-training/inexc-api}"
 inexc_stage="$(mktemp -d)"
 inexc_changed=0
@@ -30,9 +30,9 @@ done
 curl --fail --silent --show-error --location "https://raw.githubusercontent.com/Anaqweh/re/$inexc_ref/scripts/reconcile-certificate-link-payments.mjs" -o "$inexc_stage/reconcile.mjs"
 inexc_server_hash="$(sha256sum server.js | cut -d ' ' -f1)"
 inexc_certificate_hash="$(sha256sum certificate-requests.js | cut -d ' ' -f1)"
-[[ "$inexc_server_hash" == '0b20481c32af562258fd5b342528be5db8134b68ef1fcbdde0b2fb8d4d168c1c' || "$inexc_server_hash" == "$(sha256sum "$inexc_stage/server.js" | cut -d ' ' -f1)" ]] || { echo 'server.js differs from the reviewed baseline. Stop and compare.' >&2; exit 1; }
-[[ "$inexc_certificate_hash" == 'bb4eb17146e8733f49ea6942f89865b1ffe8cd2a4f000e46db78fc199b325959' || "$inexc_certificate_hash" == "$(sha256sum "$inexc_stage/certificate-requests.js" | cut -d ' ' -f1)" ]] || { echo 'certificate-requests.js differs from the reviewed baseline. Stop and compare.' >&2; exit 1; }
-if [[ -f certificate-link-payments.js ]]; then cmp -s certificate-link-payments.js "$inexc_stage/certificate-link-payments.js" || { echo 'Existing receipt module differs. Stop and compare.' >&2; exit 1; }; fi
+[[ "$inexc_server_hash" == '0b20481c32af562258fd5b342528be5db8134b68ef1fcbdde0b2fb8d4d168c1c' || "$inexc_server_hash" == 'eba910d054de1029ad52eccedd3db9725d23a60ecd3d6e8be740431f515c7514' || "$inexc_server_hash" == "$(sha256sum "$inexc_stage/server.js" | cut -d ' ' -f1)" ]] || { echo 'server.js differs from the reviewed baseline. Stop and compare.' >&2; exit 1; }
+[[ "$inexc_certificate_hash" == 'bb4eb17146e8733f49ea6942f89865b1ffe8cd2a4f000e46db78fc199b325959' || "$inexc_certificate_hash" == 'a46ef58054aba151934a2b944a63a2db6d72b6067d2739c1b720546f3bae2f55' || "$inexc_certificate_hash" == "$(sha256sum "$inexc_stage/certificate-requests.js" | cut -d ' ' -f1)" ]] || { echo 'certificate-requests.js differs from the reviewed baseline. Stop and compare.' >&2; exit 1; }
+if [[ -f certificate-link-payments.js ]]; then [[ "$(sha256sum certificate-link-payments.js | cut -d ' ' -f1)" == '8accb1ee866cb214bd91cba5ae4c8c9c770a0b3dd97665111fad28119479c631' ]] || cmp -s certificate-link-payments.js "$inexc_stage/certificate-link-payments.js" || { echo 'Existing receipt module differs. Stop and compare.' >&2; exit 1; }; fi
 cp Dockerfile "$inexc_stage/Dockerfile"
 if ! grep -Fxq 'COPY certificate-link-payments.js ./' "$inexc_stage/Dockerfile"; then printf '\nCOPY certificate-link-payments.js ./\n' >> "$inexc_stage/Dockerfile"; fi
 inexc_container="$(docker compose ps -q api)"
@@ -54,7 +54,7 @@ for attempt in {1..20}; do
 import json,sys
 try:
  with open(sys.argv[1]) as f: data=json.load(f)
- sys.exit(0 if data.get('certificateLinkPaymentsVersion')==1 and data.get('courseProjectsVersion')==3 else 1)
+ sys.exit(0 if data.get('certificateLinkPaymentsVersion')==2 and data.get('courseProjectsVersion')==3 else 1)
 except (OSError,ValueError,AttributeError): sys.exit(1)
 PYCHECK
  then

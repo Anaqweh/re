@@ -1,0 +1,31 @@
+{
+  "id": "plink_1UW0woRqVRsTIqOYvKWWzuE7",
+  "custom_fields": [
+    {
+      "key": "inexcregistrationreference",
+      "label": {"type": "custom", "custom": "رقم تسجيل الدورة من رسالة التأكيد (INX-...)"},
+      "type": "text",
+      "optional": false,
+      "text": {"minimum_length": 18, "maximum_length": 35}
+    },
+    {
+      "key": "inexcarabicname",
+      "label": {"type": "custom", "custom": "اسم صاحب الشهادة الثلاثي باللغة العربية"},
+      "type": "text",
+      "optional": false,
+      "text": {"minimum_length": 7, "maximum_length": 180}
+    },
+    {
+      "key": "inexcenglishname",
+      "label": {"type": "custom", "custom": "اسم صاحب الشهادة الكامل باللغة الإنجليزية"},
+      "type": "text",
+      "optional": false,
+      "text": {"minimum_length": 3, "maximum_length": 180}
+    }
+  ],
+  "custom_text": {
+    "submit": {
+      "message": "انسخ رقم تسجيل الدورة الذي يبدأ بـ INX من رسالة تأكيد تسجيلك أو من صفحة دوراتي وشهاداتي. اكتب اسم صاحب الشهادة كما سيظهر عليها. إذا سبق لك سداد رسوم الشهادة، تواصل مع الإدارة قبل الدفع مرة أخرى."
+    }
+  }
+}
