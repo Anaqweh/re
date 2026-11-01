@@ -13,3 +13,5 @@ COPY course-projects.js ./
 EXPOSE 3000
 CMD ["npm", "start"]
 
+
+COPY project-receipt.js ./
