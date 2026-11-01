@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import crypto from 'node:crypto';import {PGlite} from '@electric-sql/pglite';import {setupCourseProjects,installCourseProjects} from '../course-projects.js';
+import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import crypto from 'node:crypto';import {PGlite} from '@electric-sql/pglite';import {setupCourseProjects,installCourseProjects,projectWindow} from '../course-projects.js';
 const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 test('private project portal restricts materials and submissions, preserves retries and revokes links',async()=>{
  const db=new PGlite(),dir=await fs.mkdtemp(path.join(os.tmpdir(),'inexc-projects-'));let server;
@@ -15,6 +15,23 @@ test('private project portal restricts materials and submissions, preserves retr
  const dl=await get('/api/course-projects/'+key+'/materials/'+mid);assert.equal(dl.status,200);assert.match(dl.headers.get('content-disposition'),/attachment/);assert.match(dl.headers.get('content-type'),/application\/octet-stream/);
  const admin=await (await get('/api/admin/course-projects/'+id,true)).json();assert.equal(admin.submissions.length,1);assert.equal(admin.submissions[0].name,'Trainee');assert.equal((await get('/api/admin/course-projects/'+id+'/submission/'+sid)).status,401);
  const stored=(await db.query('SELECT stored_name FROM course_project_files WHERE id=$1',[sid])).rows[0].stored_name;assert.equal((await get('/uploads/trainee-private/projects/'+stored)).status,404);
+ const setDates=async dates=>fetch(base+'/api/admin/course-projects/'+id,{method:'PUT',headers:{Authorization:'Bearer test-admin','Content-Type':'application/json'},body:JSON.stringify({title:'Project',instructions:'Instructions',enabled:true,...dates})});
+ assert.equal((await setDates({opensAt:'2099-01-01T09:00:00+04:00',closesAt:'2099-01-02T18:00:00+04:00'})).status,200);
+ assert.equal((await (await get('/api/course-projects/'+key)).json()).submissionStatus,'upcoming');
+ const newId=crypto.randomUUID();assert.equal((await send('/api/course-projects/'+key+'/submissions',newId)).status,409);
+ assert.equal((await get('/api/course-projects/'+key+'/materials/'+mid)).status,200);
+ assert.equal((await setDates({opensAt:'2020-01-01T09:00:00+04:00',closesAt:'2020-01-02T18:00:00+04:00'})).status,200);
+ assert.equal((await (await get('/api/course-projects/'+key)).json()).submissionStatus,'closed');
+ assert.equal((await send('/api/course-projects/'+key+'/submissions',newId)).status,409);
+ // An accepted request can be acknowledged again after closing, without creating a second submission.
+ assert.equal((await send('/api/course-projects/'+key+'/submissions',sid)).status,200);
+ assert.equal((await send('/api/admin/course-projects/'+id+'/materials',mid,true)).status,200);
+ assert.equal((await setDates({})).status,200);assert.equal((await (await get('/api/course-projects/'+key)).json()).submissionStatus,'closed');
+ assert.equal((await setDates({opensAt:'2099-01-02T00:00:00Z',closesAt:'2099-01-01T00:00:00Z'})).status,400);
+ assert.equal((await setDates({opensAt:'not-a-date',closesAt:null})).status,400);
+ assert.equal((await setDates({opensAt:'2020-01-01T09:00:00+04:00',closesAt:'2099-01-02T18:00:00+04:00'})).status,200);
+ assert.equal((await (await get('/api/course-projects/'+key)).json()).submissionStatus,'open');
+ assert.equal((await setDates({opensAt:null,closesAt:null})).status,200);assert.equal((await (await get('/api/admin/course-projects/'+id,true)).json()).portal.closesAt,null);
  await fetch(base+'/api/admin/course-projects/'+id+'/rotate',{method:'POST',headers:{Authorization:'Bearer test-admin'}});assert.equal((await get('/api/course-projects/'+key)).status,404);
  assert.equal((await db.query('SELECT count(*)::int AS n FROM course_project_files')).rows[0].n,2);
  assert.equal((await db.query('SELECT count(*)::int AS n FROM course_project_receipts')).rows[0].n,1);
@@ -23,3 +40,5 @@ test('private project portal restricts materials and submissions, preserves retr
  assert.equal((await db.query('SELECT status FROM course_project_receipts')).rows[0].status,'sent');await projectService.processEmailQueue();assert.equal(sent.length,2);
  }finally{if(server)await new Promise(r=>server.close(r));await db.close();await fs.rm(dir,{recursive:true,force:true})}
 });
+
+test('submission window includes opening instant and excludes closing instant',()=>{const portal={opens_at:'2026-11-02T05:00:00Z',closes_at:'2026-11-02T14:00:00Z'};assert.equal(projectWindow(portal,Date.parse(portal.opens_at)-1),'upcoming');assert.equal(projectWindow(portal,Date.parse(portal.opens_at)),'open');assert.equal(projectWindow(portal,Date.parse(portal.closes_at)-1),'open');assert.equal(projectWindow(portal,Date.parse(portal.closes_at)),'closed');});
