@@ -32,6 +32,15 @@ clicks replace the hash without leaving the page; programmatic section changes
 and refresh are also remembered. Login expiry remains 60 minutes and refresh
 does not extend it. Existing form-draft recovery is retained.
 
+Message Center also retains its internal page (reports, templates, contacts,
+settings and other panels), independently of whether a draft exists. Recovering
+unfinished writing restores the editor contents without forcing the compose
+panel open. Explicit New Subscribers navigation takes precedence over a stored
+panel; moving to another internal panel updates the active top-level tab. Stale
+or invalid panel preferences and compose preferences without a recoverable draft
+fall back to the overview. This follow-up is frontend-only; it does not require
+an API restart or change email delivery, scheduling or draft autosave behavior.
+
 Verification: disposable PGlite report fixtures (including live/test/mismatched
 and duplicate evidence), real income UI rendering, session/draft/navigation
 regressions, sidebar, existing registration deletion and payment-editor tests.

@@ -15,7 +15,7 @@ async function boot() {
       try{
         const response=await fetch(endpoint+'/admin/message-capabilities',{headers:{Authorization:'Bearer '+(sessionStorage.getItem('inexc_do_admin')||'')},signal:AbortSignal.timeout(12000)}),caps=await response.json();
         if(response.status===401 || !sessionStorage.getItem('inexc_do_admin'))return;
-        if(response.ok&&caps.studio>=2){const studio=await import(caps.studio>=5?'./message-studio-ui.js?v=20261018-lists3':caps.studio>=4?'./message-studio-v4-ui.js?v=20261015-blue4':caps.studio>=3?'./message-studio-v3-ui.js?v=20261015-studio3':'./message-studio-v2-ui.js?v=20261015-compat');openStudio=await studio.mountMessageStudio(button);await openStudio(view);}
+        if(response.ok&&caps.studio>=2){const studio=await import(caps.studio>=5?'./message-studio-ui.js?v=20261102-stay2':caps.studio>=4?'./message-studio-v4-ui.js?v=20261015-blue4':caps.studio>=3?'./message-studio-v3-ui.js?v=20261015-studio3':'./message-studio-v2-ui.js?v=20261015-compat');openStudio=await studio.mountMessageStudio(button);await openStudio(view);}
         else{button.remove();subscribers.remove();await import('./message-center-legacy.js?v=20261015-studio3');document.querySelector('[data-view="message-center"]')?.click();}
       }catch{if(!sessionStorage.getItem('inexc_do_admin'))return;button.remove();subscribers.remove();await import('./message-center-legacy.js?v=20261015-studio3');document.querySelector('[data-view="message-center"]')?.click();}
       finally{button.disabled=subscribers.disabled=false;loading=null;}
