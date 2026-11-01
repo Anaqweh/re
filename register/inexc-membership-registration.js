@@ -23,6 +23,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(!guideRequest){guideRequest=fetch(API+'/memberships/plans',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Plans unavailable');return r.json()}).then(data=>{if(!Array.isArray(data))throw Error('Invalid plans');guidePlans=data}).catch(()=>{guidePlans=null}).finally(()=>{const current=course();syncFreeCardGuide(current,el('requestType')?.value!=='institution'&&!!current&&Number(current.price)===0&&current.membershipEnabled!==false)})}
   const plan=guidePlans?.find(p=>p.active!==false&&Number(p.priceUsd)===0&&Number(p.remaining)>0&&(!Array.isArray(c.membershipPlanIds)||c.membershipPlanIds.includes(p.id)));
   el('freeCardGuideSteps').hidden=!plan;
+  el('freeCardGuideLink').hidden=!plan;
+  el('freeCardGuideNote').hidden=!plan;
   el('freeCardGuideLink').href=plan?'/cards/?book='+encodeURIComponent(plan.id):'/cards/';
   el('freeCardGuideAction').textContent=plan?'التسجيل في الباقة المجانية':'استعراض الباقات المتاحة';
   el('freeCardGuideIntro').textContent=plan?'احصل على بطاقتك المجانية أولًا، ثم أكمل تسجيلك في الدورة.':guidePlans===undefined?'جارٍ البحث عن الباقة المجانية المتاحة لهذه الدورة…':guidePlans===null?'افتح صفحة الباقات واختر الباقة المجانية إن كانت متاحة، ثم عد برقم بطاقتك لإكمال التسجيل.':'لا توجد باقة مجانية متاحة لهذه الدورة حاليًا. إذا كانت لديك بطاقة، أدخل رقمها أدناه للتحقق من صلاحيتها.';
@@ -55,7 +57,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(receiptNeeded&&typeof renderBankDetails==='function')renderBankDetails();
   el('bankBox').classList.toggle('show',receiptNeeded);receipt.required=receiptNeeded;
   el('total').textContent=quote?quote.cost+' وحدة من البطاقة'+(fee>0?' + '+fee+' د.إ رسوم الشهادة'+(quote.certificateDeferred?' تُسدد لاحقًا':''):''):'تحقق من الرصيد أولًا';
-  submit.textContent=busy?'جارٍ تأكيد التسجيل…':'تأكيد التسجيل بالبطاقة';
+  submit.textContent=busy?'جارٍ تأكيد التسجيل…':cardOnly?'تأكيد التسجيل المجاني':'تأكيد التسجيل بالبطاقة';
  }
  window.addEventListener('inexc:courses-ready',sync);
  const originalSummary=window.updateSummary;if(typeof originalSummary==='function')window.updateSummary=function(...args){const result=originalSummary.apply(this,args);sync();return result};

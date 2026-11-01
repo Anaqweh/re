@@ -23,9 +23,9 @@ test('each selected detail page displays that course and keeps its ID through bo
   Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async url=>{shared=url}}});
   w.eval(await read('inexc-course-page.js'));w.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
   assert.equal(w.document.querySelector('h1').textContent,course.name);
-  const links=[...w.document.querySelectorAll('a[href^="/register/"]')];assert.equal(links.length,2);
+  const links=[...w.document.querySelectorAll('a[href^="/register/"]')];assert.equal(links.length,3);
   for(const link of links)assert.equal(new URL(link.href).searchParams.get('course_id'),course.id);
-  w.document.querySelector('.share-button').click();await tick();
+  w.document.querySelector('button.share-button').click();await tick();
   if(course.shareUrl.includes('/catalog-'))assert.equal(new URL(shared).searchParams.get('id'),course.id);else assert.equal(shared,course.shareUrl);
   dom.window.close();
  }

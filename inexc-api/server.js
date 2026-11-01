@@ -491,6 +491,7 @@ async function setupDatabase() {
     verified BOOLEAN NOT NULL DEFAULT FALSE, status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','visible','hidden','featured')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query("ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS course_ids UUID[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS source_course_id UUID REFERENCES courses(id) ON DELETE SET NULL");
   await pool.query(`CREATE TABLE IF NOT EXISTS course_alert_subscribers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT UNIQUE NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE, suppressed BOOLEAN NOT NULL DEFAULT FALSE, unsubscribe_token TEXT UNIQUE NOT NULL,
@@ -1173,6 +1174,28 @@ for (const [route,table] of [['/api/course-alerts/unsubscribe','course_alert_sub
     }catch(error){await client.query('ROLLBACK');next(error)}finally{client.release()}
   });
 }
+// Course placement is explicit: existing homepage reviews are never published to all courses.
+app.get('/api/courses/:id/testimonials', async (req, res, next) => {
+  try {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) return res.status(400).json({error:'معرّف الدورة غير صالح.'});
+    const result = await pool.query(`SELECT t.id,t.name,t.content,t.source_course_id,c.name AS source_course_name
+      FROM testimonials t LEFT JOIN courses c ON c.id=t.source_course_id
+      WHERE $1::uuid=ANY(t.course_ids) AND t.status IN ('visible','featured')
+      AND EXISTS (SELECT 1 FROM courses WHERE id=$1 AND active=true)
+      ORDER BY (t.status='featured') DESC,t.created_at DESC`, [req.params.id]);
+    res.set('Cache-Control','public, max-age=20').json(result.rows.map(row=>({id:row.id,name:row.name,content:row.content,sourceCourseId:row.source_course_id,sourceCourseName:row.source_course_name||''})));
+  } catch(error) { next(error); }
+});
+async function testimonialPlacement(data) {
+  if (data.courseIds === undefined && data.sourceCourseId === undefined) return null;
+  if (!Array.isArray(data.courseIds) || data.courseIds.length>200 || data.courseIds.some(id=>typeof id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) || (data.sourceCourseId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.sourceCourseId))) {
+    throw Object.assign(new Error('اختر الدورات من القائمة.'),{status:400});
+  }
+  const ids=[...new Set([...data.courseIds,...(data.sourceCourseId?[data.sourceCourseId]:[])])];
+  const found=await pool.query('SELECT id FROM courses WHERE id=ANY($1::uuid[])',[ids]);
+  if(found.rowCount!==ids.length) throw Object.assign(new Error('إحدى الدورات لم تعد متاحة. حدّث القائمة.'),{status:400});
+  return {courseIds:[...new Set(data.courseIds)],sourceCourseId:data.sourceCourseId||null};
+}
 app.get('/api/testimonials', async (_req, res, next) => {
   try {
     const setting = await pool.query("SELECT value FROM app_settings WHERE key='testimonials_visible'");
@@ -1538,7 +1561,7 @@ app.delete('/api/admin/course-alerts/:id', auth, async (req, res, next) => {
 app.get('/api/admin/testimonials', auth, async (_req, res, next) => {
   try {
     const result = await pool.query('SELECT * FROM testimonials ORDER BY (status=\'featured\') DESC, created_at DESC');
-    res.json(result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true, status: row.status })));
+    res.json(result.rows.map(row => ({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating || 5), verified: row.verified === true, status: row.status, courseIds: row.course_ids || [], sourceCourseId: row.source_course_id || '' })));
   } catch (error) { next(error); }
 });
 app.post('/api/admin/testimonials', auth, async (req, res, next) => {
@@ -1546,7 +1569,8 @@ app.post('/api/admin/testimonials', auth, async (req, res, next) => {
     const data = req.body || {}; const status = ['draft','visible','hidden','featured'].includes(data.status) ? data.status : 'draft';
     if (!clean(data.name, 120) || !clean(data.content, 2000)) return res.status(400).json({ error: 'الاسم ومحتوى الرأي مطلوبان.' });
     const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 5)));
-    const result = await pool.query('INSERT INTO testimonials (name,content,rating,verified,status) VALUES ($1,$2,$3,$4,$5) RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status]);
+    const placement=await testimonialPlacement(data);
+    const result = await pool.query('INSERT INTO testimonials (name,content,rating,verified,status,course_ids,source_course_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status, placement?.courseIds||[], placement?.sourceCourseId||null]);
     const row = result.rows[0]; res.status(201).json({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating), verified: row.verified, status: row.status });
   } catch (error) { next(error); }
 });
@@ -1555,7 +1579,8 @@ app.put('/api/admin/testimonials/:id', auth, async (req, res, next) => {
     const data = req.body || {}; const status = ['draft','visible','hidden','featured'].includes(data.status) ? data.status : 'draft';
     if (!clean(data.name, 120) || !clean(data.content, 2000)) return res.status(400).json({ error: 'الاسم ومحتوى الرأي مطلوبان.' });
     const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 5)));
-    const result = await pool.query('UPDATE testimonials SET name=$1,content=$2,rating=$3,verified=$4,status=$5,updated_at=now() WHERE id=$6 RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status, req.params.id]);
+    const placement=await testimonialPlacement(data);
+    const result = await pool.query('UPDATE testimonials SET name=$1,content=$2,rating=$3,verified=$4,status=$5,course_ids=CASE WHEN $7 THEN $8::uuid[] ELSE course_ids END,source_course_id=CASE WHEN $7 THEN $9::uuid ELSE source_course_id END,updated_at=now() WHERE id=$6 RETURNING *', [clean(data.name,120), clean(data.content,2000), rating, data.verified === true, status, req.params.id, placement!==null, placement?.courseIds||[], placement?.sourceCourseId||null]);
     if (!result.rowCount) return res.status(404).json({ error: 'الرأي غير موجود.' });
     const row = result.rows[0]; res.json({ id: row.id, name: row.name, content: row.content, imageUrl: row.image_path || '', rating: Number(row.rating), verified: row.verified, status: row.status });
   } catch (error) { next(error); }
