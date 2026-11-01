@@ -11,9 +11,10 @@
   el('certEmailRow').hidden=typeof d.email!=='string';el('certPhoneRow').hidden=typeof d.phone!=='string';
   el('certEmail').textContent=d.email||'غير مسجل';el('certPhone').textContent=d.phone||'غير مسجل';
   el('certArabic').value=d.arabicName||'';el('certEnglish').value=d.englishName||'';el('certArabic').readOnly=el('certEnglish').readOnly=d.namesLocked;el('certNamesConsent').checked=!!d.namesConfirmed;
-  el('certContinue').textContent=d.amount===0?'تأكيد بيانات الشهادة':d.paymentLink?'استكمال الدفع الآمن':'المتابعة إلى الدفع الآمن';
-  el('certPaymentNote').textContent=d.amount===0?'لا يلزم دفع أي مبلغ لهذا الطلب.':'سيظهر مبلغ الشهادة قبل تأكيد الدفع.';
-  if(d.state==='paid'||d.state==='no_fee')return done(d.state==='paid');
+  el('certContinue').textContent=d.needsNames?'حفظ الاسم على الشهادة':d.amount===0?'تأكيد بيانات الشهادة':d.paymentLink?'استكمال الدفع الآمن':'المتابعة إلى الدفع الآمن';
+  el('certPaymentNote').textContent=d.needsNames?'رسوم الشهادة مدفوعة. أكمل الاسم فقط.':d.amount===0?'لا يلزم دفع أي مبلغ لهذا الطلب.':'سيظهر مبلغ الشهادة قبل تأكيد الدفع.';
+  if((d.state==='paid'&&!d.needsNames)||d.state==='no_fee')return done(d.state==='paid');
+  if(d.needsNames){el('certContinue').disabled=false;message('تم سداد رسوم الشهادة. يرجى تأكيد الاسم بالعربية والإنجليزية لإكمال بيانات طلبك.');return}
   el('certContinue').disabled=d.state==='cancelled'||d.processing||d.amount>0&&!d.canPay;
   if(d.state==='cancelled')message('تم إلغاء تسجيل الدورة. تواصل مع الإدارة لمراجعة طلب الشهادة.');
   else if(d.processing){message('عملية الدفع قيد التأكيد. لا تسدّد مرة أخرى؛ سنحدّث الحالة عند وصول التأكيد.');if(pollCount++<12)pollTimer=setTimeout(refresh,5000)}
@@ -23,9 +24,9 @@
  async function refresh(){try{render(await call('status'))}catch(e){message(e.message)}}
  el('certForm').addEventListener('submit',async e=>{
   e.preventDefault();if(busy||!record)return;if(!el('certForm').reportValidity())return;busy=true;el('certContinue').disabled=true;el('certFormError').textContent='';el('certForm').setAttribute('aria-busy','true');
-  try{const d=await call('checkout',{arabicName:el('certArabic').value,englishName:el('certEnglish').value});if(d.state==='paid'||d.state==='no_fee'){render({...record,state:d.state,namesConfirmed:true});return}if(d.paymentLink){const u=new URL(d.paymentLink);if(u.protocol!=='https:'||u.hostname!=='checkout.stripe.com')throw Error('تعذّر التحقق من رابط الدفع.');location.assign(u.href);return}await refresh()}
+  try{const d=await call('checkout',{arabicName:el('certArabic').value,englishName:el('certEnglish').value});if(d.state==='paid'||d.state==='no_fee'){render({...record,state:d.state,needsNames:false,namesConfirmed:true});return}if(d.paymentLink){const u=new URL(d.paymentLink);if(u.protocol!=='https:'||u.hostname!=='checkout.stripe.com')throw Error('تعذّر التحقق من رابط الدفع.');location.assign(u.href);return}await refresh()}
   catch(err){el('certFormError').textContent=err.message}
-  finally{busy=false;el('certForm').removeAttribute('aria-busy');if(!el('certForm').hidden)el('certContinue').disabled=record?.processing||record?.state==='cancelled'||record?.amount>0&&!record?.canPay}
+  finally{busy=false;el('certForm').removeAttribute('aria-busy');if(!el('certForm').hidden)el('certContinue').disabled=record?.processing||record?.state==='cancelled'||record?.amount>0&&!record?.canPay&&!record?.needsNames}
  });
  window.addEventListener('pagehide',()=>clearTimeout(pollTimer));
  if(!/^[a-f\d-]{36}$/i.test(credentials.request)||!/^[a-f\d]{64}$/.test(credentials.token))message('افتح الرابط الخاص الوارد في رسالة طلب الشهادة على بريدك الإلكتروني.');else refresh();

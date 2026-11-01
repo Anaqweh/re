@@ -1,3 +1,4 @@
+import {setupCertificateLinkPayments,createCertificateLinkPayments} from './certificate-link-payments.js';
 import {setupCourseProjects,installCourseProjects} from './course-projects.js';
 import {setupBoardCardOffers,installBoardCardOffers} from './board-card-offers.js';
 import {allowsRepeatRegistration} from './registration-policy.js';
@@ -62,7 +63,8 @@ app.use(cors({ origin(origin, callback) {
 }}));
 const membershipPayments=createMembershipPayments({pool,notify:sendMembershipActivationEmail});
 const certificateRequests=createCertificateRequests({pool,sendEmail,emailShell,mailEnabled:!!resendApiKey,mailAllowed:async email=>!(await blockedEmails(pool,[email])).has(email)});
-const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails,handleOtherCheckout:async event=>{await membershipPayments.handleWebhook(event);await certificateRequests.handleWebhook(event)}});
+const certificateLinkPayments=createCertificateLinkPayments({pool});
+const stripePayments=createStripePayments({pool,notify:sendRegistrationEmails,handleOtherCheckout:async event=>{await membershipPayments.handleWebhook(event);await certificateRequests.handleWebhook(event);await certificateLinkPayments.handleWebhook(event)}});
 stripePayments.installWebhook(app);
 app.post('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
   try {
@@ -124,6 +126,7 @@ app.post('/api/memberships/free-course/register',rejectSuppressedCourse);
 stripePayments.installRoutes(app);
 membershipPayments.install(app,auth);
 certificateRequests.install(app,auth);
+certificateLinkPayments.install(app,auth);
 app.use('/uploads/trainee-private', (_req,res)=>res.sendStatus(404));
 app.use('/uploads', (req,res,next)=>{
   res.set('X-Content-Type-Options','nosniff');
@@ -933,7 +936,7 @@ async function processCourseAlertQueue(options = {}) {
   } catch (error) { console.error('Course alert worker failed:', error.message); }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, freeCardCertificateVersion: 1, registrationDeletionVersion: 1, courseProjectsVersion: 3 }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'INEXC Training API', trainingPackageLabelsVersion: 1, courseCardAccessVersion: 1, messageStudioVersion: 5, subscriptionsVersion: 2, learnerVersion: 1, certificateRequestsVersion: 1, certificateLinkPaymentsVersion: 2, freeCardCertificateVersion: 1, registrationDeletionVersion: 1, courseProjectsVersion: 3 }));
 const defaultSiteSections={courses:true,packages:true,services:true,links:[]};
 app.get('/api/site-sections',async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','public, max-age=10').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
 app.get('/api/admin/site-sections',auth,async(_req,res,next)=>{try{const row=(await pool.query('SELECT value FROM site_section_settings WHERE id=1')).rows[0];res.set('Cache-Control','no-store').json(row?.value||defaultSiteSections)}catch(error){next(error)}});
@@ -1926,5 +1929,5 @@ const courseProjects=installCourseProjects({app,pool,auth,uploadDir,sendEmail,ma
 installBoardCardOffers({app,pool,auth,courseMediaUpload,apiOrigin:'https://api.inexctraining.com'});
 app.use((error, _req, res, _next) => { console.error(error); if(error.constraint==='membership_orders_verified_payment_unique')return res.status(409).json({error:'رقم عملية الدفع هذا مستخدم في طلب آخر. راجع العملية قبل إصدار الباقة.'}); const status=error instanceof multer.MulterError ? 400 : [400,401,403,404,409,429].includes(error.status) ? error.status : 500; res.status(status).json({ error: status===500 ? 'حدث خطأ في الخادم. حاول مرة أخرى لاحقًا.' : error.message || 'تعذر تنفيذ الطلب.' }); });
 
-setupDatabase().then(() => setupCourseProjects(pool)).then(() => setupBoardCardOffers(pool)).then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => setupRegistrationDeletion(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); void courseProjects.processEmailQueue(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); void courseProjects.processEmailQueue(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
+setupDatabase().then(() => setupCourseProjects(pool)).then(() => setupBoardCardOffers(pool)).then(() => setupServiceCatalog(pool)).then(() => setupLearnerService(pool)).then(() => setupCertificateLinkPayments(pool)).then(() => setupStripePayments(pool)).then(() => setupCoursePaymentControls(pool)).then(() => setupMembershipPayments(pool)).then(() => setupRegistrationDeletion(pool)).then(() => { app.listen(port, () => console.log(`INEXC API listening on ${port}`)); void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); void courseProjects.processEmailQueue(); void certificateLinkPayments.sync(); setInterval(() => { void processCourseAlertQueue(); void processScheduledMessageCampaigns(); void certificateRequests.processEmailQueue(); void courseProjects.processEmailQueue(); void certificateLinkPayments.sync(); }, 60 * 1000); }).catch(error => { console.error(error); process.exit(1); });
 
