@@ -1267,7 +1267,7 @@ function courseAxisGroups(axes) {
 }
 app.get('/:shareSlug', async (req, res, next) => {
   try {
-    if (!/^course-[a-z0-9]+$/.test(req.params.shareSlug)) return res.status(404).send('الصفحة غير موجودة.');
+    if (!/^(?:course-[a-z0-9]+|catalog-[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(req.params.shareSlug)) return res.status(404).send('الصفحة غير موجودة.');
     const result = await pool.query('SELECT * FROM courses WHERE share_slug=$1 AND active=true', [req.params.shareSlug]);
     if (!result.rowCount) return res.status(404).send('الدورة غير موجودة.');
     const course = publicCourse(result.rows[0]);
@@ -1289,7 +1289,7 @@ app.get('/:shareSlug', async (req, res, next) => {
 });
 app.get('/:shareSlug', async (req, res, next) => {
   try {
-    if (!/^course-[a-z0-9]+$/.test(req.params.shareSlug)) return res.status(404).send('الصفحة غير موجودة.');
+    if (!/^(?:course-[a-z0-9]+|catalog-[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(req.params.shareSlug)) return res.status(404).send('الصفحة غير موجودة.');
     const result = await pool.query('SELECT * FROM courses WHERE share_slug=$1 AND active=true', [req.params.shareSlug]);
     if (!result.rowCount) return res.status(404).send('الدورة غير موجودة.');
     const course = publicCourse(result.rows[0]);

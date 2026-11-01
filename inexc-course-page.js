@@ -55,10 +55,13 @@
       structured.id = 'courseStructuredData';
       structured.type = 'application/ld+json';
       structured.textContent = JSON.stringify({
-        '@context':'https://schema.org','@type':'Course',name:course.name,
+        '@context':'https://schema.org','@type':'Course','@id':canonical.href+'#course',name:course.name,
         description:String(course.description||'').replace(/[#*]/g,'').slice(0,1000),
         provider:{'@type':'Organization',name:'INEXC Training',url:'https://www.inexctraining.com/'},
-        url:canonical.href,inLanguage:'ar',...(course.imageUrl?{image:new URL(course.imageUrl,new URL(endpoint).origin).href}:{})
+        url:canonical.href,inLanguage:'ar',
+        ...(course.price !== null && course.price !== undefined && course.price !== '' && Number.isFinite(Number(course.price)) && Number(course.price) >= 0
+          ? {offers:{'@type':'Offer',url:canonical.href,price:Number(course.price),priceCurrency:'AED'}} : {}),
+        ...(course.imageUrl?{image:new URL(course.imageUrl,new URL(endpoint,location.href).origin).href}:{})
       }).replace(/</g,'\\u003c');
       if (!structured.isConnected) document.head.appendChild(structured);
       const apiOrigin = endpoint.replace(/\/api\/?$/, ''), image = course.imageUrl ? `${apiOrigin}${course.imageUrl}` : '/assets/inexc-logo-official-source.png', axes = groupAxes(course.axes), outcomes = course.outcomes || [];
@@ -105,7 +108,6 @@
           }
         }));
       }
-      const schema = { '@context':'https://schema.org', '@type':'Course', name:course.name, description:course.description, provider:{'@type':'Organization',name:'INEXC Training',url:'https://www.inexctraining.com'}, offers:{'@type':'Offer',price:course.price,priceCurrency:'AED',availability:'https://schema.org/InStock'} }; const node = document.createElement('script'); node.type = 'application/ld+json'; node.textContent = JSON.stringify(schema); document.head.appendChild(node);
     } catch (_) { root.innerHTML = '<p class="error" style="padding:25px">تعذر تحميل تفاصيل هذه الدورة حاليًا.</p>'; }
   });
 })();
